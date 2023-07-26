@@ -62,4 +62,9 @@ fn main() {
 
     drop(tx);
     write_certs.join().unwrap();
+
+    println!("Decided {decided:?}");
+    for (k, v) in stats.iter() {
+        println!("{k:?} {v:?}");
+    }
 }
