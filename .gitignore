@@ -7,3 +7,5 @@ Makefile.coq.conf
 *.d
 *.aux
 *.cache
+verify/*.ml
+verify/*.mli

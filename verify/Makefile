@@ -1,6 +1,6 @@
 COQMFFLAGS := -Q . BusyCoq
 
-ALLVFILES := LibTactics.v TM.v
+ALLVFILES := LibTactics.v TM.v Cyclers.v Compute.v
 
 build: Makefile.coq
 	$(MAKE) -f Makefile.coq

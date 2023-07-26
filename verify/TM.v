@@ -1,7 +1,7 @@
 (** * TM: Definition of Turing Machines *)
 
 Set Warnings "-notation-overriden,-parsing,-deprecated-hint-without-locality".
-From Coq Require Import Lists.Streams.
+From Coq Require Export Lists.Streams.
 From BusyCoq Require Import LibTactics.
 Set Default Goal Selector "!".
 
@@ -25,8 +25,8 @@ Definition tape (S : Type) : Type := Stream S * S * Stream S.
 
 (** We define a notation for tapes, evocative of a turing machine's head
     hovering over a particular symbol. **)
-Notation "l [ [ s ] ] r" := (l, s, r)
-  (at level 30, format "l  [ [ s ] ]  r").
+Notation "l {{ s }} r" := (l, s, r)
+  (at level 30).
 
 (** Moreover the streams could use some more natural notation, to have
     the element at the start of the stream be on the right side, as necessary. *)
@@ -34,17 +34,17 @@ Notation "s >> r" := (Cons s r) (at level 25, right associativity).
 Notation "l << s" := (Cons s l) (at level 24, left associativity).
 
 Local Example tape_ex : tape nat :=
-  const 0 << 1 << 2 [[3]] 4 >> 5 >> const 6.
+  const 0 << 1 << 2 {{3}} 4 >> 5 >> const 6.
 
 (** Helper functions for moving the tape head: *)
 Definition move_left {S} (t : tape S) : tape S :=
   match t with
-  | l << s' [[s]] r => l [[s']] s >> r
+  | l << s' {{s}} r => l {{s'}} s >> r
   end.
 
 Definition move_right {S} (t : tape S) : tape S :=
   match t with
-  | l [[s]] s' >> r => l << s [[s']] r
+  | l {{s}} s' >> r => l << s {{s'}} r
   end.
 
 (** Notation for the configuration of a machine. Note that the position
@@ -58,10 +58,10 @@ Reserved Notation "c -[ tm ]-> c'" (at level 40).
 Inductive step {Q Sym} (tm : TM Q Sym) : Q * tape Sym -> Q * tape Sym -> Prop :=
   | step_left q q' s s' l r :
     tm (q, s) = Some (s', L, q') ->
-    q; l [[s]] r -[ tm ]-> q'; (move_left (l [[s']] r))
+    q; l {{s}} r -[ tm ]-> q'; (move_left (l {{s'}} r))
   | step_right q q' s s' l r :
     tm (q, s) = Some (s', R, q') ->
-    q; l [[s]] r -[ tm ]-> q'; (move_right (l [[s']] r))
+    q; l {{s}} r -[ tm ]-> q'; (move_right (l {{s'}} r))
 
   where "c -[ tm ]-> c'" := (step tm c c').
 
@@ -87,15 +87,18 @@ Section TMs.
 (** A halting configuration is one for which [tm (q, s)] returns [None]. *)
 Definition halting (tm : TM) (c : Q * tape) : Prop :=
   match c with
-  | (q, l [[s]] r) => tm (q, s) = None
+  | (q, l {{s}} r) => tm (q, s) = None
   end.
 
 (** The initial configuration for an initial state [q0] and blank symbol [s0] *)
-Definition c0 q0 s0 : Q * tape := q0; const s0 [[s0]] const s0.
+Definition c0 q0 s0 : Q * tape := q0; const s0 {{s0}} const s0.
 
 (** A Turing machine halts if it eventually reaches a halting configuration. *)
-Definition halts (tm : TM) (c0 : Q * tape) := exists n ch,
-  c0 -[ tm ]->* n / ch /\ halting tm ch.
+Definition halts_in (tm : TM) (c0 : Q * tape) (n : nat) :=
+  exists ch, c0 -[ tm ]->* n / ch /\ halting tm ch.
+
+Definition halts (tm : TM) (c0 : Q * tape) :=
+  exists n, halts_in tm c0 n.
 
 (** We prove that this corresponds with [step]. *)
 Lemma halting_no_step :
