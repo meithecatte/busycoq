@@ -12,7 +12,7 @@ use std::thread;
 use std::time::Duration;
 use rayon::prelude::*;
 use enum_map::enum_map;
-use indicatif::ProgressBar;
+use indicatif::{ProgressBar, ProgressStyle};
 
 fn main() {
     let mut db = Database::open("../seed.dat").unwrap();
@@ -31,9 +31,15 @@ fn main() {
 
     thread::scope(|s| {
         let progress_thread = s.spawn(|| {
-            let bar = ProgressBar::new(num as u64);
+            let style = ProgressStyle::with_template(
+                "[{elapsed_precise}] {bar:30.cyan} {pos:>8}/{pos:8} {msg}"
+            ).unwrap();
+            let bar = ProgressBar::new(num as u64)
+                .with_style(style);
             loop {
                 let processed = processed.load(Ordering::Relaxed);
+                let decided = decided.load(Ordering::Relaxed);
+                bar.set_message(format!("decided {decided}"));
                 bar.set_position(processed as u64);
                 if processed == num {
                     return;
