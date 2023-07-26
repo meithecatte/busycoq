@@ -1,6 +1,11 @@
 (** * LibTactics: A Collection of Handy General-Purpose Tactics *)
 
-(* Chapter maintained by Arthur Charguéraud *)
+(** This file originates in "Programming Language Foundations", a textbook
+    from the "Software Foundations" series. The original author of this file
+    seems to be Arthur Charguéraud. The textbook in question is MIT-licensed. *)
+
+(** Some changes have been introduced for the purposes of BusyCoq:
+    - the [>>] notation has been marked [Local]. *)
 
 (** This file contains a set of tactics that extends the set of builtin
     tactics provided with the standard distribution of Coq. It intends
