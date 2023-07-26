@@ -1,7 +1,9 @@
 [package]
-name = "database"
+name = "decide"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
 byteorder = "1.4.3"
+enum-map = "2.6.0"
+rayon = "1.7.0"

@@ -2,6 +2,9 @@ use std::array;
 use std::fmt;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct OutOfSpace;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Dir {
     L,
     R,
@@ -19,8 +22,15 @@ pub enum Command {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct TM {
-    index: u32,
+    pub index: u32,
     code: [[Command; 2]; 5],
+}
+
+#[derive(Clone, PartialEq, Eq)]
+pub struct Configuration {
+    pub state: u8,
+    pos: usize,
+    tape: Box<[bool]>,
 }
 
 impl TM {
@@ -43,6 +53,58 @@ impl TM {
             .map(|[a, b]| format!("{a}{b}"))
             .collect::<Vec<_>>()
             .join("_")
+    }
+}
+
+impl Configuration {
+    pub fn new(size: usize) -> Self {
+        Self {
+            state: 0,
+            pos: size / 2,
+            tape: vec![false; size].into_boxed_slice(),
+        }
+    }
+
+    pub fn head_symbol(&self) -> bool {
+        self.tape[self.pos]
+    }
+
+    pub fn write_at_head(&mut self, symbol: bool) {
+        self.tape[self.pos] = symbol;
+    }
+
+    pub fn move_head(&mut self, dir: Dir) -> Result<(), OutOfSpace> {
+        match dir {
+            Dir::L => {
+                if self.pos == 0 {
+                    Err(OutOfSpace)
+                } else {
+                    self.pos -= 1;
+                    Ok(())
+                }
+            }
+            Dir::R => {
+                if self.pos + 1 == self.tape.len() {
+                    Err(OutOfSpace)
+                } else {
+                    self.pos += 1;
+                    Ok(())
+                }
+            }
+        }
+    }
+
+    pub fn step(&mut self, tm: &TM) -> Result<bool, OutOfSpace> {
+        let cmd = tm.code[self.state as usize][self.head_symbol() as usize];
+        match cmd {
+            Command::Halt => Ok(false),
+            Command::Step { write, dir, next } => {
+                self.write_at_head(write);
+                self.move_head(dir)?;
+                self.state = next;
+                Ok(true)
+            }
+        }
     }
 }
 

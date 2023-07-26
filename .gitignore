@@ -10,4 +10,4 @@ Makefile.coq.conf
 **/extract/*.ml
 **/extract/*.mli
 **/target
-seed.dat
+*.dat
