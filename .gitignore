@@ -9,3 +9,5 @@ Makefile.coq.conf
 *.cache
 **/extract/*.ml
 **/extract/*.mli
+**/target
+seed.dat
