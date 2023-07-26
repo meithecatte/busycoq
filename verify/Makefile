@@ -7,7 +7,7 @@ build: Makefile.coq
 
 clean::
 	if [ -e Makefile.coq ]; then $(MAKE) -f Makefile.coq cleanall; fi
-	$(RM) $(wildcard Makefile.coq Makefile.coq.conf) 
+	$(RM) $(wildcard Makefile.coq Makefile.coq.conf) extract/*.ml extract/*.mli
 
 Makefile.coq:
 	coq_makefile $(COQMFFLAGS) -o Makefile.coq $(ALLVFILES)
