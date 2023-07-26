@@ -30,7 +30,7 @@ pub struct TM {
 pub struct Configuration {
     pub state: u8,
     pos: usize,
-    tape: Box<[bool]>,
+    tape: Box<[u8]>,
 }
 
 impl TM {
@@ -61,16 +61,25 @@ impl Configuration {
         Self {
             state: 0,
             pos: size / 2,
-            tape: vec![false; size].into_boxed_slice(),
+            tape: vec![0; size / 8].into_boxed_slice(),
         }
     }
 
     pub fn head_symbol(&self) -> bool {
-        self.tape[self.pos]
+        let byte = self.pos / 8;
+        let bit = self.pos % 8;
+        self.tape[byte] & (1 << bit) != 0
     }
 
     pub fn write_at_head(&mut self, symbol: bool) {
-        self.tape[self.pos] = symbol;
+        let byte = self.pos / 8;
+        let bit = self.pos % 8;
+        let mask = 1 << bit;
+        if symbol {
+            self.tape[byte] |= mask;
+        } else {
+            self.tape[byte] &= !mask;
+        }
     }
 
     pub fn move_head(&mut self, dir: Dir) -> Result<(), OutOfSpace> {
@@ -84,7 +93,7 @@ impl Configuration {
                 }
             }
             Dir::R => {
-                if self.pos + 1 == self.tape.len() {
+                if self.pos + 1 == 8 * self.tape.len() {
                     Err(OutOfSpace)
                 } else {
                     self.pos += 1;
