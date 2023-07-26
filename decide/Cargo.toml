@@ -6,4 +6,5 @@ edition = "2021"
 [dependencies]
 byteorder = "1.4.3"
 enum-map = "2.6.0"
+indicatif = { version = "0.17.5", features = ["rayon"] }
 rayon = "1.7.0"

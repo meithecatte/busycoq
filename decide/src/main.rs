@@ -11,6 +11,7 @@ use std::sync::mpsc;
 use std::thread;
 use rayon::prelude::*;
 use enum_map::enum_map;
+use indicatif::ParallelProgressIterator;
 
 fn main() {
     let mut db = Database::open("../seed.dat").unwrap();
@@ -23,11 +24,13 @@ fn main() {
     });
 
     let stats = enum_map! { _ => AtomicU32::new(0) };
+    let decided = AtomicU32::new(0);
     let num = db.num_timelimit as usize;
 
-    db.iter().take(num).par_bridge().for_each(|tm| {
+    db.iter().take(num).par_bridge().progress_count(num as u64).for_each(|tm| {
         match decide_cyclers(&tm) {
             Ok(cert) => {
+                decided.fetch_add(1, Ordering::Relaxed);
                 tx.send((tm.index, cert.into())).unwrap()
             }
             Err(e) => {
