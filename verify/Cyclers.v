@@ -5,7 +5,9 @@ From Coq Require Import Bool.Bool.
 From Coq Require Import Arith.Arith.
 From Coq Require Import Lia.
 From Coq Require Import Lists.List. Import ListNotations.
-From Coq Require Extraction. Require Import ExtrOcamlBasic.
+From Coq Require Extraction.
+Require Import ExtrOcamlBasic.
+Require Import ExtrOcamlIntConv.
 From BusyCoq Require Import LibTactics.
 From BusyCoq Require Import TM.
 From BusyCoq Require Import Compute.
@@ -110,4 +112,4 @@ Qed.
 End TMs.
 
 Extraction Language OCaml.
-Extraction "extract/cyclers.ml" verify_cycler.
+Extraction "cyclers.ml" verify_cycler nat_of_int.

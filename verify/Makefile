@@ -2,12 +2,17 @@ COQMFFLAGS := -Q . BusyCoq
 
 ALLVFILES := LibTactics.v TM.v Cyclers.v Compute.v
 
+all: build verify
+
 build: Makefile.coq
 	$(MAKE) -f Makefile.coq
 
 clean::
 	if [ -e Makefile.coq ]; then $(MAKE) -f Makefile.coq cleanall; fi
-	$(RM) $(wildcard Makefile.coq Makefile.coq.conf) extract/*.ml extract/*.mli
+	$(RM) $(wildcard Makefile.coq Makefile.coq.conf) cyclers.ml cyclers.mli verify
+
+verify: cyclers.ml cyclers.mli main.ml
+	ocamlopt.opt -o $@ $^
 
 Makefile.coq:
 	coq_makefile $(COQMFFLAGS) -o Makefile.coq $(ALLVFILES)

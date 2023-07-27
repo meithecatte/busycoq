@@ -7,7 +7,12 @@ Makefile.coq.conf
 *.d
 *.aux
 *.cache
-**/extract/*.ml
-**/extract/*.mli
+*.ml
+*.mli
+!verify/main.ml
+*.o
+*.cmx
+*.cmi
 **/target
 *.dat
+verify/verify
