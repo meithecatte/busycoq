@@ -6,6 +6,7 @@ mod turing;
 use certificate::CertList;
 use cyclers::decide_cyclers;
 use database::Database;
+use std::collections::HashMap;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::mpsc;
 use std::thread;
@@ -19,8 +20,17 @@ fn main() {
     let mut certs = CertList::create("../certs.dat").unwrap();
     let (tx, rx) = mpsc::channel();
     let write_certs = thread::spawn(move || {
+        let mut staging = HashMap::new();
+        let mut next = 0;
         for (index, cert) in rx {
-            certs.write_entry(index, &cert).unwrap();
+            staging.insert(index, cert);
+            while let Some(cert) = staging.remove(&next) {
+                if let Some(cert) = cert {
+                    certs.write_entry(next, &cert).unwrap();
+                }
+
+                next += 1;
+            }
         }
     });
 
@@ -50,17 +60,19 @@ fn main() {
         });
 
         db.iter().take(num as usize).par_bridge().for_each(|tm| {
-            match decide_cyclers(&tm) {
+            let cert = match decide_cyclers(&tm) {
                 Ok(cert) => {
                     decided.fetch_add(1, Ordering::Relaxed);
-                    tx.send((tm.index, cert.into())).unwrap()
+                    Some(cert.into())
                 }
                 Err(e) => {
                     stats[e].fetch_add(1, Ordering::Relaxed);
+                    None
                 }
-            }
+            };
 
             processed.fetch_add(1, Ordering::Relaxed);
+            tx.send((tm.index, cert)).unwrap()
         });
 
         progress_thread.thread().unpark();
