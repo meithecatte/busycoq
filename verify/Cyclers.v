@@ -8,7 +8,7 @@ From Coq Require Import Lists.List. Import ListNotations.
 From Coq Require Extraction.
 Require Import ExtrOcamlBasic.
 Require Import ExtrOcamlIntConv.
-From BusyCoq Require Import LibTactics.
+From BusyCoq Require Import Helper.
 From BusyCoq Require Import TM.
 From BusyCoq Require Import Compute.
 Set Default Goal Selector "!".
@@ -42,17 +42,6 @@ Definition verify_cycler (tm : TM) (n k : nat) : bool :=
     end
   | None => false
   end.
-
-Lemma eventually_exceeds :
-  forall a d h, d > 0 ->
-  exists k, a + k * d > h.
-Proof.
-  introv H.
-  induction h.
-  - exists 1. lia.
-  - destruct IHh as [k IH].
-    exists (S k). lia.
-Qed.
 
 Lemma cycle_chain :
   forall (tm : TM) c n k,

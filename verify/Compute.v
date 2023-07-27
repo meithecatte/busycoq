@@ -11,29 +11,9 @@ Set Warnings "-notation-overriden,-parsing,-deprecated-hint-without-locality".
 From Coq Require Import Bool.
 From Coq Require Import Lists.List. Import ListNotations.
 From Coq Require Import Lia.
-From BusyCoq Require Import LibTactics.
+From BusyCoq Require Import Helper.
 From BusyCoq Require Import TM.
 Set Default Goal Selector "!".
-
-Lemma Cons_unfold : forall A (xs : Stream A),
-  xs = Cons (hd xs) (tl xs).
-Proof.
-  introv. destruct xs. reflexivity.
-Qed.
-
-Lemma const_unfold : forall T (x : T),
-  const x = Cons x (const x).
-Proof.
-  introv.
-  rewrite Cons_unfold at 1.
-  reflexivity.
-Qed.
-
-Lemma reflect_sym : forall A (x y : A) b,
-  reflect (x = y) b -> reflect (y = x) b.
-Proof.
-  introv H. destruct H; constructor; congruence.
-Qed.
 
 Definition ctape (S : Type) : Type := list S * S * list S.
 
