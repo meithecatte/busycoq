@@ -136,8 +136,8 @@ Definition right (t : ctape) : ctape :=
   | (l, s, s' :: r) => (s :: l, s', r)
   end.
 
-Arguments left t : simpl never.
-Arguments right t : simpl never.
+Arguments left : simpl never.
+Arguments right : simpl never.
 
 Lemma lift_left : forall t, lift_tape (left t) = move_left (lift_tape t).
 Proof.
@@ -239,3 +239,6 @@ Lemma lift_starting : lift starting = c0.
 Proof. reflexivity. Qed.
 
 End TMs.
+
+Arguments left : simpl never.
+Arguments right : simpl never.
