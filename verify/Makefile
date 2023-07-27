@@ -11,7 +11,7 @@ clean::
 	if [ -e Makefile.coq ]; then $(MAKE) -f Makefile.coq cleanall; fi
 	$(RM) $(wildcard Makefile.coq Makefile.coq.conf) cyclers.ml cyclers.mli verify
 
-verify: cyclers.ml cyclers.mli main.ml
+verify: cyclers.mli cyclers.ml main.ml
 	ocamlopt.opt -o $@ $^
 
 Makefile.coq:
