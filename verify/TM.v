@@ -2,6 +2,8 @@
 
 Set Warnings "-notation-overriden,-parsing,-deprecated-hint-without-locality".
 From Coq Require Export Lists.Streams.
+From Coq Require Import PeanoNat.
+From Coq Require Import Lia.
 From BusyCoq Require Import LibTactics.
 Set Default Goal Selector "!".
 
@@ -194,6 +196,33 @@ Proof.
   - inverts Hgt0.
   - eapply halting_no_step in Hhalting.
     apply Hhalting. exact Hstep.
+Qed.
+
+Lemma skip_halts: forall tm c c' n,
+  c -[ tm ]->* n / c' ->
+  ~ halts tm c' ->
+  ~ halts tm c.
+Proof.
+  introv Hexec Hnonhalt Hhalt.
+  destruct Hhalt as [k [ch [Hrunch Hhalting]]].
+  destruct (Nat.ltb_spec k n).
+  - replace n with (k + (n - k)) in Hexec by lia.
+    apply rewind_split in Hexec.
+    destruct Hexec as [ch' [H1 H2]].
+    replace ch' with ch in *
+      by (eapply multistep_deterministic; eassumption).
+    clear ch' H1.
+    eapply halting_no_multistep in Hhalting.
+    + apply Hhalting, H2.
+    + lia.
+  - replace k with (n + (k - n)) in Hrunch by lia.
+    apply rewind_split in Hrunch.
+    destruct Hrunch as [cm [H1 H2]].
+    replace cm with c' in *
+      by (eapply multistep_deterministic; eassumption).
+    clear cm H1.
+    apply Hnonhalt.
+    exists (k - n), ch. auto.
 Qed.
 
 End TMs.

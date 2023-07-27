@@ -28,8 +28,8 @@ Proof.
 Qed.
 
 Lemma eventually_exceeds :
-  forall a d h, d > 0 ->
-  exists k, a + k * d > h.
+  forall d h, d > 0 ->
+  exists k, k * d > h.
 Proof.
   introv H.
   induction h.

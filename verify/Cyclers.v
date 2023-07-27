@@ -55,20 +55,17 @@ Proof.
 Qed.
 
 Lemma cycle_nonhalting :
-  forall (tm : TM) c1 c2 n k,
+  forall (tm : TM) c k,
   k > 0 ->
-  c1 -[ tm ]->* n / c2 ->
-  c2 -[ tm ]->* k / c2 ->
-  ~ halts tm c1.
+  c -[ tm ]->* k / c ->
+  ~ halts tm c.
 Proof.
-  introv Hgt0 Hn Hk [h [ch [Hh Hhalting]]].
-  destruct (eventually_exceeds n k h Hgt0) as [r Hr].
-  assert (Hreach : c1 -[ tm ]->* (n + r * k) / c2).
-  { eapply multistep_trans.
-    - exact Hn.
-    - apply cycle_chain. exact Hk. }
-  assert (Hsplit : exists w, w > 0 /\ h + w = n + r * k).
-  { exists (n + r * k - h). lia. }
+  introv Hgt0 Hk [h [ch [Hh Hhalting]]].
+  destruct (eventually_exceeds k h Hgt0) as [r Hr].
+  assert (Hreach : c -[ tm ]->* (r * k) / c).
+  { apply cycle_chain. exact Hk. }
+  assert (Hsplit : exists w, w > 0 /\ h + w = r * k).
+  { exists (r * k - h). lia. }
   destruct Hsplit as [w [Hwgt0 Ehw]].
   rewrite <- Ehw in Hreach.
   apply rewind_split in Hreach.
@@ -95,7 +92,9 @@ Proof.
   apply cmultistep_some in E, E'.
   rewrite lift_starting in E.
   rewrite <- Elift in E'.
-  eapply cycle_nonhalting; eassumption.
+  eapply skip_halts.
+  - eassumption.
+  - eapply cycle_nonhalting; eassumption.
 Qed.
 
 End TMs.
