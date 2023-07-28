@@ -47,6 +47,14 @@ Proof.
   introv H. destruct H; intuition.
 Qed.
 
+Lemma reflect_andb : forall P Q p q,
+  reflect P p ->
+  reflect Q q ->
+  reflect (P /\ Q) (p && q).
+Proof.
+  introv H1 H2. destruct H1, H2; constructor; intuition.
+Qed.
+
 Lemma eventually_exceeds :
   forall d h, d > 0 ->
   exists k, k * d > h.

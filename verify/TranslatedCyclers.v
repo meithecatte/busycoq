@@ -82,7 +82,15 @@ Qed.
 
 Lemma empty_side_firstn : forall n xs,
   reflect (EqTake n (lift_side xs) (const s0)) (empty_side (firstn n xs)).
-Admitted.
+Proof.
+  induction n; introv.
+  - repeat constructor.
+  - destruct xs as [| x xs].
+    + rewrite firstn_nil. apply ReflectT, EqTake_refl.
+    + simpl. apply reflect_andb.
+      * apply eqb_sym_spec.
+      * apply IHn.
+Qed.
 
 Lemma eqb_take_spec : forall n xs ys,
   reflect (EqTake n (lift_side xs) (lift_side ys)) (eqb_take n xs ys).
@@ -96,11 +104,10 @@ Proof.
     + destruct ys as [| y ys].
       * unfold eqb_take. rewrite firstn_nil. apply empty_side_firstn.
       * rewrite eqb_take_cons.
-        specialize (IHn xs ys). apply reflect_iff in IHn. simpl.
-        apply iff_reflect. rewrite IHn, andb_true_iff.
-        apply ZifyClasses.and_morph. (* fuck it *)
-        ** apply reflect_iff, eqb_sym_spec.
-        ** apply iff_refl.
+        specialize (IHn xs ys). simpl.
+        apply reflect_andb.
+        ** apply eqb_sym_spec.
+        ** apply IHn.
 Qed.
 
 (** [EqLimit] checks that the tapes match if you don't look more
@@ -173,13 +180,11 @@ Proof.
   introv.
   destruct t as [[l s] r].
   destruct t' as [[l' s'] r'].
-  apply iff_reflect. simpl.
-  repeat rewrite andb_true_iff. rewrite and_assoc.
-  apply ZifyClasses.and_morph.
-  { apply reflect_iff, eqb_take_spec. }
-  apply ZifyClasses.and_morph.
-  - apply reflect_iff, eqb_sym_spec.
-  - apply reflect_iff, eqb_side_spec.
+  simpl. rewrite <- andb_assoc.
+  repeat apply reflect_andb.
+  - apply eqb_take_spec.
+  - apply eqb_sym_spec.
+  - apply eqb_side_spec.
 Qed.
 
 (** We define a refinement of the Turing machine step relation,
