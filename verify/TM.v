@@ -225,4 +225,20 @@ Proof.
     exists (k - n), ch. auto.
 Qed.
 
+Lemma exceeds_halt : forall tm c c' n k,
+  halts_in tm c k ->
+  n > k ->
+  c -[ tm ]->* n / c' ->
+  False.
+Proof.
+  introv [ch [Hch Hhalting]] Hnk Hexec.
+  replace n with (k + (n - k)) in Hexec by lia.
+  eapply rewind_split in Hexec.
+  destruct Hexec as [ch' [H1 H2]].
+  replace ch' with ch in * by (eapply multistep_deterministic; eassumption).
+  eapply halting_no_multistep in Hhalting.
+  - apply Hhalting. eassumption.
+  - lia.
+Qed.
+
 End TMs.

@@ -60,22 +60,10 @@ Lemma cycle_nonhalting :
   c -[ tm ]->* k / c ->
   ~ halts tm c.
 Proof.
-  introv Hgt0 Hk [h [ch [Hh Hhalting]]].
+  introv Hgt0 Hk [h Hhalts_in].
   destruct (eventually_exceeds k h Hgt0) as [r Hr].
-  assert (Hreach : c -[ tm ]->* (r * k) / c).
-  { apply cycle_chain. exact Hk. }
-  assert (Hsplit : exists w, w > 0 /\ h + w = r * k).
-  { exists (r * k - h). lia. }
-  destruct Hsplit as [w [Hwgt0 Ehw]].
-  rewrite <- Ehw in Hreach.
-  apply rewind_split in Hreach.
-  destruct Hreach as [ch' [Hh' Hw]].
-  assert (Ech' : ch = ch').
-  { eapply multistep_deterministic; eassumption. }
-  rewrite <- Ech' in Hw.
-  eapply halting_no_multistep in Hhalting.
-  - apply Hhalting in Hw. contradiction.
-  - assumption.
+  eapply cycle_chain in Hk.
+  eapply exceeds_halt; eassumption.
 Qed.
 
 Theorem verify_cycler_correct : forall tm n k,
