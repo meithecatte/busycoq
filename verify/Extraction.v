@@ -7,6 +7,7 @@ Require Import ExtrOcamlIntConv.
 From BusyCoq Require Import Helper.
 From BusyCoq Require Import TM.
 From BusyCoq Require Import Cyclers.
+From BusyCoq Require Import TranslatedCyclers.
 
 Inductive state := A | B | C | D | E.
 Inductive sym := S0 | S1.
@@ -45,7 +46,10 @@ Module Ctx <: Ctx.
   Qed.
 End Ctx.
 
-Module Extraction := Cyclers Ctx.
+Module ECyclers := Cyclers Ctx.
+Module ETranslatedCyclers := TranslatedCyclers Ctx.
 
 Extraction Language OCaml.
-Extraction "cyclers.ml" Extraction.verify_cycler nat_of_int.
+Extraction "cyclers.ml" nat_of_int
+  ECyclers.verify_cycler
+  ETranslatedCyclers.verify_tcycler.

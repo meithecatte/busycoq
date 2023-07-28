@@ -5,7 +5,7 @@ type tm = state * sym -> command
 
 let verify_cycler tm n =
     let n = nat_of_int n in
-    Extraction.verify_cycler tm n n
+    ECyclers.verify_cycler tm n n
 
 let seed_file = open_in_bin "../seed.dat"
 let cert_file = open_in_bin "../certs.dat"
