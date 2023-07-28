@@ -5,15 +5,11 @@ From Coq Require Import Bool.Bool.
 From Coq Require Import Arith.Arith.
 From Coq Require Import Lia.
 From Coq Require Import Lists.List. Import ListNotations.
-From BusyCoq Require Import Helper.
-From BusyCoq Require Import TM.
-From BusyCoq Require Import Compute.
+From BusyCoq Require Export Flip.
 Set Default Goal Selector "!".
 
 Module Cyclers (Ctx : Ctx).
-  Export Ctx.
-  Local Module TMs := TMs Ctx. Export TMs.
-  Local Module Compute := Compute Ctx. Export Compute.
+  Local Module Flip := Flip Ctx. Export Flip.
 
 Definition verify_cycler (tm : TM) (n k : nat) : bool :=
   match cmultistep tm n starting with

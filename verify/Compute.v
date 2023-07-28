@@ -11,13 +11,11 @@ Set Warnings "-notation-overriden,-parsing,-deprecated-hint-without-locality".
 From Coq Require Import Bool.
 From Coq Require Import Lists.List. Import ListNotations.
 From Coq Require Import Lia.
-From BusyCoq Require Import Helper.
-From BusyCoq Require Import TM.
+From BusyCoq Require Export TM.
 Set Default Goal Selector "!".
 
 Module Compute (Ctx : Ctx).
-  Export Ctx.
-  Local Module TMs := TMs Ctx. Export TMs.
+  Local Module TM := TM Ctx. Export TM.
 
 (** During computation, a tape is represented similarly to [tape], but
     with finite lists at each side, implicitly completed with [s0]. *)

@@ -4,7 +4,7 @@ Set Warnings "-notation-overriden,-parsing,-deprecated-hint-without-locality".
 From Coq Require Export Lists.Streams.
 From Coq Require Import PeanoNat.
 From Coq Require Import Lia.
-From BusyCoq Require Import Helper.
+From BusyCoq Require Export Helper.
 Set Default Goal Selector "!".
 
 (** The direction a Turing machine can step in. *)
@@ -28,7 +28,7 @@ Module Type Ctx.
   Parameter eqb_sym_spec : forall a b, reflect (a = b) (eqb_sym a b).
 End Ctx.
 
-Module TMs (Ctx : Ctx).
+Module TM (Ctx : Ctx).
   Export Ctx.
 
 (** A Turing machine is a function mapping each [(state, symbol)] pair
@@ -255,4 +255,4 @@ Proof.
   - lia.
 Qed.
 
-End TMs.
+End TM.

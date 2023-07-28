@@ -5,15 +5,11 @@ From Coq Require Import Bool.Bool.
 From Coq Require Import Arith.Arith.
 From Coq Require Import Lia.
 From Coq Require Import Lists.List. Import ListNotations.
-From BusyCoq Require Import Helper.
-From BusyCoq Require Import TM.
-From BusyCoq Require Import Compute.
+From BusyCoq Require Export Cyclers.
 Set Default Goal Selector "!".
 
 Module TranslatedCyclers (Ctx : Ctx).
-  Export Ctx.
-  Local Module TMs := TMs Ctx. Export Ctx.
-  Local Module Compute := Compute Ctx. Export Compute.
+  Local Module Cyclers := Cyclers Ctx. Export Cyclers.
 
 (** [EqTake] holds if the first [n] symbols on a particular side of the
     tape match. *)
@@ -366,7 +362,7 @@ Proof.
     eauto using lmultistep_S.
 Qed.
 
-Definition verify_tcycler (tm : TM) (n0 n1 k : nat) :=
+Definition verify_tcycler_r (tm : TM) (n0 n1 k : nat) :=
   match cmultistep tm n0 starting with
   | Some c1 =>
     match clmultistep tm n1 (k, c1) with
@@ -380,10 +376,10 @@ Definition verify_tcycler (tm : TM) (n0 n1 k : nat) :=
   | None => false
   end.
 
-Theorem verify_tcycler_correct : forall tm n0 n1 k,
-  verify_tcycler tm n0 n1 k = true -> ~ halts tm c0.
+Theorem verify_tcycler_r_correct : forall tm n0 n1 k,
+  verify_tcycler_r tm n0 n1 k = true -> ~ halts tm c0.
 Proof.
-  introv H. unfold verify_tcycler in H.
+  introv H. unfold verify_tcycler_r in H.
   destruct (cmultistep tm n0 starting) as [c1 |] eqn:E0; try discriminate.
   destruct (clmultistep tm n1 (k, c1)) as [[k' c1'] |] eqn:E1; try discriminate.
   destruct c1 as [q t]. destruct c1' as [q' t'].
@@ -397,6 +393,22 @@ Proof.
   eapply skip_halts; try exact E0.
   replace k' with (k + (k' - k)) in E1 by lia.
   eapply tcycle_nonhalting; eassumption.
+Qed.
+
+Definition verify_tcycler (tm : TM) (d : dir) (n0 n1 k : nat) :=
+  match d with
+  | L => verify_tcycler_r (flip tm) n0 n1 k
+  | R => verify_tcycler_r tm n0 n1 k
+  end.
+
+Definition verify_tcycler_correct : forall tm d n0 n1 k,
+  verify_tcycler tm d n0 n1 k = true -> ~ halts tm c0.
+Proof.
+  introv H. unfold verify_tcycler in H.
+  destruct d; apply verify_tcycler_r_correct in H.
+  - replace c0 with (flip_conf c0) in H by reflexivity.
+    rewrite <- flip_halts_iff in H. assumption.
+  - assumption.
 Qed.
 
 End TranslatedCyclers.
