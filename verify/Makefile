@@ -9,9 +9,9 @@ build: Makefile.coq
 
 clean::
 	if [ -e Makefile.coq ]; then $(MAKE) -f Makefile.coq cleanall; fi
-	$(RM) $(wildcard Makefile.coq Makefile.coq.conf) cyclers.ml cyclers.mli *.cmi *.cmx *.o verify
+	$(RM) $(wildcard Makefile.coq Makefile.coq.conf) extraction.ml extraction.mli *.cmi *.cmx *.o verify
 
-verify: cyclers.mli cyclers.ml main.ml
+verify: extraction.mli extraction.ml main.ml
 	ocamlopt.opt -o $@ $^
 
 Makefile.coq:

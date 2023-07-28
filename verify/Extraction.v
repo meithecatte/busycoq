@@ -50,6 +50,6 @@ Module ECyclers := Cyclers Ctx.
 Module ETranslatedCyclers := TranslatedCyclers Ctx.
 
 Extraction Language OCaml.
-Extraction "cyclers.ml" nat_of_int
+Extraction "extraction.ml" nat_of_int
   ECyclers.verify_cycler
   ETranslatedCyclers.verify_tcycler.
