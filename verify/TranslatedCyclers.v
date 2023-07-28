@@ -31,6 +31,10 @@ Section TMs.
   Notation lift := (lift s0).
   Notation left := (left s0).
   Notation right := (right s0).
+  Notation empty_side := (empty_side s0 eqb_sym).
+  Notation eqb_side := (eqb_side s0 eqb_sym).
+  Notation lift_side := (lift_side s0).
+  Notation lift_tape := (lift_tape s0).
 
 (** [EqTake] holds if the first [n] symbols on a particular side of the
     tape match. *)
@@ -51,16 +55,19 @@ Proof.
     simpl. auto.
 Qed.
 
-Lemma EqTake_less : forall n k xs ys,
-  EqTake (n + k) xs ys -> EqTake n xs ys.
+Lemma EqTake_sym : forall n xs ys,
+  EqTake n xs ys -> EqTake n ys xs.
 Proof.
   induction n; introv H.
   - exact I.
   - destruct xs, ys.
-    simpl. simpl in H. destruct H as [E H].
-    split; try assumption.
-    eapply IHn, H.
+    simpl. simpl in *.
+    destruct H. auto.
 Qed.
+
+Corollary EqTake_sym_iff : forall n xs ys,
+  EqTake n xs ys <-> EqTake n ys xs.
+Proof. introv. split; auto using EqTake_sym. Qed.
 
 Lemma EqTake_trans : forall n xs ys zs,
   EqTake n xs ys -> EqTake n ys zs -> EqTake n xs zs.
@@ -72,6 +79,49 @@ Proof.
     destruct H1, H2. split.
     + congruence.
     + eauto.
+Qed.
+
+Lemma EqTake_less : forall n k xs ys,
+  EqTake (n + k) xs ys -> EqTake n xs ys.
+Proof.
+  induction n; introv H.
+  - exact I.
+  - destruct xs, ys.
+    simpl. simpl in H. destruct H as [E H].
+    split; try assumption.
+    eapply IHn, H.
+Qed.
+
+Definition eqb_take (n : nat) (xs ys : list Sym) : bool :=
+  eqb_side (firstn n xs) (firstn n ys).
+
+Lemma eqb_take_cons : forall n x y xs xs',
+  eqb_take (S n) (x :: xs) (y :: xs') = eqb_sym x y && eqb_take n xs xs'.
+Proof.
+  reflexivity.
+Qed.
+
+Lemma empty_side_firstn : forall n xs,
+  reflect (EqTake n (lift_side xs) (const s0)) (empty_side (firstn n xs)).
+Admitted.
+
+Lemma eqb_take_spec : forall n xs ys,
+  reflect (EqTake n (lift_side xs) (lift_side ys)) (eqb_take n xs ys).
+Proof.
+  induction n; introv.
+  - apply ReflectT. exact I.
+  - destruct xs as [| x xs].
+    + unfold eqb_take. rewrite firstn_nil. apply iff_reflect.
+      rewrite EqTake_sym_iff. apply reflect_iff.
+      apply empty_side_firstn.
+    + destruct ys as [| y ys].
+      * unfold eqb_take. rewrite firstn_nil. apply empty_side_firstn.
+      * rewrite eqb_take_cons.
+        specialize (IHn xs ys). apply reflect_iff in IHn. simpl.
+        apply iff_reflect. rewrite IHn, andb_true_iff.
+        apply ZifyClasses.and_morph. (* fuck it *)
+        ** apply reflect_iff, eqb_sym_spec.
+        ** apply iff_refl.
 Qed.
 
 (** [EqLimit] checks that the tapes match if you don't look more
@@ -113,15 +163,6 @@ Proof.
   apply EqTake_refl.
 Qed.
 
-Lemma EqLimit_less : forall n k t t',
-  EqLimit (n + k) t t' -> EqLimit n t t'.
-Proof.
-  intros n k [[l s] r] [[l' s'] r'] H.
-  simpl in H. destruct H.
-  split; try assumption.
-  eapply EqTake_less; eassumption.
-Qed.
-
 Lemma EqLimit_trans : forall n t1 t2 t3,
   EqLimit n t1 t2 -> EqLimit n t2 t3 -> EqLimit n t1 t3.
 Proof.
@@ -132,6 +173,39 @@ Proof.
   eapply EqTake_trans; eassumption.
 Qed.
 
+Lemma EqLimit_less : forall n k t t',
+  EqLimit (n + k) t t' -> EqLimit n t t'.
+Proof.
+  intros n k [[l s] r] [[l' s'] r'] H.
+  simpl in H. destruct H.
+  split; try assumption.
+  eapply EqTake_less; eassumption.
+Qed.
+
+Definition eqb_limit (n : nat) (t t' : ctape) : bool :=
+  match t, t' with
+  | l {{s}} r, l' {{s'}} r' =>
+    eqb_take n l l' && eqb_sym s s' && eqb_side r r'
+  end.
+
+Lemma eqb_limit_spec : forall n t t',
+  reflect (EqLimit n (lift_tape t) (lift_tape t')) (eqb_limit n t t').
+Proof.
+  introv.
+  destruct t as [[l s] r].
+  destruct t' as [[l' s'] r'].
+  apply iff_reflect. simpl.
+  repeat rewrite andb_true_iff. rewrite and_assoc.
+  apply ZifyClasses.and_morph.
+  { apply reflect_iff, eqb_take_spec. }
+  apply ZifyClasses.and_morph.
+  - apply reflect_iff, eqb_sym_spec.
+  - apply reflect_iff, eqb_side_spec, eqb_sym_spec.
+Qed.
+
+(** We define a refinement of the Turing machine step relation,
+    that makes sure we don't go further left than a specified point
+    on the tape. *)
 Reserved Notation "c =[ tm ]=> c'" (at level 40).
 
 Inductive lstep (tm : TM) : nat * (Q * tape) -> nat * (Q * tape) -> Prop :=
@@ -217,6 +291,7 @@ Proof.
     eapply multistep_S; eassumption.
 Qed.
 
+(** This allows us to describe the behavior of a translated cycler: *)
 Lemma tcycle_chain : forall tm n k k' q t t' i,
   (k, q; t) =[ tm ]=>* n / (k + k', q; t') ->
   EqLimit k t t' ->
@@ -239,12 +314,12 @@ Proof.
 Qed.
 
 Theorem tcycle_nonhalting : forall tm n k k' q t t',
-  n > 0 ->
   (k, q; t) =[ tm ]=>* n / (k + k', q; t') ->
   EqLimit k t t' ->
+  n > 0 ->
   ~ halts tm (q; t).
 Proof.
-  introv Hgt0 Hrun Heq Hhalt.
+  introv Hrun Heq Hgt0 Hhalt.
   destruct Hhalt as [h Hhalt].
   apply (eventually_exceeds n h) in Hgt0.
   destruct Hgt0 as [i Hexceeds].
@@ -253,9 +328,8 @@ Proof.
   eapply exceeds_halt; eassumption.
 Qed.
 
-Definition cnf : Type := nat * (Q * ctape).
-
-Definition cstep_limit (tm : TM) (c : cnf) : option cnf :=
+Definition clstep (tm : TM) (c : nat * (Q * ctape))
+    : option (nat * (Q * ctape)) :=
   match c with
   | (k, q; l {{s}} r) =>
     match tm (q, s) with
@@ -269,8 +343,8 @@ Definition cstep_limit (tm : TM) (c : cnf) : option cnf :=
     end
   end.
 
-Lemma cstep_limit_step : forall tm k c k' c',
-  cstep_limit tm (k, c) = Some (k', c') ->
+Lemma clstep_lstep : forall tm k c k' c',
+  clstep tm (k, c) = Some (k', c') ->
   (k, lift c) =[ tm ]=> (k', lift c').
 Proof.
   introv H.
@@ -283,3 +357,62 @@ Proof.
   - inverts H as; simpl.
     rewrite lift_right. apply lstep_right. assumption.
 Qed.
+
+Arguments clstep : simpl never.
+
+Fixpoint clmultistep (tm : TM) (n : nat) (c : nat * (Q * ctape))
+    : option (nat * (Q * ctape)) :=
+  match n with
+  | 0 => Some c
+  | S n' =>
+    match clstep tm c with
+    | Some c' => clmultistep tm n' c'
+    | None => None
+    end
+  end.
+
+Lemma clmultistep_some : forall tm n k c k' c',
+  clmultistep tm n (k, c) = Some (k', c') ->
+  (k, lift c) =[ tm ]=>* n / (k', lift c').
+Proof.
+  induction n; introv H; simpl in H.
+  - inverts H. apply lmultistep_0.
+  - destruct (clstep tm (k; c)) as [[kk cc] |] eqn:E; try discriminate.
+    apply IHn in H. apply clstep_lstep in E.
+    eauto using lmultistep_S.
+Qed.
+
+Definition verify_tcycler (tm : TM) (n0 n1 k : nat) :=
+  match cmultistep tm n0 starting with
+  | Some c1 =>
+    match clmultistep tm n1 (k, c1) with
+    | Some (k', c1') =>
+      match c1, c1' with
+      | q; t, q'; t' =>
+        (0 <? n1) && (k <=? k') && eqb_q q q' && eqb_limit k t t'
+      end
+    | None => false
+    end
+  | None => false
+  end.
+
+Theorem verify_tcycler_correct : forall tm n0 n1 k,
+  verify_tcycler tm n0 n1 k = true -> ~ halts tm c0.
+Proof.
+  introv H. unfold verify_tcycler in H.
+  destruct (cmultistep tm n0 starting) as [c1 |] eqn:E0; try discriminate.
+  destruct (clmultistep tm n1 (k, c1)) as [[k' c1'] |] eqn:E1; try discriminate.
+  destruct c1 as [q t]. destruct c1' as [q' t'].
+  destruct (Nat.ltb_spec 0 n1); try discriminate.
+  destruct (Nat.leb_spec k k'); try discriminate.
+  destruct (eqb_q_spec q q'); try discriminate. subst q'.
+  destruct (eqb_limit_spec k t t'); try discriminate.
+
+  apply cmultistep_some in E0.
+  apply clmultistep_some in E1.
+  eapply skip_halts; try exact E0.
+  replace k' with (k + (k' - k)) in E1 by lia.
+  eapply tcycle_nonhalting; eassumption.
+Qed.
+
+End TMs.
