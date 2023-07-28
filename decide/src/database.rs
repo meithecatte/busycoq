@@ -3,7 +3,7 @@ use std::io::{BufReader, Error, ErrorKind, Result};
 use std::fs::File;
 use std::path::Path;
 use byteorder::{BE, ReadBytesExt};
-use crate::turing::TM;
+use crate::turing::{Limit, TM};
 
 #[derive(Debug)]
 pub struct Database {
@@ -68,7 +68,14 @@ impl<'a> Iterator for Iter<'a> {
             Err(e) if e.kind() == ErrorKind::UnexpectedEof => return None,
             Err(e) => panic!("{e}"),
         }
-        let tm = TM::from_bytes(self.index, &buf);
+
+        let limit = if self.index < self.db.num_timelimit {
+            Limit::Time
+        } else {
+            Limit::Space
+        };
+
+        let tm = TM::from_bytes(self.index, limit, &buf);
         self.index += 1;
         Some(tm)
     }

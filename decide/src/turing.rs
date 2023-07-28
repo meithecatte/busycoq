@@ -11,6 +11,12 @@ pub enum Dir {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Limit {
+    Time,
+    Space,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Command {
     Halt,
     Step {
@@ -22,21 +28,26 @@ pub enum Command {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct TM {
+    /// Records the index of this Turing machine in the database.
     pub index: u32,
+    /// Records which limit the machine triggered during the initial
+    /// evaluation.
+    pub limit: Limit,
     code: [[Command; 2]; 5],
 }
 
 #[derive(Clone, PartialEq, Eq)]
 pub struct Configuration {
     pub state: u8,
-    pos: usize,
+    pub pos: usize,
     tape: Box<[bool]>,
 }
 
 impl TM {
-    pub fn from_bytes(index: u32, data: &[u8; 30]) -> TM {
+    pub fn from_bytes(index: u32, limit: Limit, data: &[u8; 30]) -> TM {
         TM {
             index,
+            limit,
             code: array::from_fn(|st| {
                 array::from_fn(|read| {
                     let offset = 6 * st + 3 * read;
@@ -116,6 +127,15 @@ impl TryFrom<u8> for Dir {
             0 => Ok(Dir::R),
             1 => Ok(Dir::L),
             _ => Err("invalid byte for direction"),
+        }
+    }
+}
+
+impl From<Dir> for u8 {
+    fn from(x: Dir) -> u8 {
+        match x {
+            Dir::R => 0,
+            Dir::L => 1,
         }
     }
 }

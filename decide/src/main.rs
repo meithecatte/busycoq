@@ -90,7 +90,7 @@ fn main() {
     });
 
     let processed = AtomicU32::new(0);
-    let num = db.num_timelimit;
+    let num = db.num_total;
 
     let cyclers = DeciderStats::<Cyclers>::new();
 
@@ -113,7 +113,7 @@ fn main() {
             }
         });
 
-        db.iter().take(num as usize).par_bridge().for_each(|tm| {
+        db.iter().par_bridge().for_each(|tm| {
             let cert = cyclers.decide(&tm);
             processed.fetch_add(1, Ordering::Relaxed);
             tx.send((tm.index, cert)).unwrap()
