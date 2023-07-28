@@ -3,17 +3,72 @@ mod cyclers;
 mod database;
 mod turing;
 
-use certificate::CertList;
-use cyclers::decide_cyclers;
+use certificate::{Certificate, CertList};
+use cyclers::Cyclers;
 use database::Database;
+use turing::TM;
 use std::collections::HashMap;
+use std::fmt;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
 use rayon::prelude::*;
-use enum_map::enum_map;
+use enum_map::{EnumArray, EnumMap, enum_map};
 use indicatif::{ProgressBar, ProgressStyle};
+
+trait Decider {
+    type Error: Clone + Copy + fmt::Debug + EnumArray<AtomicU32>;
+    const NAME: &'static str;
+
+    fn decide(tm: &TM) -> Result<Certificate, Self::Error>;
+}
+
+struct DeciderStats<D: Decider> {
+    decided: AtomicU32,
+    fail_stats: EnumMap<D::Error, AtomicU32>,
+}
+
+impl<D: Decider> fmt::Display for DeciderStats<D> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let decided = self.decided.load(Ordering::Relaxed);
+        if decided < 10000 {
+            write!(f, "{decided}")
+        } else {
+            write!(f, "{}k", decided / 1000)
+        }
+    }
+}
+
+impl<D: Decider> DeciderStats<D> {
+    fn new() -> Self {
+        Self {
+            decided: AtomicU32::new(0),
+            fail_stats: enum_map! { _ => AtomicU32::new(0) },
+        }
+    }
+
+    fn decide(&self, tm: &TM) -> Option<Certificate> {
+        match D::decide(tm) {
+            Ok(cert) => {
+                self.decided.fetch_add(1, Ordering::Relaxed);
+                Some(cert)
+            }
+            Err(e) => {
+                self.fail_stats[e].fetch_add(1, Ordering::Relaxed);
+                None
+            }
+        }
+    }
+
+    fn print_stats(&self) {
+        println!("{}:", D::NAME);
+        println!("  {:8?} Decided", self.decided);
+        for (k, v) in self.fail_stats.iter() {
+            println!("  {v:8?} {k:?}");
+        }
+    }
+}
 
 fn main() {
     let mut db = Database::open("../seed.dat").unwrap();
@@ -34,10 +89,10 @@ fn main() {
         }
     });
 
-    let stats = enum_map! { _ => AtomicU32::new(0) };
-    let decided = AtomicU32::new(0);
     let processed = AtomicU32::new(0);
     let num = db.num_timelimit;
+
+    let cyclers = DeciderStats::<Cyclers>::new();
 
     thread::scope(|s| {
         let progress_thread = s.spawn(|| {
@@ -48,8 +103,7 @@ fn main() {
                 .with_style(style);
             loop {
                 let processed = processed.load(Ordering::Relaxed);
-                let decided = decided.load(Ordering::Relaxed);
-                bar.set_message(format!("decided {decided}"));
+                bar.set_message(format!("C {cyclers}"));
                 bar.set_position(processed as u64);
                 if processed == num {
                     return;
@@ -60,17 +114,7 @@ fn main() {
         });
 
         db.iter().take(num as usize).par_bridge().for_each(|tm| {
-            let cert = match decide_cyclers(&tm) {
-                Ok(cert) => {
-                    decided.fetch_add(1, Ordering::Relaxed);
-                    Some(cert.into())
-                }
-                Err(e) => {
-                    stats[e].fetch_add(1, Ordering::Relaxed);
-                    None
-                }
-            };
-
+            let cert = cyclers.decide(&tm);
             processed.fetch_add(1, Ordering::Relaxed);
             tx.send((tm.index, cert)).unwrap()
         });
@@ -81,8 +125,5 @@ fn main() {
     drop(tx);
     write_certs.join().unwrap();
 
-    println!("Decided {decided:?}");
-    for (k, v) in stats.iter() {
-        println!("{k:?} {v:?}");
-    }
+    cyclers.print_stats();
 }

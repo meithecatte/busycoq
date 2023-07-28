@@ -8,7 +8,7 @@ use crate::cyclers;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Certificate {
-    Cyclers(cyclers::Certificate),
+    Cyclers(cyclers::Cert),
 }
 
 pub struct CertList {
@@ -36,8 +36,8 @@ impl CertList {
     }
 }
 
-impl From<cyclers::Certificate> for Certificate {
-    fn from(cert: cyclers::Certificate) -> Certificate {
+impl From<cyclers::Cert> for Certificate {
+    fn from(cert: cyclers::Cert) -> Certificate {
         Certificate::Cyclers(cert)
     }
 }

@@ -1,3 +1,4 @@
+use crate::Certificate;
 use crate::turing::{Configuration, TM, OutOfSpace};
 use enum_map::Enum;
 
@@ -5,7 +6,7 @@ const SPACE_LIMIT: usize = 2048;
 const TIME_LIMIT: u32 = 1024;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Certificate {
+pub struct Cert {
     n: u32,
 }
 
@@ -24,7 +25,7 @@ fn check(s: Result<bool, OutOfSpace>) -> Result<(), FailReason> {
     }
 }
 
-pub fn decide_cyclers(tm: &TM) -> Result<Certificate, FailReason> {
+fn decide_cyclers(tm: &TM) -> Result<Cert, FailReason> {
     let mut tortoise = Configuration::new(SPACE_LIMIT);
     let mut hare = Configuration::new(SPACE_LIMIT);
 
@@ -34,15 +35,26 @@ pub fn decide_cyclers(tm: &TM) -> Result<Certificate, FailReason> {
         check(hare.step(tm))?;
 
         if tortoise == hare {
-            return Ok(Certificate { n });
+            return Ok(Cert { n });
         }
     }
 
     Err(FailReason::OutOfTime)
 }
 
-impl Certificate {
+impl Cert {
     pub fn to_bytes(self) -> [u8; 4] {
         self.n.to_be_bytes()
+    }
+}
+
+pub struct Cyclers;
+
+impl crate::Decider for Cyclers {
+    type Error = FailReason;
+    const NAME: &'static str = "Cyclers";
+
+    fn decide(tm: &TM) -> Result<Certificate, FailReason> {
+        decide_cyclers(tm).map(From::from)
     }
 }
