@@ -12,7 +12,7 @@ Set Default Goal Selector "!".
 
 Module Cyclers (Ctx : Ctx).
   Export Ctx.
-  Local Module TMs := TMs Ctx. Export Ctx.
+  Local Module TMs := TMs Ctx. Export TMs.
   Local Module Compute := Compute Ctx. Export Compute.
 
 Definition verify_cycler (tm : TM) (n k : nat) : bool :=
