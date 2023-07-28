@@ -54,10 +54,8 @@ Proof.
   introv H. unfold verify_cycler in H.
   destruct (cmultistep tm n starting) as [c |] eqn:E; try discriminate.
   destruct (cmultistep tm k c) as [c' |] eqn:E'; try discriminate.
-  rewrite andb_true_iff, Nat.ltb_lt in H. destruct H as [Hgt0 H].
-  assert (Hs : reflect (lift c = lift c') (eqb c c'))
-    by (apply eqb_spec; assumption).
-  inverts Hs as Elift Eeqb; try congruence.
+  destruct (Nat.ltb_spec 0 k) as [Hgt0 |]; try discriminate.
+  destruct (eqb_spec c c') as [Elift |]; try discriminate.
 
   apply cmultistep_some in E, E'.
   rewrite lift_starting in E.
