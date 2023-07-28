@@ -10,31 +10,10 @@ From BusyCoq Require Import TM.
 From BusyCoq Require Import Compute.
 Set Default Goal Selector "!".
 
-Section TMs.
-  Context {Q Sym : Type}.
-  Variable q0 : Q.
-  Variable s0 : Sym.
-
-  Variable eqb_sym : Sym -> Sym -> bool.
-  Variable eqb_sym_spec : forall a b, reflect (a = b) (eqb_sym a b).
-
-  Variable eqb_q : Q -> Q -> bool.
-  Variable eqb_q_spec : forall a b, reflect (a = b) (eqb_q a b).
-
-  Notation TM := (TM Q Sym).
-  Notation tape := (tape Sym).
-  Notation ctape := (ctape Sym).
-  Notation c0 := (c0 q0 s0).
-  Notation starting := (starting q0 s0).
-  Notation cmultistep := (cmultistep s0).
-  Notation eqb := (eqb s0 eqb_sym eqb_q).
-  Notation lift := (lift s0).
-  Notation left := (left s0).
-  Notation right := (right s0).
-  Notation empty_side := (empty_side s0 eqb_sym).
-  Notation eqb_side := (eqb_side s0 eqb_sym).
-  Notation lift_side := (lift_side s0).
-  Notation lift_tape := (lift_tape s0).
+Module TranslatedCyclers (Ctx : Ctx).
+  Export Ctx.
+  Local Module TMs := TMs Ctx. Export Ctx.
+  Local Module Compute := Compute Ctx. Export Compute.
 
 (** [EqTake] holds if the first [n] symbols on a particular side of the
     tape match. *)
@@ -200,7 +179,7 @@ Proof.
   { apply reflect_iff, eqb_take_spec. }
   apply ZifyClasses.and_morph.
   - apply reflect_iff, eqb_sym_spec.
-  - apply reflect_iff, eqb_side_spec, eqb_sym_spec.
+  - apply reflect_iff, eqb_side_spec.
 Qed.
 
 (** We define a refinement of the Turing machine step relation,
@@ -415,4 +394,4 @@ Proof.
   eapply tcycle_nonhalting; eassumption.
 Qed.
 
-End TMs.
+End TranslatedCyclers.

@@ -4,11 +4,32 @@ Set Warnings "-notation-overriden,-parsing,-deprecated-hint-without-locality".
 From Coq Require Export Lists.Streams.
 From Coq Require Import PeanoNat.
 From Coq Require Import Lia.
-From BusyCoq Require Import LibTactics.
+From BusyCoq Require Import Helper.
 Set Default Goal Selector "!".
 
 (** The direction a Turing machine can step in. *)
 Inductive dir : Type := L | R.
+
+(** We parametrize over... *)
+Module Type Ctx.
+  (** the type of states [Q]; *)
+  Parameter Q : Type.
+  (** the type of tape symbols [Sym]; *)
+  Parameter Sym : Type.
+  (** the starting state [q0]; *)
+  Parameter q0 : Q.
+  (** and the blank symbol [s0]. *)
+  Parameter s0 : Sym.
+
+  (** Moreover we want decidable equality for [Q] and [Sym]. *)
+  Parameter eqb_q : Q -> Q -> bool.
+  Parameter eqb_q_spec : forall a b, reflect (a = b) (eqb_q a b).
+  Parameter eqb_sym : Sym -> Sym -> bool.
+  Parameter eqb_sym_spec : forall a b, reflect (a = b) (eqb_sym a b).
+End Ctx.
+
+Module TMs (Ctx : Ctx).
+  Export Ctx.
 
 (** A Turing machine is a function mapping each [(state, symbol)] pair
     to one of
@@ -18,12 +39,12 @@ Inductive dir : Type := L | R.
       moves in the direction specified by [d], and transitions to state [q].
 
 *)
-Definition TM (Q Sym : Type): Type := Q * Sym -> option (Sym * dir * Q).
+Definition TM : Type := Q * Sym -> option (Sym * dir * Q).
 
 (** The state of the tape is represented abstractly as a tuple [(l, s, r)],
     where [v] is the symbol under the head, while [l] and [r] are infinite
     streams of symbols on the left and right side of the head, respectively. *)
-Definition tape (S : Type) : Type := Stream S * S * Stream S.
+Definition tape : Type := Stream Sym * Sym * Stream Sym.
 
 (** We define a notation for tapes, evocative of a turing machine's head
     hovering over a particular symbol. **)
@@ -35,16 +56,16 @@ Notation "l {{ s }} r" := (l, s, r)
 Notation "s >> r" := (Cons s r) (at level 25, right associativity).
 Notation "l << s" := (Cons s l) (at level 24, left associativity).
 
-Local Example tape_ex : tape nat :=
-  const 0 << 1 << 2 {{3}} 4 >> 5 >> const 6.
+Local Example tape_ex (a b c d e : Sym) : tape :=
+  const s0 << a << b {{c}} d >> e >> const s0.
 
 (** Helper functions for moving the tape head: *)
-Definition move_left {S} (t : tape S) : tape S :=
+Definition move_left (t : tape) : tape :=
   match t with
   | l << s' {{s}} r => l {{s'}} s >> r
   end.
 
-Definition move_right {S} (t : tape S) : tape S :=
+Definition move_right (t : tape) : tape :=
   match t with
   | l {{s}} s' >> r => l << s {{s'}} r
   end.
@@ -57,7 +78,7 @@ Notation "q ; t" := (q, t) (at level 35).
 (** The small-step semantics of Turing machines: *)
 Reserved Notation "c -[ tm ]-> c'" (at level 40).
 
-Inductive step {Q Sym} (tm : TM Q Sym) : Q * tape Sym -> Q * tape Sym -> Prop :=
+Inductive step (tm : TM) : Q * tape -> Q * tape -> Prop :=
   | step_left q q' s s' l r :
     tm (q, s) = Some (s', L, q') ->
     q; l {{s}} r -[ tm ]-> q'; (move_left (l {{s'}} r))
@@ -70,8 +91,7 @@ Inductive step {Q Sym} (tm : TM Q Sym) : Q * tape Sym -> Q * tape Sym -> Prop :=
 (** And the indexed multistep relation: *)
 Reserved Notation "c -[ tm ]->* n / c'" (at level 40, n at next level).
 
-Inductive multistep {Q Sym} (tm : TM Q Sym)
-    : nat -> Q * tape Sym -> Q * tape Sym -> Prop :=
+Inductive multistep (tm : TM) : nat -> Q * tape -> Q * tape -> Prop :=
   | multistep_0 c : c -[ tm ]->* 0 / c
   | multistep_S n c c' c'' :
     c  -[ tm ]->  c' ->
@@ -80,24 +100,18 @@ Inductive multistep {Q Sym} (tm : TM Q Sym)
 
   where "c -[ tm ]->* n / c'" := (multistep tm n c c').
 
-Section TMs.
-  Context {Q Sym : Type}.
-
-  Notation TM := (TM Q Sym).
-  Notation tape := (tape Sym).
-
 (** A halting configuration is one for which [tm (q, s)] returns [None]. *)
 Definition halting (tm : TM) (c : Q * tape) : Prop :=
   match c with
   | (q, l {{s}} r) => tm (q, s) = None
   end.
 
-(** The initial configuration for an initial state [q0] and blank symbol [s0] *)
-Definition c0 q0 s0 : Q * tape := q0; const s0 {{s0}} const s0.
+(** The initial configuration of the machine *)
+Definition c0 : Q * tape := q0; const s0 {{s0}} const s0.
 
 (** A Turing machine halts if it eventually reaches a halting configuration. *)
-Definition halts_in (tm : TM) (c0 : Q * tape) (n : nat) :=
-  exists ch, c0 -[ tm ]->* n / ch /\ halting tm ch.
+Definition halts_in (tm : TM) (c : Q * tape) (n : nat) :=
+  exists ch, c -[ tm ]->* n / ch /\ halting tm ch.
 
 Definition halts (tm : TM) (c0 : Q * tape) :=
   exists n, halts_in tm c0 n.
@@ -131,7 +145,7 @@ Qed.
 
 (** Other useful lemmas: *)
 Lemma step_deterministic :
-  forall (tm : TM) c c' c'',
+  forall tm c c' c'',
   c -[ tm ]-> c'  ->
   c -[ tm ]-> c'' ->
   c' = c''.
@@ -142,7 +156,7 @@ Proof.
 Qed.
 
 Lemma multistep_trans :
-  forall (tm : TM) n m c c' c'',
+  forall tm n m c c' c'',
   c  -[ tm ]->* n / c' ->
   c' -[ tm ]->* m / c'' ->
   c  -[ tm ]->* (n + m) / c''.
@@ -154,7 +168,7 @@ Proof.
 Qed.
 
 Lemma multistep_deterministic :
-  forall (tm : TM) n c c' c'',
+  forall tm n c c' c'',
   c -[ tm ]->* n / c'  ->
   c -[ tm ]->* n / c'' ->
   c' = c''.
@@ -168,7 +182,7 @@ Proof.
 Qed.
 
 Lemma rewind_split:
-  forall (tm : TM) n k c c'',
+  forall tm n k c c'',
   c -[ tm ]->* (n + k) / c'' ->
   exists c', c -[ tm ]->* n / c' /\ c' -[ tm ]->* k / c''.
 Proof.

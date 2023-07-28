@@ -1,12 +1,11 @@
 open Cyclers
 
-type sym = bool
-type state = int
 type command = ((sym * dir) * state) option
+type tm = state * sym -> command
 
 let verify_cycler tm n =
     let n = nat_of_int n in
-    verify_cycler 0 false (=) (=) tm n n
+    Extraction.verify_cycler tm n n
 
 let seed_file = open_in_bin "../seed.dat"
 let cert_file = open_in_bin "../certs.dat"
@@ -31,8 +30,8 @@ let write_u32 (ch: out_channel) (v: int) =
 
 let parse_symbol (c: char): sym =
     match Char.code c with
-    | 0 -> false
-    | 1 -> true
+    | 0 -> S0
+    | 1 -> S1
     | _ -> failwith "invalid byte for symbol"
 
 let parse_dir (c: char): dir =
@@ -41,25 +40,41 @@ let parse_dir (c: char): dir =
     | 1 -> L
     | _ -> failwith "invalid byte for direction"
 
-let read_tm (index: int): (state, sym) tM =
+let parse_state (c : char): state option =
+    match Char.code c with
+    | 0 -> None
+    | 1 -> Some A
+    | 2 -> Some B
+    | 3 -> Some C
+    | 4 -> Some D
+    | 5 -> Some E
+    | _ -> failwith "invalid byte for state"
+
+let read_tm (index: int): tm =
     seek_in seed_file (30 + 30 * index);
     let buf = Bytes.create 30 in
     really_input seed_file buf 0 30;
     let parse_cmd (i: int): command =
         let offset = 3 * i in
-        let symbol = parse_symbol (Bytes.get buf offset) in
-        let dir = parse_dir (Bytes.get buf (offset + 1)) in
-        let next = Char.code (Bytes.get buf (offset + 2)) in
-        if next = 0 then
-            None
-        else
-            Some ((symbol, dir), next - 1)
+        match parse_state (Bytes.get buf (offset + 2)) with
+        | None -> None
+        | Some next ->
+            let symbol = parse_symbol (Bytes.get buf offset) in
+            let dir = parse_dir (Bytes.get buf (offset + 1)) in
+            Some ((symbol, dir), next)
         in
     let commands = Array.init 10 parse_cmd in
     fun (q, s) ->
+        let q = match q with
+                | A -> 0
+                | B -> 1
+                | C -> 2
+                | D -> 3
+                | E -> 4
+                in
         let i = match s with
-                | false -> 2 * q
-                | true -> 2 * q + 1
+                | S0 -> 2 * q
+                | S1 -> 2 * q + 1
                 in
         Array.get commands i
 

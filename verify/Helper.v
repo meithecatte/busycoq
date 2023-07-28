@@ -21,10 +21,30 @@ Proof.
   reflexivity.
 Qed.
 
+(** We define our own [reflect] in [Prop] instead of [Set],
+    as we don't want it to occur in the extracted programs. *)
+
+Inductive reflect (P : Prop) : bool -> Prop :=
+  | ReflectT : P -> reflect P true
+  | ReflectF : ~ P -> reflect P false.
+
+#[global]
+Hint Constructors reflect : bool.
+
+Lemma reflect_iff : forall P b, reflect P b -> (P <-> b = true).
+Proof.
+  introv H. destruct H; intuition.
+Qed.
+
+Lemma iff_reflect : forall P b, (P <-> b = true) -> reflect P b.
+Proof.
+  destr_bool; intuition.
+Qed.
+
 Lemma reflect_sym : forall A (x y : A) b,
   reflect (x = y) b -> reflect (y = x) b.
 Proof.
-  introv H. destruct H; constructor; congruence.
+  introv H. destruct H; intuition.
 Qed.
 
 Lemma eventually_exceeds :

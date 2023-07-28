@@ -5,33 +5,15 @@ From Coq Require Import Bool.Bool.
 From Coq Require Import Arith.Arith.
 From Coq Require Import Lia.
 From Coq Require Import Lists.List. Import ListNotations.
-From Coq Require Extraction.
-Require Import ExtrOcamlBasic.
-Require Import ExtrOcamlIntConv.
 From BusyCoq Require Import Helper.
 From BusyCoq Require Import TM.
 From BusyCoq Require Import Compute.
 Set Default Goal Selector "!".
 
-Section TMs.
-  Context {Q Sym : Type}.
-  Variable q0 : Q.
-  Variable s0 : Sym.
-
-  Variable eqb_sym : Sym -> Sym -> bool.
-  Variable eqb_sym_spec : forall a b, reflect (a = b) (eqb_sym a b).
-
-  Variable eqb_q : Q -> Q -> bool.
-  Variable eqb_q_spec : forall a b, reflect (a = b) (eqb_q a b).
-
-  Notation TM := (TM Q Sym).
-  Notation tape := (tape Sym).
-  Notation ctape := (ctape Sym).
-  Notation c0 := (c0 q0 s0).
-  Notation starting := (starting q0 s0).
-  Notation cmultistep := (cmultistep s0).
-  Notation eqb := (eqb s0 eqb_sym eqb_q).
-  Notation lift := (lift s0).
+Module Cyclers (Ctx : Ctx).
+  Export Ctx.
+  Local Module TMs := TMs Ctx. Export Ctx.
+  Local Module Compute := Compute Ctx. Export Compute.
 
 Definition verify_cycler (tm : TM) (n k : nat) : bool :=
   match cmultistep tm n starting with
@@ -85,7 +67,4 @@ Proof.
   - eapply cycle_nonhalting; eassumption.
 Qed.
 
-End TMs.
-
-Extraction Language OCaml.
-Extraction "cyclers.ml" verify_cycler nat_of_int.
+End Cyclers.
