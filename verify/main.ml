@@ -3,9 +3,10 @@ open Cyclers
 type command = ((sym * dir) * state) option
 type tm = state * sym -> command
 
-let verify_cycler tm n =
+let verify_cycler tm n k =
     let n = nat_of_int n in
-    Extraction.verify_cycler tm n n
+    let k = nat_of_int k in
+    Extraction.verify_cycler tm n k
 
 let seed_file = open_in_bin "../seed.dat"
 let cert_file = open_in_bin "../certs.dat"
@@ -79,19 +80,22 @@ let read_tm (index: int): tm =
         Array.get commands i
 
 type cert =
-    | CertCyclers of int
+    | CertCyclers of int * int
 
 let read_cert (): int * cert =
     let index = read_u32 cert_file in
     let cert = match read_u32 cert_file with
-    | 0 -> CertCyclers (read_u32 cert_file)
+    | 0 ->
+        let n = read_u32 cert_file
+        and k = read_u32 cert_file in
+        CertCyclers (n, k)
     | _ -> failwith "unknown certificate type"
     in (index, cert)
 
 let verify_cert (index: int) (cert: cert): unit =
     let tm = read_tm index in
     let ok = match cert with
-    | CertCyclers n -> verify_cycler tm n
+    | CertCyclers (n, k) -> verify_cycler tm n k
     in
     if ok then
         write_u32 index_file index
