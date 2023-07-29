@@ -89,16 +89,16 @@ Inductive step (tm : TM) : Q * tape -> Q * tape -> Prop :=
   where "c -[ tm ]-> c'" := (step tm c c').
 
 (** And the indexed multistep relation: *)
-Reserved Notation "c -[ tm ]->* n / c'" (at level 40, n at next level).
+Reserved Notation "c -[ tm ]->> n / c'" (at level 40, n at next level).
 
 Inductive multistep (tm : TM) : nat -> Q * tape -> Q * tape -> Prop :=
-  | multistep_0 c : c -[ tm ]->* 0 / c
+  | multistep_0 c : c -[ tm ]->> 0 / c
   | multistep_S n c c' c'' :
     c  -[ tm ]->  c' ->
-    c' -[ tm ]->* n / c'' ->
-    c  -[ tm ]->* S n / c''
+    c' -[ tm ]->> n / c'' ->
+    c  -[ tm ]->> S n / c''
 
-  where "c -[ tm ]->* n / c'" := (multistep tm n c c').
+  where "c -[ tm ]->> n / c'" := (multistep tm n c c').
 
 (** A halting configuration is one for which [tm (q, s)] returns [None]. *)
 Definition halting (tm : TM) (c : Q * tape) : Prop :=
@@ -111,7 +111,7 @@ Definition c0 : Q * tape := q0; const s0 {{s0}} const s0.
 
 (** A Turing machine halts if it eventually reaches a halting configuration. *)
 Definition halts_in (tm : TM) (c : Q * tape) (n : nat) :=
-  exists ch, c -[ tm ]->* n / ch /\ halting tm ch.
+  exists ch, c -[ tm ]->> n / ch /\ halting tm ch.
 
 Definition halts (tm : TM) (c0 : Q * tape) :=
   exists n, halts_in tm c0 n.
@@ -157,9 +157,9 @@ Qed.
 
 Lemma multistep_trans :
   forall tm n m c c' c'',
-  c  -[ tm ]->* n / c' ->
-  c' -[ tm ]->* m / c'' ->
-  c  -[ tm ]->* (n + m) / c''.
+  c  -[ tm ]->> n / c' ->
+  c' -[ tm ]->> m / c'' ->
+  c  -[ tm ]->> (n + m) / c''.
 Proof.
   introv H1 H2.
   induction H1.
@@ -169,8 +169,8 @@ Qed.
 
 Lemma multistep_deterministic :
   forall tm n c c' c'',
-  c -[ tm ]->* n / c'  ->
-  c -[ tm ]->* n / c'' ->
+  c -[ tm ]->> n / c'  ->
+  c -[ tm ]->> n / c'' ->
   c' = c''.
 Proof.
   introv H1 H2.
@@ -183,8 +183,8 @@ Qed.
 
 Lemma rewind_split:
   forall tm n k c c'',
-  c -[ tm ]->* (n + k) / c'' ->
-  exists c', c -[ tm ]->* n / c' /\ c' -[ tm ]->* k / c''.
+  c -[ tm ]->> (n + k) / c'' ->
+  exists c', c -[ tm ]->> n / c' /\ c' -[ tm ]->> k / c''.
 Proof.
   intros tm n k.
   induction n; intros c c'' H.
@@ -203,7 +203,7 @@ Lemma halting_no_multistep:
   forall tm c c' n,
   n > 0 ->
   halting tm c ->
-  ~ c -[ tm ]->* n / c'.
+  ~ c -[ tm ]->> n / c'.
 Proof.
   introv Hgt0 Hhalting Hrun.
   inverts Hrun as Hstep Hrest.
@@ -213,7 +213,7 @@ Proof.
 Qed.
 
 Lemma skip_halts: forall tm c c' n,
-  c -[ tm ]->* n / c' ->
+  c -[ tm ]->> n / c' ->
   ~ halts tm c' ->
   ~ halts tm c.
 Proof.
@@ -242,7 +242,7 @@ Qed.
 Lemma exceeds_halt : forall tm c c' n k,
   halts_in tm c k ->
   n > k ->
-  c -[ tm ]->* n / c' ->
+  c -[ tm ]->> n / c' ->
   False.
 Proof.
   introv [ch [Hch Hhalting]] Hnk Hexec.

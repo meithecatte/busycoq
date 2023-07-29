@@ -23,8 +23,8 @@ Definition verify_cycler (tm : TM) (n k : nat) : bool :=
 
 Lemma cycle_chain :
   forall (tm : TM) c n k,
-  c -[ tm ]->* k / c ->
-  c -[ tm ]->* (n * k) / c.
+  c -[ tm ]->> k / c ->
+  c -[ tm ]->> (n * k) / c.
 Proof.
   introv H.
   induction n.
@@ -35,7 +35,7 @@ Qed.
 Lemma cycle_nonhalting :
   forall (tm : TM) c k,
   k > 0 ->
-  c -[ tm ]->* k / c ->
+  c -[ tm ]->> k / c ->
   ~ halts tm c.
 Proof.
   introv Hgt0 Hk [h Hhalts_in].

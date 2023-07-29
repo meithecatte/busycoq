@@ -261,7 +261,7 @@ Qed.
 
 Lemma lmultistep_multistep : forall tm n k c k' c',
   (k, c) =[ tm ]=>* n / (k', c') ->
-  c -[ tm ]->* n / c'.
+  c -[ tm ]->> n / c'.
 Proof.
   induction n; introv H; inverts H as Hstep Hrest.
   - apply multistep_0.
@@ -275,7 +275,7 @@ Qed.
 Lemma tcycle_chain : forall tm n k k' q t t' i,
   (k, q; t) =[ tm ]=>* n / (k + k', q; t') ->
   EqLimit k t t' ->
-  exists t'', EqLimit k t t'' /\ q; t -[ tm ]->* (i * n) / q; t''.
+  exists t'', EqLimit k t t'' /\ q; t -[ tm ]->> (i * n) / q; t''.
 Proof.
   introv Hexec Heq.
   induction i.

@@ -183,7 +183,7 @@ Fixpoint cmultistep (tm : TM) (n : nat) (c : Q * ctape) : option (Q * ctape) :=
 
 Lemma cmultistep_some : forall tm n c c',
   cmultistep tm n c = Some c' ->
-  lift c -[ tm ]->* n / lift c'.
+  lift c -[ tm ]->> n / lift c'.
 Proof.
   induction n; introv H; simpl in H.
   - inverts H. apply multistep_0.

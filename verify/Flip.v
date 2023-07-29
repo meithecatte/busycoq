@@ -75,8 +75,8 @@ Proof.
 Qed.
 
 Lemma flip_multistep : forall tm n c c',
-  c -[ tm ]->* n / c' ->
-  flip_conf c -[ flip tm ]->* n / flip_conf c'.
+  c -[ tm ]->> n / c' ->
+  flip_conf c -[ flip tm ]->> n / flip_conf c'.
 Proof.
   induction n; introv H; inverts H as Hstep Hrest.
   - apply multistep_0.

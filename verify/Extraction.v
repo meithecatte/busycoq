@@ -4,10 +4,7 @@ Set Warnings "-notation-overriden,-parsing,-deprecated-hint-without-locality".
 From Coq Require Extraction.
 Require Import ExtrOcamlBasic.
 Require Import ExtrOcamlIntConv.
-From BusyCoq Require Import Helper.
-From BusyCoq Require Import TM.
-From BusyCoq Require Import Cyclers.
-From BusyCoq Require Import TranslatedCyclers.
+From BusyCoq Require Export TranslatedCyclers.
 
 Inductive state := A | B | C | D | E.
 Inductive sym := S0 | S1.
