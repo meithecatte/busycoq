@@ -120,7 +120,7 @@ fn main() {
             let cert = cyclers.decide(&tm)
                 .or_else(|| tcyclers.decide(&tm));
             processed.fetch_add(1, Ordering::Relaxed);
-            tx.send((tm.index, cert)).unwrap()
+            tx.send((tm.index, cert)).unwrap();
         });
 
         progress_thread.thread().unpark();

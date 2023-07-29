@@ -4,8 +4,8 @@ use byteorder::{BE, WriteBytesExt};
 use enum_map::Enum;
 use std::io::Cursor;
 
-const SPACE_LIMIT: usize = 4096;
-const TIME_LIMIT: u32 = 1000;
+const SPACE_LIMIT: usize = 8192;
+const TIME_LIMIT: u32 = 5000000;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Cert {
@@ -23,6 +23,7 @@ pub struct Cert {
 struct RecordDetect {
     conf: Configuration,
     num_records: usize,
+    steps_taken: u32,
     // invariant: record_left <= record_right
     record_left: usize,
     record_right: usize,
@@ -38,6 +39,7 @@ pub enum FailReason {
     NotApplicable,
 }
 
+#[derive(Debug)]
 struct Record {
     direction: Dir,
     record_index: usize,
@@ -59,6 +61,7 @@ impl RecordDetect {
         Self {
             conf,
             num_records: 0,
+            steps_taken: 0,
             record_left: pos,
             record_right: pos,
             leftmost_since_record: pos,
@@ -82,26 +85,30 @@ impl RecordDetect {
         }
     }
 
-    fn step(&mut self, tm: &TM) -> Result<Option<Record>, FailReason> {
-        match self.conf.step(tm) {
-            Ok(false) => return Err(FailReason::Halted),
-            Ok(true) => (),
-            Err(OutOfSpace) => return Err(FailReason::OutOfSpace),
+    fn next_record(&mut self, tm: &TM) -> Result<Record, FailReason> {
+        while self.steps_taken < TIME_LIMIT {
+            self.steps_taken += 1;
+
+            match self.conf.step(tm) {
+                Ok(false) => return Err(FailReason::Halted),
+                Ok(true) => (),
+                Err(OutOfSpace) => return Err(FailReason::OutOfSpace),
+            }
+
+            let pos = self.conf.pos;
+            running_min(&mut self.leftmost_since_record, pos);
+            running_max(&mut self.rightmost_since_record, pos);
+
+            if self.record_right < pos {
+                self.record_right = pos;
+                return Ok(self.make_record(Dir::R));
+            } else if pos < self.record_left {
+                self.record_left = pos;
+                return Ok(self.make_record(Dir::L))
+            }
         }
 
-        let pos = self.conf.pos;
-        running_min(&mut self.leftmost_since_record, pos);
-        running_max(&mut self.rightmost_since_record, pos);
-
-        if self.record_right < pos {
-            self.record_right = pos;
-            Ok(Some(self.make_record(Dir::R)))
-        } else if pos < self.record_left {
-            self.record_left = pos;
-            Ok(Some(self.make_record(Dir::L)))
-        } else {
-            Ok(None)
-        }
+        Err(FailReason::OutOfTime)
     }
 }
 
@@ -146,32 +153,26 @@ fn decide_tcyclers(tm: &TM) -> Result<Cert, FailReason> {
     // records.
     let mut record_history = Vec::with_capacity(512);
 
-    for n in 1..=TIME_LIMIT {
-        let tortoise_record = tortoise.step(tm)?;
-        if let Some(r) = hare.step(tm)? {
-            record_history.push(r.accessed_since_previous);
-        }
+    loop {
+        let tortoise_record = tortoise.next_record(tm)?;
+        let hare_record = hare.next_record(tm)?;
+        record_history.push(hare_record.accessed_since_previous);
+        let hare_record = hare.next_record(tm)?;
+        record_history.push(hare_record.accessed_since_previous);
 
-        if let Some(hare_record) = hare.step(tm)? {
-            record_history.push(hare_record.accessed_since_previous);
-
-            let Some(tortoise_record) = tortoise_record else { continue };
-            if hare_record.direction != tortoise_record.direction { continue }
-            if tortoise.conf.state != hare.conf.state { continue }
-            let k = find_k(&record_history, &tortoise_record, &hare_record);
-            let dir = hare_record.direction;
-            if compare_segment(dir, k, &tortoise.conf, &hare.conf) {
-                return Ok(Cert {
-                    dir,
-                    n0: n,
-                    n1: n,
-                    k: k as u32,
-                });
-            }
+        if hare_record.direction != tortoise_record.direction { continue }
+        if tortoise.conf.state != hare.conf.state { continue }
+        let k = find_k(&record_history, &tortoise_record, &hare_record);
+        let dir = hare_record.direction;
+        if compare_segment(dir, k, &tortoise.conf, &hare.conf) {
+            return Ok(Cert {
+                dir,
+                n0: tortoise.steps_taken,
+                n1: hare.steps_taken - tortoise.steps_taken,
+                k: k as u32,
+            });
         }
     }
-
-    Err(FailReason::OutOfTime)
 }
 
 fn running_min(x: &mut usize, y: usize) {

@@ -15,6 +15,7 @@ is split into two parts:
 ## Implemented deciders
 
  - Cyclers
+ - Translated Cyclers
 
 ## Running the deciders
 
@@ -33,3 +34,26 @@ A binary file listing the database indices of all successfully decided machines
 will be generated at `decided.dat`.
 
 [seed]: https://bbchallenge.org/method#download
+
+## Results
+
+```
+chikara:~/dev/busycoq/decide$ \time target/release/decide
+Cyclers:
+  11229238 Decided
+         0 OutOfSpace
+   3092791 OutOfTime
+         0 Halted
+  74342035 NotApplicable
+Translated Cyclers:
+  73861173 Decided
+    138452 OutOfSpace
+    342410 OutOfTime
+         0 Halted
+   3092791 NotApplicable
+10784.09user 136.66system 15:12.51elapsed 1196%CPU (0avgtext+0avgdata 10180maxresident)k
+0inputs+2794536outputs (0major+2590minor)pagefaults 0swaps
+chikara:~/dev/busycoq/verify$ \time ./verify
+79.89user 0.41system 1:20.32elapsed 99%CPU (0avgtext+0avgdata 124288maxresident)k
+0inputs+664776outputs (0major+30600minor)pagefaults 0swaps
+```
