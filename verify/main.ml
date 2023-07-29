@@ -91,6 +91,25 @@ type cert =
     | CertCyclers of int
     | CertTCyclers of dir * int * int * int
 
+exception BadCert of int * cert
+
+let show_cert (cert: cert): string =
+    match cert with
+    | CertCyclers n ->
+        Printf.sprintf "CertCyclers %d" n
+    | CertTCyclers (L, n0, n1, k) ->
+        Printf.sprintf "CertTCyclers (L, %d, %d, %d)" n0 n1 k
+    | CertTCyclers (R, n0, n1, k) ->
+        Printf.sprintf "CertTCyclers (R, %d, %d, %d)" n0 n1 k
+
+let show_exn (e: exn): string option =
+    match e with
+    | BadCert (index, cert) ->
+        Some (Printf.sprintf "BadCert (%d, %s)" index (show_cert cert))
+    | _ -> None
+
+let _ = Printexc.register_printer show_exn
+
 let read_cert (): int * cert =
     let index = read_u32 cert_file in
     let cert = match read_u8 cert_file with
@@ -113,7 +132,7 @@ let verify_cert (index: int) (cert: cert): unit =
     if ok then
         write_u32 index_file index
     else
-        failwith "verification failed"
+        raise (BadCert (index, cert))
 
 let rec verify () =
     let (index, cert) = read_cert () in
