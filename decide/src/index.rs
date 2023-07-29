@@ -161,6 +161,18 @@ pub struct Diff {
 
     #[argh(positional)]
     input2: PathBuf,
+
+    /// output the indices unique for the first input to file
+    #[argh(option, short = 'l')]
+    output1: Option<PathBuf>,
+
+    /// output the indices unique for the second input to file
+    #[argh(option, short = 'r')]
+    output2: Option<PathBuf>,
+
+    /// don't output diff to standard output
+    #[argh(switch, short = 'q')]
+    quiet: bool,
 }
 
 impl Diff {
@@ -168,11 +180,32 @@ impl Diff {
         let input1 = IndexReader::open(&self.input1).unwrap();
         let input2 = IndexReader::open(&self.input2).unwrap();
 
+        let mut output1 = self.output1.as_ref()
+            .map(|path| IndexWriter::create(path).unwrap());
+        let mut output2 = self.output2.as_ref()
+            .map(|path| IndexWriter::create(path).unwrap());
+
         for x in input1.merge_join_by(input2, |i, j| i.cmp(j)) {
             match x {
                 EitherOrBoth::Both(_, _) => (),
-                EitherOrBoth::Left(i) => println!("< {i}"),
-                EitherOrBoth::Right(i) => println!("> {i}"),
+                EitherOrBoth::Left(i) => {
+                    if !self.quiet {
+                        println!("< {i}");
+                    }
+
+                    if let Some(output) = &mut output1 {
+                        output.write(i).unwrap();
+                    }
+                }
+                EitherOrBoth::Right(i) => {
+                    if !self.quiet {
+                        println!("> {i}");
+                    }
+
+                    if let Some(output) = &mut output2 {
+                        output.write(i).unwrap();
+                    }
+                }
             }
         }
     }
