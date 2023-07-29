@@ -1,3 +1,4 @@
+mod api;
 mod certificate;
 mod cyclers;
 mod database;
@@ -89,6 +90,7 @@ enum SubCommand {
     Decide(Decide),
     Merge(index::Merge),
     Diff(index::Diff),
+    Query(api::Query),
 }
 
 #[derive(FromArgs)]
@@ -110,6 +112,7 @@ fn main() {
         SubCommand::Decide(decide) => decide.run(),
         SubCommand::Merge(merge) => merge.run(),
         SubCommand::Diff(diff) => diff.run(),
+        SubCommand::Query(query) => query.run(),
     }
 }
 

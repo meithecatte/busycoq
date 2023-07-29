@@ -15,4 +15,5 @@ Makefile.coq.conf
 *.cmi
 **/target
 *.dat
+*.log
 verify/verify
