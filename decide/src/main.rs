@@ -9,8 +9,11 @@ use cyclers::Cyclers;
 use database::Database;
 use tcyclers::TCyclers;
 use turing::TM;
+
+use argh::FromArgs;
 use std::collections::HashMap;
 use std::fmt;
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::mpsc;
 use std::thread;
@@ -72,63 +75,113 @@ impl<D: Decider> DeciderStats<D> {
     }
 }
 
+#[derive(FromArgs)]
+/// Busy beaver decision tool
+struct TopLevel {
+    #[argh(subcommand)]
+    cmd: SubCommand,
+}
+
+#[derive(FromArgs)]
+#[argh(subcommand)]
+enum SubCommand {
+    Decide(Decide),
+    Merge(Merge),
+}
+
+#[derive(FromArgs)]
+#[argh(subcommand, name = "decide")]
+/// Run deciders and produce a certificate file
+struct Decide {
+    /// path to the seed database file
+    #[argh(positional)]
+    database: PathBuf,
+
+    /// path to the output certificate file
+    #[argh(positional)]
+    certs: PathBuf,
+}
+
+#[derive(FromArgs)]
+#[argh(subcommand, name = "merge")]
+/// Merge index files
+struct Merge {
+    /// output file
+    #[argh(option, short = 'o')]
+    out: PathBuf,
+
+    /// input files
+    #[argh(positional)]
+    inputs: Vec<PathBuf>,
+}
+
 fn main() {
-    let mut db = Database::open("../seed.dat").unwrap();
-    let mut certs = CertList::create("../certs.dat").unwrap();
-    let (tx, rx) = mpsc::channel();
-    let write_certs = thread::spawn(move || {
-        let mut staging = HashMap::new();
-        let mut next = 0;
-        for (index, cert) in rx {
-            staging.insert(index, cert);
-            while let Some(cert) = staging.remove(&next) {
-                if let Some(cert) = cert {
-                    certs.write_entry(next, &cert).unwrap();
+    let args: TopLevel = argh::from_env();
+    match args.cmd {
+        SubCommand::Decide(decide) => decide.run(),
+        SubCommand::Merge(merge) => todo!(),
+    }
+}
+
+impl Decide {
+    fn run(&self) {
+        let mut db = Database::open(&self.database).unwrap();
+        let mut certs = CertList::create(&self.certs).unwrap();
+        let (tx, rx) = mpsc::channel();
+        let write_certs = thread::spawn(move || {
+            let mut staging = HashMap::new();
+            let mut next = 0;
+            for (index, cert) in rx {
+                staging.insert(index, cert);
+                while let Some(cert) = staging.remove(&next) {
+                    if let Some(cert) = cert {
+                        certs.write_entry(next, &cert).unwrap();
+                    }
+
+                    next += 1;
                 }
-
-                next += 1;
-            }
-        }
-    });
-
-    let processed = AtomicU32::new(0);
-    let num = db.num_total;
-
-    let cyclers = DeciderStats::<Cyclers>::new();
-    let tcyclers = DeciderStats::<TCyclers>::new();
-
-    thread::scope(|s| {
-        let progress_thread = s.spawn(|| {
-            let style = ProgressStyle::with_template(
-                "[{elapsed_precise}] {bar:30.cyan} {pos:>8}/{len:8} {msg}"
-            ).unwrap();
-            let bar = ProgressBar::new(num as u64)
-                .with_style(style);
-            loop {
-                let processed = processed.load(Ordering::Relaxed);
-                bar.set_message(format!("C {cyclers} TC {tcyclers}"));
-                bar.set_position(processed as u64);
-                if processed == num {
-                    return;
-                }
-
-                thread::park_timeout(Duration::from_millis(250));
             }
         });
 
-        db.iter().par_bridge().for_each(|tm| {
-            let cert = cyclers.decide(&tm)
-                .or_else(|| tcyclers.decide(&tm));
-            processed.fetch_add(1, Ordering::Relaxed);
-            tx.send((tm.index, cert)).unwrap();
+        let processed = AtomicU32::new(0);
+        let num = db.num_total;
+
+        let cyclers = DeciderStats::<Cyclers>::new();
+        let tcyclers = DeciderStats::<TCyclers>::new();
+
+        thread::scope(|s| {
+            let progress_thread = s.spawn(|| {
+                let style = ProgressStyle::with_template(
+                    "[{elapsed_precise}] {bar:30.cyan} {pos:>8}/{len:8} {msg}"
+                ).unwrap();
+                let bar = ProgressBar::new(num as u64)
+                    .with_style(style);
+                loop {
+                    let processed = processed.load(Ordering::Relaxed);
+                    bar.set_message(format!("C {cyclers} TC {tcyclers}"));
+                    bar.set_position(processed as u64);
+                    if processed == num {
+                        return;
+                    }
+
+                    thread::park_timeout(Duration::from_millis(250));
+                }
+            });
+
+            db.iter().par_bridge().for_each(|tm| {
+                let cert = cyclers.decide(&tm)
+                    .or_else(|| tcyclers.decide(&tm));
+                processed.fetch_add(1, Ordering::Relaxed);
+                tx.send((tm.index, cert)).unwrap();
+            });
+
+            progress_thread.thread().unpark();
         });
 
-        progress_thread.thread().unpark();
-    });
+        drop(tx);
+        write_certs.join().unwrap();
 
-    drop(tx);
-    write_certs.join().unwrap();
-
-    cyclers.print_stats();
-    tcyclers.print_stats();
+        cyclers.print_stats();
+        tcyclers.print_stats();
+    }
 }
