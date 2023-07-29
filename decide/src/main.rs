@@ -1,6 +1,7 @@
 mod certificate;
 mod cyclers;
 mod database;
+mod index;
 mod tcyclers;
 mod turing;
 
@@ -86,7 +87,8 @@ struct TopLevel {
 #[argh(subcommand)]
 enum SubCommand {
     Decide(Decide),
-    Merge(Merge),
+    Merge(index::Merge),
+    Diff(index::Diff),
 }
 
 #[derive(FromArgs)]
@@ -102,24 +104,12 @@ struct Decide {
     certs: PathBuf,
 }
 
-#[derive(FromArgs)]
-#[argh(subcommand, name = "merge")]
-/// Merge index files
-struct Merge {
-    /// output file
-    #[argh(option, short = 'o')]
-    out: PathBuf,
-
-    /// input files
-    #[argh(positional)]
-    inputs: Vec<PathBuf>,
-}
-
 fn main() {
     let args: TopLevel = argh::from_env();
     match args.cmd {
         SubCommand::Decide(decide) => decide.run(),
-        SubCommand::Merge(merge) => todo!(),
+        SubCommand::Merge(merge) => merge.run(),
+        SubCommand::Diff(diff) => diff.run(),
     }
 }
 

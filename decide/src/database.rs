@@ -37,6 +37,8 @@ impl Database {
 
         reader.seek_relative(30 - 13)?;
 
+        assert_eq!(num_timelimit + num_spacelimit, num_total);
+
         Ok(Self {
             num_timelimit,
             num_spacelimit,
