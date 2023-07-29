@@ -1,11 +1,13 @@
 mod certificate;
 mod cyclers;
 mod database;
+mod tcyclers;
 mod turing;
 
 use certificate::{Certificate, CertList};
 use cyclers::Cyclers;
 use database::Database;
+use tcyclers::TCyclers;
 use turing::TM;
 use std::collections::HashMap;
 use std::fmt;
@@ -93,17 +95,18 @@ fn main() {
     let num = db.num_total;
 
     let cyclers = DeciderStats::<Cyclers>::new();
+    let tcyclers = DeciderStats::<TCyclers>::new();
 
     thread::scope(|s| {
         let progress_thread = s.spawn(|| {
             let style = ProgressStyle::with_template(
-                "[{elapsed_precise}] {bar:30.cyan} {pos:>8}/{pos:8} {msg}"
+                "[{elapsed_precise}] {bar:30.cyan} {pos:>8}/{len:8} {msg}"
             ).unwrap();
             let bar = ProgressBar::new(num as u64)
                 .with_style(style);
             loop {
                 let processed = processed.load(Ordering::Relaxed);
-                bar.set_message(format!("C {cyclers}"));
+                bar.set_message(format!("C {cyclers} TC {tcyclers}"));
                 bar.set_position(processed as u64);
                 if processed == num {
                     return;
@@ -114,7 +117,8 @@ fn main() {
         });
 
         db.iter().par_bridge().for_each(|tm| {
-            let cert = cyclers.decide(&tm);
+            let cert = cyclers.decide(&tm)
+                .or_else(|| tcyclers.decide(&tm));
             processed.fetch_add(1, Ordering::Relaxed);
             tx.send((tm.index, cert)).unwrap()
         });
@@ -126,4 +130,5 @@ fn main() {
     write_certs.join().unwrap();
 
     cyclers.print_stats();
+    tcyclers.print_stats();
 }

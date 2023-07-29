@@ -7,9 +7,18 @@ let verify_cycler tm n =
     let n = nat_of_int n in
     ECyclers.verify_cycler tm n n
 
+let verify_tcycler tm dir n0 n1 k =
+    let n0 = nat_of_int n0
+    and n1 = nat_of_int n1
+    and k = nat_of_int k in
+    ETranslatedCyclers.verify_tcycler tm dir n0 n1 k
+
 let seed_file = open_in_bin "../seed.dat"
 let cert_file = open_in_bin "../certs.dat"
 let index_file = open_out_bin "../decided.dat"
+
+let read_u8 (ch: in_channel): int =
+    Char.code (input_char ch)
 
 let read_u32 (ch: in_channel): int =
     let buf = Bytes.create 4 in
@@ -80,11 +89,18 @@ let read_tm (index: int): tm =
 
 type cert =
     | CertCyclers of int
+    | CertTCyclers of dir * int * int * int
 
 let read_cert (): int * cert =
     let index = read_u32 cert_file in
-    let cert = match read_u32 cert_file with
+    let cert = match read_u8 cert_file with
     | 0 -> CertCyclers (read_u32 cert_file)
+    | 1 ->
+        let dir = parse_dir (input_char cert_file)
+        and n0 = read_u32 cert_file
+        and n1 = read_u32 cert_file
+        and k = read_u32 cert_file in
+        CertTCyclers (dir, n0, n1, k)
     | _ -> failwith "unknown certificate type"
     in (index, cert)
 
@@ -92,6 +108,7 @@ let verify_cert (index: int) (cert: cert): unit =
     let tm = read_tm index in
     let ok = match cert with
     | CertCyclers n -> verify_cycler tm n
+    | CertTCyclers (dir, n0, n1, k) -> verify_tcycler tm dir n0 n1 k
     in
     if ok then
         write_u32 index_file index

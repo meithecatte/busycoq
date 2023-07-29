@@ -5,10 +5,12 @@ use std::fs::File;
 use std::path::Path;
 use byteorder::{BE, WriteBytesExt};
 use crate::cyclers;
+use crate::tcyclers;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Certificate {
     Cyclers(cyclers::Cert),
+    TCyclers(tcyclers::Cert),
 }
 
 pub struct CertList {
@@ -27,7 +29,11 @@ impl CertList {
         use Certificate::*;
         match cert {
             Cyclers(cert) => {
-                self.writer.write_u32::<BE>(0)?;
+                self.writer.write_u8(0)?;
+                self.writer.write_all(&cert.to_bytes())?;
+            }
+            TCyclers(cert) => {
+                self.writer.write_u8(1)?;
                 self.writer.write_all(&cert.to_bytes())?;
             }
         }
@@ -39,5 +45,11 @@ impl CertList {
 impl From<cyclers::Cert> for Certificate {
     fn from(cert: cyclers::Cert) -> Certificate {
         Certificate::Cyclers(cert)
+    }
+}
+
+impl From<tcyclers::Cert> for Certificate {
+    fn from(cert: tcyclers::Cert) -> Certificate {
+        Certificate::TCyclers(cert)
     }
 }

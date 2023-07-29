@@ -40,7 +40,7 @@ pub struct TM {
 pub struct Configuration {
     pub state: u8,
     pub pos: usize,
-    tape: Box<[bool]>,
+    pub tape: Box<[bool]>,
 }
 
 impl TM {
