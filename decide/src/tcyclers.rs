@@ -4,8 +4,8 @@ use byteorder::{BE, WriteBytesExt};
 use enum_map::Enum;
 use std::io::Cursor;
 
-const SPACE_LIMIT: usize = 65536;
-const TIME_LIMIT: u32 = 50000000;
+const SPACE_LIMIT: usize = 4096;
+const TIME_LIMIT: u32 = 20000;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Cert {
