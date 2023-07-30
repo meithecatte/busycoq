@@ -38,7 +38,7 @@ Qed.
 
 Definition flip_conf (c : Q * tape) : Q * tape :=
   match c with
-  | q; t => q; flip_tape t
+  | q;; t => q;; flip_tape t
   end.
 
 Lemma flip_conf_involutive : forall c,

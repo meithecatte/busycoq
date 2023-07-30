@@ -100,7 +100,7 @@ Qed.
 
 Definition eqb (c c' : Q * ctape) : bool :=
   match c, c' with
-  | q; t, q'; t' => eqb_q q q' && eqb_tape t t'
+  | q;; t, q';; t' => eqb_q q q' && eqb_tape t t'
   end.
 
 Lemma eqb_spec : forall c c',
@@ -143,11 +143,11 @@ Qed.
 (** Computable semantics of Turing machines. *)
 Definition cstep (tm : TM) (c : Q * ctape) : option (Q * ctape) :=
   match c with
-  | q; l {{s}} r =>
+  | q;; l {{s}} r =>
     match tm (q, s) with
     | None => None
-    | Some (s', L, q') => Some (q'; left  (l {{s'}} r))
-    | Some (s', R, q') => Some (q'; right (l {{s'}} r))
+    | Some (s', L, q') => Some (q';; left  (l {{s'}} r))
+    | Some (s', R, q') => Some (q';; right (l {{s'}} r))
     end
   end.
 
@@ -156,7 +156,7 @@ Lemma cstep_halting : forall tm c,
 Proof.
   introv H. destruct c as [q [[l s] r]]. unfold halting.
   simpl. simpl in H.
-  destruct (tm (q; s)) as [[[s' []] q'] |]; try discriminate.
+  destruct (tm (q;; s)) as [[[s' []] q'] |]; try discriminate.
   reflexivity.
 Qed.
 
@@ -166,7 +166,7 @@ Lemma cstep_some : forall tm c c',
 Proof.
   introv H. destruct c as [q [[l s] r]].
   simpl. simpl in H.
-  destruct (tm (q; s)) as [[[s' []] q1] |] eqn:E; inverts H as; simpl.
+  destruct (tm (q;; s)) as [[[s' []] q1] |] eqn:E; inverts H as; simpl.
   - rewrite lift_left. apply step_left. assumption.
   - rewrite lift_right. apply step_right. assumption.
 Qed.
@@ -225,7 +225,7 @@ Proof.
 Qed.
 
 (** The starting configuration. *)
-Definition starting : Q * ctape := q0; [] {{s0}} [].
+Definition starting : Q * ctape := q0;; [] {{s0}} [].
 
 Lemma lift_starting : lift starting = c0.
 Proof. reflexivity. Qed.

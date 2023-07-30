@@ -73,7 +73,7 @@ Definition move_right (t : tape) : tape :=
 (** Notation for the configuration of a machine. Note that the position
     of the head within the tape is implicit, since the tape is centered
     at the head. *)
-Notation "q ; t" := (q, t) (at level 35).
+Notation "q ;; t" := (q, t) (at level 35).
 
 (** The small-step semantics of Turing machines: *)
 Reserved Notation "c -[ tm ]-> c'" (at level 40).
@@ -81,10 +81,10 @@ Reserved Notation "c -[ tm ]-> c'" (at level 40).
 Inductive step (tm : TM) : Q * tape -> Q * tape -> Prop :=
   | step_left q q' s s' l r :
     tm (q, s) = Some (s', L, q') ->
-    q; l {{s}} r -[ tm ]-> q'; (move_left (l {{s'}} r))
+    q;; l {{s}} r -[ tm ]-> q';; (move_left (l {{s'}} r))
   | step_right q q' s s' l r :
     tm (q, s) = Some (s', R, q') ->
-    q; l {{s}} r -[ tm ]-> q'; (move_right (l {{s'}} r))
+    q;; l {{s}} r -[ tm ]-> q';; (move_right (l {{s'}} r))
 
   where "c -[ tm ]-> c'" := (step tm c c').
 
@@ -120,7 +120,7 @@ Definition halting (tm : TM) (c : Q * tape) : Prop :=
   end.
 
 (** The initial configuration of the machine *)
-Definition c0 : Q * tape := q0; const s0 {{s0}} const s0.
+Definition c0 : Q * tape := q0;; const s0 {{s0}} const s0.
 
 (** A Turing machine halts if it eventually reaches a halting configuration. *)
 Definition halts_in (tm : TM) (c : Q * tape) (n : nat) :=

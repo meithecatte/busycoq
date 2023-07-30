@@ -57,8 +57,8 @@ Ltac triv := introv; repeat (step || follow); try apply evstep_refl.
 
 Notation "c --> c'" := (c -[ tm ]-> c')   (at level 40).
 Notation "c -->* c'" := (c -[ tm ]->* c') (at level 40).
-Notation "l <{{ q }} r" := (q; tl l {{hd l}} r)  (at level 30, q at next level).
-Notation "l {{ q }}> r" := (q; l {{hd r}} tl r)  (at level 30, q at next level).
+Notation "l <{{ q }} r" := (q;; tl l {{hd l}} r)  (at level 30, q at next level).
+Notation "l {{ q }}> r" := (q;; l {{hd r}} tl r)  (at level 30, q at next level).
 
 Fixpoint L (n : positive) : side :=
   match n with

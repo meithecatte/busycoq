@@ -191,10 +191,10 @@ Reserved Notation "c =[ tm ]=> c'" (at level 40).
 Inductive lstep (tm : TM) : nat * (Q * tape) -> nat * (Q * tape) -> Prop :=
   | lstep_left k q q' s s' l r :
     tm (q, s) = Some (s', L, q') ->
-    (S k, q; l {{s}} r) =[ tm ]=> (k, q'; (move_left (l {{s'}} r)))
+    (S k, q;; l {{s}} r) =[ tm ]=> (k, q';; move_left (l {{s'}} r))
   | lstep_right k q q' s s' l r :
     tm (q, s) = Some (s', R, q') ->
-    (k, q; l {{s}} r) =[ tm ]=> (S k, q'; (move_right (l {{s'}} r)))
+    (k, q;; l {{s}} r) =[ tm ]=> (S k, q';; move_right (l {{s'}} r))
 
   where "c =[ tm ]=> c'" := (lstep tm c c').
 
@@ -216,8 +216,8 @@ Local Arguments move_right : simpl never.
 
 Lemma lstep_EqLimit : forall tm k q t1 t2 k' q' t1',
   EqLimit k t1 t2 ->
-  (k, q; t1) =[ tm ]=> (k', q'; t1') ->
-  exists t2', EqLimit k' t1' t2' /\ (k, q; t2) =[ tm ]=> (k', q'; t2').
+  (k, q;; t1) =[ tm ]=> (k', q';; t1') ->
+  exists t2', EqLimit k' t1' t2' /\ (k, q;; t2) =[ tm ]=> (k', q';; t2').
 Proof.
   introv Heq Hstep.
   destruct t1 as [[l1 s1] r1].
@@ -235,8 +235,8 @@ Qed.
 
 Lemma lmultistep_EqLimit : forall tm n k q t1 t2 k' q' t1',
   EqLimit k t1 t2 ->
-  (k, q; t1) =[ tm ]=>* n / (k', q'; t1') ->
-  exists t2', EqLimit k' t1' t2' /\ (k, q; t2) =[ tm ]=>* n / (k', q'; t2').
+  (k, q;; t1) =[ tm ]=>* n / (k', q';; t1') ->
+  exists t2', EqLimit k' t1' t2' /\ (k, q;; t2) =[ tm ]=>* n / (k', q';; t2').
 Proof.
   induction n; introv Heq Hexec; inverts Hexec as Hstep Hrest.
   - exists t2. split.
@@ -273,9 +273,9 @@ Qed.
 
 (** This allows us to describe the behavior of a translated cycler: *)
 Lemma tcycle_chain : forall tm n k k' q t t' i,
-  (k, q; t) =[ tm ]=>* n / (k + k', q; t') ->
+  (k, q;; t) =[ tm ]=>* n / (k + k', q;; t') ->
   EqLimit k t t' ->
-  exists t'', EqLimit k t t'' /\ q; t -[ tm ]->> (i * n) / q; t''.
+  exists t'', EqLimit k t t'' /\ q;; t -[ tm ]->> (i * n) / q;; t''.
 Proof.
   introv Hexec Heq.
   induction i.
@@ -294,10 +294,10 @@ Proof.
 Qed.
 
 Theorem tcycle_nonhalting : forall tm n k k' q t t',
-  (k, q; t) =[ tm ]=>* n / (k + k', q; t') ->
+  (k, q;; t) =[ tm ]=>* n / (k + k', q;; t') ->
   EqLimit k t t' ->
   n > 0 ->
-  ~ halts tm (q; t).
+  ~ halts tm (q;; t).
 Proof.
   introv Hrun Heq Hgt0 Hhalt.
   destruct Hhalt as [h Hhalt].
@@ -311,15 +311,15 @@ Qed.
 Definition clstep (tm : TM) (c : nat * (Q * ctape))
     : option (nat * (Q * ctape)) :=
   match c with
-  | (k, q; l {{s}} r) =>
+  | (k, q;; l {{s}} r) =>
     match tm (q, s) with
     | None => None
     | Some (s', L, q') =>
       match k with
       | 0 => None
-      | S k => Some (k, q'; left (l {{s'}} r))
+      | S k => Some (k, q';; left (l {{s'}} r))
       end
-    | Some (s', R, q') => Some (S k, q'; right (l {{s'}} r))
+    | Some (s', R, q') => Some (S k, q';; right (l {{s'}} r))
     end
   end.
 
@@ -330,7 +330,7 @@ Proof.
   introv H.
   destruct c as [q [[l s] r]].
   simpl. simpl in H.
-  destruct (tm (q; s)) as [[[s' []] q1] |] eqn:E; try discriminate.
+  destruct (tm (q;; s)) as [[[s' []] q1] |] eqn:E; try discriminate.
   - destruct k as [| k]; try discriminate.
     inverts H as; simpl.
     rewrite lift_left. apply lstep_left. assumption.
@@ -357,7 +357,7 @@ Lemma clmultistep_some : forall tm n k c k' c',
 Proof.
   induction n; introv H; simpl in H.
   - inverts H. apply lmultistep_0.
-  - destruct (clstep tm (k; c)) as [[kk cc] |] eqn:E; try discriminate.
+  - destruct (clstep tm (k;; c)) as [[kk cc] |] eqn:E; try discriminate.
     apply IHn in H. apply clstep_lstep in E.
     eauto using lmultistep_S.
 Qed.
@@ -368,7 +368,7 @@ Definition verify_tcycler_r (tm : TM) (n0 n1 k : nat) :=
     match clmultistep tm n1 (k, c1) with
     | Some (k', c1') =>
       match c1, c1' with
-      | q; t, q'; t' =>
+      | q;; t, q';; t' =>
         (0 <? n1) && (k <=? k') && eqb_q q q' && eqb_limit k t t'
       end
     | None => false

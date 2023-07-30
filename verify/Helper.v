@@ -2,6 +2,7 @@
 
 Set Warnings "-notation-overriden,-parsing,-deprecated-hint-without-locality".
 From Coq Require Import Bool.
+From Coq Require Import Lists.List. Import ListNotations.
 From Coq Require Import Lists.Streams.
 From Coq Require Import Lia.
 From BusyCoq Require Export LibTactics.
@@ -65,3 +66,9 @@ Proof.
   - destruct IHh as [k IH].
     exists (S k). lia.
 Qed.
+
+Fixpoint Str_app {A} (xs : list A) (ys : Stream A) : Stream A :=
+  match xs with
+  | [] => ys
+  | x :: xs => Cons x (Str_app xs ys)
+  end.
