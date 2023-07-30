@@ -62,12 +62,12 @@ Local Example tape_ex (a b c d e : Sym) : tape :=
 (** Helper functions for moving the tape head: *)
 Definition move_left (t : tape) : tape :=
   match t with
-  | l << s' {{s}} r => l {{s'}} s >> r
+  | l {{s}} r => tl l {{hd l}} s >> r
   end.
 
 Definition move_right (t : tape) : tape :=
   match t with
-  | l {{s}} s' >> r => l << s {{s'}} r
+  | l {{s}} r => l << s {{hd r}} tl r
   end.
 
 (** Notation for the configuration of a machine. Note that the position
@@ -88,7 +88,7 @@ Inductive step (tm : TM) : Q * tape -> Q * tape -> Prop :=
 
   where "c -[ tm ]-> c'" := (step tm c c').
 
-(** And the indexed multistep relation: *)
+(** Executing a specified number of steps: *)
 Reserved Notation "c -[ tm ]->> n / c'" (at level 40, n at next level).
 
 Inductive multistep (tm : TM) : nat -> Q * tape -> Q * tape -> Prop :=
@@ -99,6 +99,19 @@ Inductive multistep (tm : TM) : nat -> Q * tape -> Q * tape -> Prop :=
     c  -[ tm ]->> S n / c''
 
   where "c -[ tm ]->> n / c'" := (multistep tm n c c').
+
+(** Executing an unspecified number of steps (the "eventually
+    reaches" relation): *)
+Reserved Notation "c -[ tm ]->* c'" (at level 40).
+
+Inductive evstep (tm : TM) : Q * tape -> Q * tape -> Prop :=
+  | evstep_refl c : c -[ tm ]->* c
+  | evstep_step c c' c'' :
+    c  -[ tm ]->  c'  ->
+    c' -[ tm ]->* c'' ->
+    c  -[ tm ]->* c''
+
+    where "c -[ tm ]->* c'" := (evstep tm c c').
 
 (** A halting configuration is one for which [tm (q, s)] returns [None]. *)
 Definition halting (tm : TM) (c : Q * tape) : Prop :=
@@ -116,7 +129,8 @@ Definition halts_in (tm : TM) (c : Q * tape) (n : nat) :=
 Definition halts (tm : TM) (c0 : Q * tape) :=
   exists n, halts_in tm c0 n.
 
-(** We prove that this corresponds with [step]. *)
+(** We prove that the "syntactic" notion of [halting] corresponds
+    to the behavior of [step]. *)
 Lemma halting_no_step :
   forall tm c c',
   halting tm c ->
@@ -179,6 +193,38 @@ Proof.
   - apply IH.
     rewrite (step_deterministic _ _ _ _ H01 H0a).
     assumption.
+Qed.
+
+Lemma evstep_trans :
+  forall tm c c' c'',
+  c  -[ tm ]->* c'  ->
+  c' -[ tm ]->* c'' ->
+  c  -[ tm ]->* c''.
+Proof.
+  introv H1 H2. induction H1.
+  - apply H2.
+  - eauto using evstep_step.
+Qed.
+
+Lemma without_counter :
+  forall tm n c c',
+  c -[ tm ]->> n / c' ->
+  c -[ tm ]->* c'.
+Proof.
+  introv H. induction H.
+  - apply evstep_refl.
+  - eauto using evstep_step.
+Qed.
+
+Lemma with_counter :
+  forall tm c c',
+  c -[ tm ]->* c' ->
+  exists n, c -[ tm ]->> n / c'.
+Proof.
+  introv H. induction H.
+  - exists 0. apply multistep_0.
+  - destruct IHevstep as [n IH].
+    eauto using multistep_S.
 Qed.
 
 Lemma rewind_split:

@@ -22,21 +22,6 @@ Definition flip_tape (t : tape) :=
   | l {{s}} r => r {{s}} l
   end.
 
-Lemma flip_move_left : forall t,
-  flip_tape (move_left t) = move_right (flip_tape t).
-Proof.
-  intros [[[u l] s] r]. reflexivity.
-Qed.
-
-Lemma flip_move_right : forall t,
-  flip_tape (move_right t) = move_left (flip_tape t).
-Proof.
-  intros [[l s] [u r]]. reflexivity.
-Qed.
-
-Arguments move_left : simpl never.
-Arguments move_right : simpl never.
-
 Definition flip (tm : TM) : TM := fun qs =>
   match tm qs with
   | Some (s, d, q) => Some (s, flip_dir d, q)
@@ -68,9 +53,9 @@ Lemma flip_step : forall tm c c',
 Proof.
   introv H.
   inverts H as E.
-  - simpl. rewrite flip_move_left. apply step_right.
+  - simpl. apply step_right.
     unfold flip. rewrite E. reflexivity.
-  - simpl. rewrite flip_move_right. apply step_left.
+  - simpl. apply step_left.
     unfold flip. rewrite E. reflexivity.
 Qed.
 

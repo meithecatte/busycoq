@@ -211,8 +211,8 @@ Inductive lmultistep (tm : TM)
 
   where "c =[ tm ]=>* n / c'" := (lmultistep tm n c c').
 
-Arguments move_left : simpl never.
-Arguments move_right : simpl never.
+Local Arguments move_left : simpl never.
+Local Arguments move_right : simpl never.
 
 Lemma lstep_EqLimit : forall tm k q t1 t2 k' q' t1',
   EqLimit k t1 t2 ->
