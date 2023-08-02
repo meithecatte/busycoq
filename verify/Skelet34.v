@@ -8,12 +8,8 @@ From Coq Require Import List. Import ListNotations.
 From Coq Require Import Lia.
 From Coq Require Import PArith.BinPos PArith.Pnat.
 From Coq Require Import NArith.BinNat NArith.Nnat.
-From BusyCoq Require Import Extraction. Import ETranslatedCyclers.
+From BusyCoq Require Import Individual FixedBin ShiftOverflow.
 Set Default Goal Selector "!".
-
-Notation "0" := S0.
-Notation "1" := S1.
-Notation side := (Stream sym).
 
 Definition tm : TM := fun '(q, s) =>
   match q, s with
@@ -24,73 +20,11 @@ Definition tm : TM := fun '(q, s) =>
   | E, 0 => Some (1, L, A)  | E, 1 => Some (1, R, A)
   end.
 
-(** Trivial lemmas, but [simpl] in these situations leaves a mess. *)
-Lemma move_left_const : forall s0 s r,
-  move_left (const s0 {{s}} r) = const s0 {{s0}} s >> r.
-Proof. reflexivity. Qed.
-
-Lemma move_right_const : forall l s s0,
-  move_right (l {{s}} const s0) = l << s {{s0}} const s0.
-Proof. reflexivity. Qed.
-
-(** [assumption] and [eassumption] both refuse to instantiate [forall]s. *)
-
-Ltac apply_assumption :=
-  match goal with
-  | H: _ |- _ => apply H
-  end.
-
-Ltac prove_step_left := apply step_left; reflexivity.
-Ltac prove_step_right := apply step_right; reflexivity.
-Ltac prove_step := prove_step_left || prove_step_right.
-Ltac simpl_tape :=
-  try rewrite move_left_const;
-  try rewrite move_right_const;
-  simpl.
-Ltac finish := apply evstep_refl.
-Ltac step := eapply evstep_step; [prove_step | simpl_tape].
-Ltac execute := repeat (try finish; step).
-Ltac follow_assm := eapply evstep_trans; [apply_assumption; eauto |].
-Ltac follow_hyp H := eapply evstep_trans; [apply H; eauto |].
-
-Tactic Notation "follow" := follow_assm.
-Tactic Notation "follow" constr(H) := follow_hyp H.
-
-Ltac triv := introv; repeat (step || follow); try finish.
-
 Notation "c --> c'" := (c -[ tm ]-> c')   (at level 40).
 Notation "c -->* c'" := (c -[ tm ]->* c') (at level 40).
 Notation "c -->+ c'" := (c -[ tm ]->+ c') (at level 40).
-Notation "l <{{ q }} r" := (q;; tl l {{hd l}} r)  (at level 30, q at next level).
-Notation "l {{ q }}> r" := (q;; l {{hd r}} tl r)  (at level 30, q at next level).
-Notation "s >>> r" := (Str_app s r)  (at level 25, right associativity).
-Notation "l <<< s" := (Str_app s l)  (at level 24, left associativity).
-Notation pow s n := (concat (repeat s n)).
 
 Notation P := Pos.succ.
-
-Definition het_add (a : N) (b : positive) : positive :=
-  match a with
-  | N0 => b
-  | Npos a => a + b
-  end.
-
-Notation "a :+ b" := (het_add a b)  (at level 50, left associativity).
-
-Lemma het_add_succ : forall a b, N.succ a :+ b = a :+ P b.
-Proof.
-  introv. destruct a; unfold ":+", N.succ; lia.
-Qed.
-
-Lemma het_add_succ_l : forall a b, N.succ a :+ b = P (a :+ b).
-Proof.
-  introv. destruct a; unfold ":+", N.succ; lia.
-Qed.
-
-Lemma pos_het_add : forall a b, (N.pos (a :+ b) = a + N.pos b)%N.
-Proof.
-  introv. destruct a; unfold ":+"; lia.
-Qed.
 
 Fixpoint L' (n : positive) : side :=
   match n with
@@ -114,70 +48,6 @@ Fixpoint R (n : positive) : side :=
 
 Definition D n m : Q * tape :=
   L n <{{C}} 1 >> 0 >> 1 >> 0 >> R m.
-
-(** We use a definition of [b] shifted by 1 compared to the informal proof, i.e.
-    we can do [n + b n] is the farthest we can go without reaching a new power
-    of two. *)
-Fixpoint b (n : positive) : N :=
-  match n with
-  | xH => N0
-  | xO n' => N.succ_double (b n')
-  | xI n' => N.double (b n')
-  end.
-
-Inductive has0 : positive -> Prop :=
-  | has0_0 n: has0 (n~0)
-  | has0_1 n: has0 n -> has0 (n~1).
-
-Hint Constructors has0 : core.
-
-Inductive all1 : positive -> Prop :=
-  | all1_H:   all1 1
-  | all1_1 n: all1 n -> all1 (n~1).
-
-Lemma b0_all1 : forall n, b n = N0 -> all1 n.
-Proof.
-  induction n; introv H.
-  - apply all1_1, IHn.
-    simpl in H. lia.
-  - simpl in H. lia.
-  - apply all1_H.
-Qed.
-
-Lemma bn0_has0 : forall n, (b n > 0)%N -> has0 n.
-Proof.
-  induction n; introv H; simpl; simpl in H.
-  - apply has0_1, IHn. lia.
-  - apply has0_0.
-  - lia.
-Qed.
-
-Lemma b_succ : forall n, (b n > 0)%N -> b (P n) = N.pred (b n).
-Proof. induction n; simpl; lia. Qed.
-
-Lemma b_add : forall u n,
-  (u <= b n -> b (u :+ n) = b n - u)%N.
-Proof.
-  apply (N.induction (fun u => forall n, u <= b n -> b (u :+ n) = b n - u)%N).
-  - intuition.
-  - introv H. simpl. lia.
-  - intros u IH n H.
-    rewrite het_add_succ_l, b_succ; rewrite IH; lia.
-Qed.
-
-Corollary b_add_self : forall n,
-  b (b n :+ n) = 0%N.
-Proof.
-  introv. rewrite b_add; lia.
-Qed.
-
-Lemma b0_succ : forall n, b n = 0%N -> b (P n) = (Npos n).
-Proof.
-  introv H. apply b0_all1 in H.
-  induction H.
-  - reflexivity.
-  - simpl. rewrite IHall1. lia.
-Qed.
 
 Lemma L_inc : forall n r,
   L n <{{C}} r -->* L (N.succ n) {{B}}> r.
@@ -290,88 +160,6 @@ Proof.
   follow R_inc_has0. execute.
 Qed.
 
-Inductive bin : nat -> Type :=
-  | bb : bin 0
-  | b0 {k} : bin k -> bin (S k)
-  | b1 {k} : bin k -> bin (S k).
-
-Reserved Notation "c -S-> c'" (at level 40, c' at next level).
-
-Inductive bin_succ : forall {k}, bin k -> bin k -> Prop :=
-  | succ_b0 {k} (n : bin k)    : (b0 n) -S-> (b1 n)
-  | succ_b1 {k} (n n' : bin k) : n -S-> n'  ->  b1 n -S-> b0 n'
-
-  where "c -S-> c'" := (bin_succ c c').
-
-Inductive bin_plus {k} : N -> bin k -> bin k -> Prop :=
-  | plus_0 n : bin_plus N0 n n
-  | plus_S u n n' n'' :
-    n -S-> n' ->
-    bin_plus         u  n' n'' ->
-    bin_plus (N.succ u) n n''.
-
-Hint Constructors bin_succ bin_plus : core.
-
-Lemma plus_S' : forall k u (n n' n'' : bin k),
-  bin_plus u n n' ->
-  n' -S-> n'' ->
-  bin_plus (N.succ u) n n''.
-Proof.
-  introv H. induction H; eauto.
-Qed.
-
-Lemma bin_plus_b0 : forall k u (n n' : bin k),
-  bin_plus u n n' ->
-  bin_plus (N.double u) (b0 n) (b0 n').
-Proof.
-  introv H. induction H.
-  - auto.
-  - replace (N.double (N.succ u)) with (N.succ (N.succ (N.double u))) by lia.
-    eauto.
-Qed.
-
-Fixpoint bin_min k : bin k :=
-  match k with
-  | O => bb
-  | S k => b0 (bin_min k)
-  end.
-
-Fixpoint bin_max k : bin k :=
-  match k with
-  | O => bb
-  | S k => b1 (bin_max k)
-  end.
-
-Fixpoint pow2' (k : nat) : positive :=
-  match k with
-  | O => 1
-  | S k => (pow2' k)~0
-  end.
-
-Definition pow2 (k : nat) : N := Npos (pow2' k).
-
-Arguments pow2 _ : simpl never.
-
-Lemma pow2_S : forall k,
-  pow2 (S k) = N.double (pow2 k).
-Proof. introv. unfold pow2. simpl. lia. Qed.
-
-Lemma pow2_gt0 : forall k, (pow2 k > 0)%N.
-Proof. unfold pow2. lia. Qed.
-
-Lemma inc_to_max : forall k,
-  bin_plus (pow2 k - 1) (bin_min k) (bin_max k).
-Proof.
-  induction k.
-  - auto.
-  - replace (pow2 (S k) - 1)%N with (N.succ (N.double (pow2 k - 1))).
-    + eapply plus_S'.
-      * apply bin_plus_b0. eassumption.
-      * constructor.
-    + assert (pow2 k > 0)%N by apply pow2_gt0.
-      rewrite pow2_S. lia.
-Qed.
-
 Fixpoint pow4 (k : nat) (n : positive) : positive :=
   match k with
   | O => n
@@ -401,34 +189,6 @@ Proof.
   introv Hm Hn. destruct a;
     follow Lk_inc; execute; follow R_inc_has0; execute.
 Qed.
-
-(*
-Fixpoint R_incs (n : nat) (m : positive) : Prop :=
-  match n with
-  | O => True
-  | S n => has0 m /\ R_incs n (P m)
-  end.
-
-Lemma R_incs_less : forall n n' m,
-  n' < n ->
-  R_incs n m -> R_incs n' m.
-Proof.
-  induction n; introv Hlt H.
-  - inversion Hlt.
-  - destruct n' as [| n'].
-    + apply I.
-    + destruct H as [H1 H2].
-      split.
-      * exact H1.
-      * apply IHn; [lia | assumption].
-Qed.
-
-Fixpoint incr (n : nat) (m : positive) : positive :=
-  match n with
-  | O => m
-  | S n => incr n (P m)
-  end.
-  *)
 
 Lemma LaR_incs : forall l k u (n n' : bin k) a m,
   bin_plus u n n' ->
@@ -525,23 +285,6 @@ Proof.
   - rewrite En'. unfold pow2. nia.
   - admit.
 Admitted.
-
-Lemma N_strong_induction : forall (P : N -> Prop),
-  (forall n, (forall k, (k < n)%N -> P k) -> P n) ->
-  forall n, P n.
-Proof.
-  introv H.
-  assert (G: forall n : nat, P (N.of_nat n)).
-  { induction n using strong_induction.
-    apply H. introv G.
-    replace k with (N.of_nat (N.to_nat k))
-      by apply N2Nat.id.
-    apply H0. lia. }
-  introv.
-  replace n with (N.of_nat (N.to_nat n))
-    by apply N2Nat.id.
-  apply G.
-Qed.
 
 Corollary do_reset : forall n m a,
   (n <= b m)%N ->

@@ -5,6 +5,8 @@ From Coq Require Import Bool.
 From Coq Require Import Lists.List. Import ListNotations.
 From Coq Require Import Lists.Streams.
 From Coq Require Import Lia.
+From Coq Require Import PArith.BinPos PArith.Pnat.
+From Coq Require Import NArith.BinNat NArith.Nnat.
 From BusyCoq Require Export LibTactics.
 Set Default Goal Selector "!".
 
@@ -86,3 +88,60 @@ Proof.
     + apply H. introv G. apply IHn. lia.
     + auto.
 Qed.
+
+Lemma N_strong_induction : forall (P : N -> Prop),
+  (forall n, (forall k, (k < n)%N -> P k) -> P n) ->
+  forall n, P n.
+Proof.
+  introv H.
+  assert (G: forall n : nat, P (N.of_nat n)).
+  { induction n using strong_induction.
+    apply H. introv G.
+    replace k with (N.of_nat (N.to_nat k))
+      by apply N2Nat.id.
+    apply H0. lia. }
+  introv.
+  replace n with (N.of_nat (N.to_nat n))
+    by apply N2Nat.id.
+  apply G.
+Qed.
+
+Definition het_add (a : N) (b : positive) : positive :=
+  match a with
+  | N0 => b
+  | Npos a => a + b
+  end.
+
+Notation "a :+ b" := (het_add a b)  (at level 50, left associativity).
+
+Lemma het_add_succ : forall a b, N.succ a :+ b = a :+ Pos.succ b.
+Proof.
+  introv. destruct a; unfold ":+", N.succ; lia.
+Qed.
+
+Lemma het_add_succ_l : forall a b, N.succ a :+ b = Pos.succ (a :+ b).
+Proof.
+  introv. destruct a; unfold ":+", N.succ; lia.
+Qed.
+
+Lemma pos_het_add : forall a b, (N.pos (a :+ b) = a + N.pos b)%N.
+Proof.
+  introv. destruct a; unfold ":+"; lia.
+Qed.
+
+Fixpoint pow2' (k : nat) : positive :=
+  match k with
+  | O => 1
+  | S k => (pow2' k)~0
+  end.
+
+Definition pow2 (k : nat) : N := Npos (pow2' k).
+
+Arguments pow2 _ : simpl never.
+
+Lemma pow2_S : forall k,
+  pow2 (S k) = N.double (pow2 k).
+Proof. introv. unfold pow2. simpl. lia. Qed.
+
+Lemma pow2_gt0 : forall k, (pow2 k > 0)%N.
+Proof. unfold pow2. lia. Qed.
