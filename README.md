@@ -17,6 +17,14 @@ is split into two parts:
  - Cyclers
  - Translated Cyclers
 
+## Individual machines
+
+Apart from deciders, the repository includes manual proofs for some machines
+considered hard to decide automatically. At the moment, these include:
+
+ - [Skelet #34](https://www.sligocki.com/2023/02/02/skelet-34.html)
+ - [Skelet #35](https://www.sligocki.com/2023/02/05/shift-overflow.html)
+
 ## Running the deciders
 
 Place the [seed database][seed] at `seed.dat` in the root of the repository.
