@@ -72,3 +72,17 @@ Fixpoint Str_app {A} (xs : list A) (ys : Stream A) : Stream A :=
   | [] => ys
   | x :: xs => Cons x (Str_app xs ys)
   end.
+
+Lemma strong_induction : forall (P : nat -> Prop),
+  (forall n, (forall k, k < n -> P k) -> P n) ->
+  forall n, P n.
+Proof.
+  introv H. introv.
+  enough (H' : forall k, k <= n -> P k).
+  { apply H'. constructor. }
+  induction n; introv G.
+  - inverts G. apply H. introv G. inverts G.
+  - inverts G.
+    + apply H. introv G. apply IHn. lia.
+    + auto.
+Qed.

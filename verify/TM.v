@@ -111,7 +111,21 @@ Inductive evstep (tm : TM) : Q * tape -> Q * tape -> Prop :=
     c' -[ tm ]->* c'' ->
     c  -[ tm ]->* c''
 
-    where "c -[ tm ]->* c'" := (evstep tm c c').
+  where "c -[ tm ]->* c'" := (evstep tm c c').
+
+(** Executing an unspecified, but non-zero number of steps: *)
+Reserved Notation "c -[ tm ]->+ c'" (at level 40).
+
+Inductive progress (tm : TM) : Q * tape -> Q * tape -> Prop :=
+  | progress_base c c' :
+    c -[ tm ]->  c' ->
+    c -[ tm ]->+ c'
+  | progress_step c c' c'' :
+    c  -[ tm ]->  c'  ->
+    c' -[ tm ]->+ c'' ->
+    c  -[ tm ]->+ c''
+
+  where "c -[ tm ]->+ c'" := (progress tm c c').
 
 (** A halting configuration is one for which [tm (q, s)] returns [None]. *)
 Definition halting (tm : TM) (c : Q * tape) : Prop :=
@@ -206,6 +220,37 @@ Proof.
   - eauto using evstep_step.
 Qed.
 
+Lemma progress_trans :
+  forall tm c c' c'',
+  c  -[ tm ]->+ c'  ->
+  c' -[ tm ]->+ c'' ->
+  c  -[ tm ]->+ c''.
+Proof.
+  introv H1 H2. induction H1; eauto using progress_step.
+Qed.
+
+Lemma multistep_progress :
+  forall tm n c c',
+  c -[ tm ]->> S n / c' ->
+  c -[ tm ]->+ c'.
+Proof.
+  induction n; introv H; inverts H as Hstep Hrest.
+  - inverts Hrest. apply progress_base. assumption.
+  - apply IHn in Hrest. eapply progress_step; eassumption.
+Qed.
+
+Lemma progress_multistep :
+  forall tm c c',
+  c -[ tm ]->+ c' ->
+  exists n,
+  c -[ tm ]->> S n / c'.
+Proof.
+  introv H. induction H.
+  - eauto using multistep_S, multistep_0.
+  - destruct IHprogress as [n IH].
+    eauto using multistep_S.
+Qed.
+
 Lemma without_counter :
   forall tm n c c',
   c -[ tm ]->> n / c' ->
@@ -225,6 +270,44 @@ Proof.
   - exists 0. apply multistep_0.
   - destruct IHevstep as [n IH].
     eauto using multistep_S.
+Qed.
+
+Lemma evstep_progress :
+  forall tm c c',
+  c -[ tm ]->* c' ->
+  c <> c' ->
+  c -[ tm ]->+ c'.
+Proof.
+  introv Hrun Hneq.
+  apply with_counter in Hrun.
+  destruct Hrun as [[| n] Hrun].
+  - inverts Hrun. contradiction.
+  - apply multistep_progress in Hrun. assumption.
+Qed.
+
+Lemma evstep_progress_trans :
+  forall tm c c' c'',
+  c  -[ tm ]->* c'  ->
+  c' -[ tm ]->+ c'' ->
+  c  -[ tm ]->+ c''.
+Proof.
+  introv H1 H2. induction H1.
+  - exact H2.
+  - eauto using progress_step.
+Qed.
+
+Lemma progress_evstep_trans :
+  forall tm c c' c'',
+  c  -[ tm ]->+ c'  ->
+  c' -[ tm ]->* c'' ->
+  c  -[ tm ]->+ c''.
+Proof.
+  introv H1 H2. induction H1.
+  - apply with_counter in H2.
+    destruct H2 as [[| n] H2].
+    + inverts H2. apply progress_base. assumption.
+    + apply multistep_progress in H2. eauto using progress_step.
+  - eauto using progress_step.
 Qed.
 
 Lemma rewind_split:
@@ -258,33 +341,6 @@ Proof.
     apply Hhalting. exact Hstep.
 Qed.
 
-Lemma skip_halts: forall tm c c' n,
-  c -[ tm ]->> n / c' ->
-  ~ halts tm c' ->
-  ~ halts tm c.
-Proof.
-  introv Hexec Hnonhalt Hhalt.
-  destruct Hhalt as [k [ch [Hrunch Hhalting]]].
-  destruct (Nat.ltb_spec k n).
-  - replace n with (k + (n - k)) in Hexec by lia.
-    apply rewind_split in Hexec.
-    destruct Hexec as [ch' [H1 H2]].
-    replace ch' with ch in *
-      by (eapply multistep_deterministic; eassumption).
-    clear ch' H1.
-    eapply halting_no_multistep in Hhalting.
-    + apply Hhalting, H2.
-    + lia.
-  - replace k with (n + (k - n)) in Hrunch by lia.
-    apply rewind_split in Hrunch.
-    destruct Hrunch as [cm [H1 H2]].
-    replace cm with c' in *
-      by (eapply multistep_deterministic; eassumption).
-    clear cm H1.
-    apply Hnonhalt.
-    exists (k - n), ch. auto.
-Qed.
-
 Lemma exceeds_halt : forall tm c c' n k,
   halts_in tm c k ->
   n > k ->
@@ -299,6 +355,65 @@ Proof.
   eapply halting_no_multistep in Hhalting.
   - apply Hhalting. eassumption.
   - lia.
+Qed.
+
+Lemma preceeds_halt : forall tm c c' n k,
+  halts_in tm c k ->
+  c -[ tm ]->> n / c' ->
+  n <= k ->
+  halts_in tm c' (k - n).
+Proof.
+  introv Hhalt Hexec Hle.
+  destruct Hhalt as [ch [Hrunch Hhalting]].
+  replace k with (n + (k - n)) in Hrunch by lia.
+  apply rewind_split in Hrunch.
+  destruct Hrunch as [cm [H1 H2]].
+  replace cm with c' in *
+    by (eapply multistep_deterministic; eassumption).
+  exists ch. auto.
+Qed.
+
+Lemma skip_halts: forall tm c c' n,
+  c -[ tm ]->> n / c' ->
+  ~ halts tm c' ->
+  ~ halts tm c.
+Proof.
+  introv Hexec Hnonhalt [k Hhalt].
+  (* destruct Hhalt as [k [ch [Hrunch Hhalting]]]. *)
+  destruct (Nat.ltb_spec k n).
+  - eapply exceeds_halt; eassumption.
+  - apply Hnonhalt.
+    eexists. eapply preceeds_halt; eassumption.
+Qed.
+
+Lemma progress_nonhalt' : forall tm (P : Q * tape -> Prop),
+  (forall c, P c -> exists c', P c' /\ c -[ tm ]->+ c') ->
+  forall k c, P c -> ~ halts_in tm c k.
+Proof.
+  introv Hstep.
+  induction k using strong_induction.
+  introv H0 Hhalts.
+  apply Hstep in H0. destruct H0 as [c' [HP Hrun]].
+  apply progress_multistep in Hrun. destruct Hrun as [n Hrun].
+  destruct (Nat.leb_spec (S n) k).
+  - assert (Hhalts' : halts_in tm c' (k - S n)).
+    { eapply preceeds_halt; eassumption. }
+    assert (Hnhalts : ~ halts_in tm c' (k - S n)).
+    { apply H; [lia | assumption]. }
+    contradiction.
+  - eapply exceeds_halt; eassumption.
+Qed.
+
+Lemma progress_nonhalt : forall tm (P : Q * tape -> Prop) c,
+  (forall c, P c -> exists c', P c' /\ c -[ tm ]->+ c') ->
+  P c ->
+  ~ halts tm c.
+Proof.
+  introv Hstep H0 Hhalts.
+  destruct Hhalts as [k Hhalts].
+  assert (Hnhalts : ~ halts_in tm c k).
+  { apply (progress_nonhalt' tm P); assumption. }
+  contradiction.
 Qed.
 
 End TM.

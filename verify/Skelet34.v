@@ -7,7 +7,7 @@ From Coq Require Import PeanoNat.
 From Coq Require Import List. Import ListNotations.
 From Coq Require Import Lia.
 From Coq Require Import PArith.BinPos PArith.Pnat.
-From Coq Require Import NArith.BinNat.
+From Coq Require Import NArith.BinNat NArith.Nnat.
 From BusyCoq Require Import Extraction. Import ETranslatedCyclers.
 Set Default Goal Selector "!".
 
@@ -49,7 +49,7 @@ Ltac simpl_tape :=
   simpl.
 Ltac finish := apply evstep_refl.
 Ltac step := eapply evstep_step; [prove_step | simpl_tape].
-Ltac execute := repeat step; try finish.
+Ltac execute := repeat (try finish; step).
 Ltac follow_assm := eapply evstep_trans; [apply_assumption; eauto |].
 Ltac follow_hyp H := eapply evstep_trans; [apply H; eauto |].
 
@@ -60,6 +60,7 @@ Ltac triv := introv; repeat (step || follow); try finish.
 
 Notation "c --> c'" := (c -[ tm ]-> c')   (at level 40).
 Notation "c -->* c'" := (c -[ tm ]->* c') (at level 40).
+Notation "c -->+ c'" := (c -[ tm ]->+ c') (at level 40).
 Notation "l <{{ q }} r" := (q;; tl l {{hd l}} r)  (at level 30, q at next level).
 Notation "l {{ q }}> r" := (q;; l {{hd r}} tl r)  (at level 30, q at next level).
 Notation "s >>> r" := (Str_app s r)  (at level 25, right associativity).
@@ -67,6 +68,29 @@ Notation "l <<< s" := (Str_app s l)  (at level 24, left associativity).
 Notation pow s n := (concat (repeat s n)).
 
 Notation P := Pos.succ.
+
+Definition het_add (a : N) (b : positive) : positive :=
+  match a with
+  | N0 => b
+  | Npos a => a + b
+  end.
+
+Notation "a :+ b" := (het_add a b)  (at level 50, left associativity).
+
+Lemma het_add_succ : forall a b, N.succ a :+ b = a :+ P b.
+Proof.
+  introv. destruct a; unfold ":+", N.succ; lia.
+Qed.
+
+Lemma het_add_succ_l : forall a b, N.succ a :+ b = P (a :+ b).
+Proof.
+  introv. destruct a; unfold ":+", N.succ; lia.
+Qed.
+
+Lemma pos_het_add : forall a b, (N.pos (a :+ b) = a + N.pos b)%N.
+Proof.
+  introv. destruct a; unfold ":+"; lia.
+Qed.
 
 Fixpoint L' (n : positive) : side :=
   match n with
@@ -91,13 +115,15 @@ Fixpoint R (n : positive) : side :=
 Definition D n m : Q * tape :=
   L n <{{C}} 1 >> 0 >> 1 >> 0 >> R m.
 
-Lemma L_inc : forall n r,
-  L n <{{C}} r -->* L (N.succ n) {{B}}> r.
-Proof.
-  destruct n as [|n].
-  - triv.
-  - induction n; triv.
-Qed.
+(** We use a definition of [b] shifted by 1 compared to the informal proof, i.e.
+    we can do [n + b n] is the farthest we can go without reaching a new power
+    of two. *)
+Fixpoint b (n : positive) : N :=
+  match n with
+  | xH => N0
+  | xO n' => N.succ_double (b n')
+  | xI n' => N.double (b n')
+  end.
 
 Inductive has0 : positive -> Prop :=
   | has0_0 n: has0 (n~0)
@@ -108,6 +134,58 @@ Hint Constructors has0 : core.
 Inductive all1 : positive -> Prop :=
   | all1_H:   all1 1
   | all1_1 n: all1 n -> all1 (n~1).
+
+Lemma b0_all1 : forall n, b n = N0 -> all1 n.
+Proof.
+  induction n; introv H.
+  - apply all1_1, IHn.
+    simpl in H. lia.
+  - simpl in H. lia.
+  - apply all1_H.
+Qed.
+
+Lemma bn0_has0 : forall n, (b n > 0)%N -> has0 n.
+Proof.
+  induction n; introv H; simpl; simpl in H.
+  - apply has0_1, IHn. lia.
+  - apply has0_0.
+  - lia.
+Qed.
+
+Lemma b_succ : forall n, (b n > 0)%N -> b (P n) = N.pred (b n).
+Proof. induction n; simpl; lia. Qed.
+
+Lemma b_add : forall u n,
+  (u <= b n -> b (u :+ n) = b n - u)%N.
+Proof.
+  apply (N.induction (fun u => forall n, u <= b n -> b (u :+ n) = b n - u)%N).
+  - intuition.
+  - introv H. simpl. lia.
+  - intros u IH n H.
+    rewrite het_add_succ_l, b_succ; rewrite IH; lia.
+Qed.
+
+Corollary b_add_self : forall n,
+  b (b n :+ n) = 0%N.
+Proof.
+  introv. rewrite b_add; lia.
+Qed.
+
+Lemma b0_succ : forall n, b n = 0%N -> b (P n) = (Npos n).
+Proof.
+  introv H. apply b0_all1 in H.
+  induction H.
+  - reflexivity.
+  - simpl. rewrite IHall1. lia.
+Qed.
+
+Lemma L_inc : forall n r,
+  L n <{{C}} r -->* L (N.succ n) {{B}}> r.
+Proof.
+  destruct n as [|n].
+  - triv.
+  - induction n; triv.
+Qed.
 
 Lemma R_inc_has0 : forall n l,
   has0 n ->
@@ -126,6 +204,26 @@ Proof.
   follow L_inc. execute.
   follow R_inc_has0. execute.
 Qed.
+
+Corollary D_run : forall u n m,
+  (u <= b m)%N ->
+  D n m -->* D (u + n) (u :+ m).
+Proof.
+  apply (N.induction (fun u =>
+    forall n m, (u <= b m)%N -> D n m -->* D (u + n) (u :+ m))).
+  - (* morphism bullshit *) intuition.
+  - (* u = 0 *) introv H. finish.
+  - intros u IH n m H.
+    follow D_inc. { apply bn0_has0. lia. }
+    replace (N.succ u + n)%N with (u + N.succ n)%N by lia.
+    replace (N.succ u :+ m)%N with (u :+ P m)%N
+      by (rewrite het_add_succ; reflexivity).
+    apply IH. rewrite b_succ; lia.
+Qed.
+
+Corollary D_finish : forall n m,
+  D n m -->* D (b m + n) (b m :+ m).
+Proof. introv. apply D_run. lia. Qed.
 
 Lemma R_inc_all1 : forall n l,
   all1 n ->
@@ -168,6 +266,16 @@ Proof.
   execute.
 Qed.
 
+Corollary start_reset' : forall n m,
+  all1 m ->
+  D n m -->+ E (N.succ n) 1 (P m).
+Proof.
+  introv H.
+  apply evstep_progress.
+  - apply start_reset. assumption.
+  - discriminate.
+Qed.
+
 Lemma eat_LI : forall l t,
   l << 1 << 0 << 0 << 0 <{{C}} R t -->*
   l <{{C}} R (t~1~1).
@@ -195,30 +303,30 @@ Inductive bin_succ : forall {k}, bin k -> bin k -> Prop :=
 
   where "c -S-> c'" := (bin_succ c c').
 
-Inductive bin_plus {k} : nat -> bin k -> bin k -> Prop :=
-  | plus_0 n : bin_plus 0 n n
+Inductive bin_plus {k} : N -> bin k -> bin k -> Prop :=
+  | plus_0 n : bin_plus N0 n n
   | plus_S u n n' n'' :
     n -S-> n' ->
-    bin_plus    u  n' n'' ->
-    bin_plus (S u) n n''.
+    bin_plus         u  n' n'' ->
+    bin_plus (N.succ u) n n''.
 
 Hint Constructors bin_succ bin_plus : core.
 
 Lemma plus_S' : forall k u (n n' n'' : bin k),
   bin_plus u n n' ->
   n' -S-> n'' ->
-  bin_plus (S u) n n''.
+  bin_plus (N.succ u) n n''.
 Proof.
   introv H. induction H; eauto.
 Qed.
 
 Lemma bin_plus_b0 : forall k u (n n' : bin k),
   bin_plus u n n' ->
-  bin_plus (2 * u) (b0 n) (b0 n').
+  bin_plus (N.double u) (b0 n) (b0 n').
 Proof.
   introv H. induction H.
   - auto.
-  - replace (2 * S u) with (S (S (2 * u))) by lia.
+  - replace (N.double (N.succ u)) with (N.succ (N.succ (N.double u))) by lia.
     eauto.
 Qed.
 
@@ -234,20 +342,34 @@ Fixpoint bin_max k : bin k :=
   | S k => b1 (bin_max k)
   end.
 
-Lemma pow2_gt0 : forall k, 2 ^ k > 0.
-Proof. induction k; simpl; lia. Qed.
+Fixpoint pow2' (k : nat) : positive :=
+  match k with
+  | O => 1
+  | S k => (pow2' k)~0
+  end.
+
+Definition pow2 (k : nat) : N := Npos (pow2' k).
+
+Arguments pow2 _ : simpl never.
+
+Lemma pow2_S : forall k,
+  pow2 (S k) = N.double (pow2 k).
+Proof. introv. unfold pow2. simpl. lia. Qed.
+
+Lemma pow2_gt0 : forall k, (pow2 k > 0)%N.
+Proof. unfold pow2. lia. Qed.
 
 Lemma inc_to_max : forall k,
-  bin_plus (2^k - 1) (bin_min k) (bin_max k).
+  bin_plus (pow2 k - 1) (bin_min k) (bin_max k).
 Proof.
   induction k.
   - auto.
-  - replace (2 ^ S k - 1) with (S (2 * (2 ^ k - 1))).
+  - replace (pow2 (S k) - 1)%N with (N.succ (N.double (pow2 k - 1))).
     + eapply plus_S'.
-      * simpl. apply bin_plus_b0. eassumption.
+      * apply bin_plus_b0. eassumption.
       * constructor.
-    + assert (2 ^ k > 0) by apply pow2_gt0.
-      simpl. lia.
+    + assert (pow2 k > 0)%N by apply pow2_gt0.
+      rewrite pow2_S. lia.
 Qed.
 
 Fixpoint pow4 (k : nat) (n : positive) : positive :=
@@ -280,6 +402,7 @@ Proof.
     follow Lk_inc; execute; follow R_inc_has0; execute.
 Qed.
 
+(*
 Fixpoint R_incs (n : nat) (m : positive) : Prop :=
   match n with
   | O => True
@@ -305,23 +428,28 @@ Fixpoint incr (n : nat) (m : positive) : positive :=
   | O => m
   | S n => incr n (P m)
   end.
+  *)
 
 Lemma LaR_incs : forall l k u (n n' : bin k) a m,
   bin_plus u n n' ->
-  R_incs u m ->
+  (u <= b m)%N ->
   Lk n  l <{{C}} 1 >> 0 >> 1 >> a >> R m -->*
-  Lk n' l <{{C}} 1 >> 0 >> 1 >> a >> R (incr u m).
+  Lk n' l <{{C}} 1 >> 0 >> 1 >> a >> R (u :+ m).
 Proof.
-  introv H. generalize dependent m. induction H; introv Hr.
+  introv H.
+  generalize dependent m. induction H; introv Hr.
   - finish.
-  - inverts Hr as Hr0 Hr1. follow LaR_inc.
-    follow IHbin_plus. finish.
+  - follow LaR_inc. { apply bn0_has0. lia. }
+    follow IHbin_plus. { rewrite b_succ; lia. }
+    replace (u :+ P m)%N with (N.succ u :+ m)%N
+      by (rewrite het_add_succ; reflexivity).
+    finish.
 Qed.
 
 Corollary LaR_max : forall l k a m,
-  R_incs (2 ^ k - 1) m ->
+  (pow2 k - 1 <= b m)%N ->
   Lk (bin_min k) l <{{C}} 1 >> 0 >> 1 >> a >> R m -->*
-  Lk (bin_max k) l <{{C}} 1 >> 0 >> 1 >> a >> R (incr (2 ^ k - 1) m).
+  Lk (bin_max k) l <{{C}} 1 >> 0 >> 1 >> a >> R (pow2 k - 1 :+ m).
 Proof.
   introv H.
   apply LaR_incs.
@@ -340,7 +468,7 @@ Proof.
 Qed.
 
 Definition f (m : positive) (a : sym) (k : nat) : positive :=
-  let t := incr (2 ^ k - 1) m in
+  let t := (pow2 k - 1 :+ m) in
   match a with
   | 0 => t~0~0
   | 1 => t~1~0
@@ -352,47 +480,119 @@ Proof. destruct a; introv; simpl; constructor. Qed.
 Hint Resolve has0_f : core.
 
 Lemma drop_KI : forall l m k a,
-  R_incs (2 ^ k - 1) m ->
+  (pow2 k - 1 <= b m)%N ->
   Lk (bin_min k) (l << 0 << 1 << 0 << 0) <{{C}} 1 >> 0 >> 1 >> a >> R m -->*
   l <{{C}} 1 >> 0 >> 1 >> 0 >> R (pow4 k (P (f m a k))).
 Proof.
   introv H.
   follow LaR_max.
-  replace (1 >> 0 >> 1 >> a >> R (incr (2 ^ k - 1) m)) with (R (f m a k))
+  replace (1 >> 0 >> 1 >> a >> R (pow2 k - 1 :+ m)) with (R (f m a k))
     by (destruct a; reflexivity).
   follow eat_bin_max. finish.
 Qed.
 
-Lemma prepare_K : forall n, exists k n',
-  K' n = Lk (bin_min k) (K n' << 0 << 1 << 0 << 0)
-  /\ 2 ^ k - 1 < Pos.to_nat n /\ (n' < N.pos n)%N.
+Lemma prepare_K : forall (n : N), (n > 0)%N -> exists (k : nat) (n' : N),
+  K n = Lk (bin_min k) (K n' << 0 << 1 << 0 << 0)
+  /\ (n = pow2 k + pow2 (S k) * n')%N.
 Proof.
+  destruct n as [| n]. { lia. }
+  intros _.
   induction n.
-  - destruct IHn as [k [n' IH]].
-    exists O, (Npos n). repeat split.
-    + apply Pos2Nat.is_pos.
-    + lia.
+  - exists O, (Npos n). auto.
   - destruct IHn as [k [n' [EIH IH]]].
-    exists (S k), n'. repeat split.
-    + simpl. rewrite EIH. reflexivity.
-    + rewrite Pos2Nat.inj_xO. simpl. lia.
-    + lia.
-  - exists O, N0. split.
-    + simpl. rewrite const_unfold at 1. reflexivity.
-    + simpl. lia.
+    exists (S k), n'. split.
+    + simpl. simpl in EIH. rewrite EIH. reflexivity.
+    + unfold pow2, pow2'. fold pow2'.
+      unfold pow2, pow2' in IH. fold pow2' in IH.
+      lia.
+  - exists O, N0. repeat split.
+    simpl. rewrite const_unfold at 1. reflexivity.
 Qed.
 
-Theorem step_reset : forall (n m : positive) a,
-  R_incs (Pos.to_nat n) m ->
+Theorem step_reset : forall n m a,
+  (n <= b m)%N ->
+  (n > 0)%N ->
   exists (n' : N) (m' : positive),
-  E (Npos n) a m -->* E n' 0 m' /\
-  (n' < Npos n)%N /\ R_incs (N.to_nat n') m'.
+  E n a m -->* E n' 0 m' /\
+  (n' < n)%N /\ (n' <= b m')%N.
+Proof.
+  introv Hinvariant Hgt0.
+  destruct (prepare_K n Hgt0) as [k [n' [EK En']]].
+  exists n'. eexists. repeat split.
+  - unfold E. rewrite EK.
+    follow drop_KI. { lia. }
+    finish.
+  - rewrite En'. unfold pow2. nia.
+  - admit.
+Admitted.
+
+Lemma N_strong_induction : forall (P : N -> Prop),
+  (forall n, (forall k, (k < n)%N -> P k) -> P n) ->
+  forall n, P n.
 Proof.
   introv H.
-  destruct (prepare_K n) as [k [n' [EK [HK Hless]]]].
-  exists n'. repeat eexists.
-  - unfold E. simpl. rewrite EK.
-    follow drop_KI. { eapply R_incs_less; eassumption. }
-    finish.
-  - exact Hless.
-  - exact H.
+  assert (G: forall n : nat, P (N.of_nat n)).
+  { induction n using strong_induction.
+    apply H. introv G.
+    replace k with (N.of_nat (N.to_nat k))
+      by apply N2Nat.id.
+    apply H0. lia. }
+  introv.
+  replace n with (N.of_nat (N.to_nat n))
+    by apply N2Nat.id.
+  apply G.
+Qed.
+
+Corollary do_reset : forall n m a,
+  (n <= b m)%N ->
+  (n > 0)%N ->
+  exists m',
+  E n a m -->* E 0 0 m'.
+Proof.
+  induction n using N_strong_induction; introv Hinvariant Hgt0.
+  destruct (step_reset n m a Hinvariant Hgt0)
+    as [n' [m' [Hsteps [Hless Hinvariant']]]].
+  destruct n' as [| n'].
+  - exists m'. exact Hsteps.
+  - assert (G: exists m'', E (Npos n') 0 m' -->* E 0 0 m'').
+    { apply H; try assumption; reflexivity. }
+    destruct G as [m'' G]. exists m''.
+    follow Hsteps. apply G.
+Qed.
+
+Theorem D_next : forall m, exists m',
+  D 0 m -->+ D 0 m'.
+Proof.
+  introv.
+  assert (H: exists m', E (N.succ (b m)) 1 (P (b m :+ m)) -->* E 0 0 m').
+  { apply do_reset; try lia.
+    rewrite b0_succ, pos_het_add.
+    - lia.
+    - apply b_add_self. }
+  destruct H as [m' H]. exists m'.
+  eapply evstep_progress_trans. { apply D_finish. }
+  eapply progress_evstep_trans. { apply start_reset', b0_all1, b_add_self. }
+  rewrite N.add_0_r.
+  follow H. finish.
+Qed.
+
+Theorem D_nonhalt : forall m, ~ halts tm (D 0 m).
+Proof.
+  introv.
+  apply progress_nonhalt with (P := fun c => exists m, c = D 0 m).
+  - clear m. introv H. destruct H as [m H]. subst.
+    destruct (D_next m) as [m' Hrun].
+    exists (D 0 m'); eauto.
+  - eauto.
+Qed.
+
+Lemma enters_D : c0 -->* D 0 1441.
+Proof. execute. Qed.
+
+Corollary nonhalt : ~ halts tm c0.
+Proof.
+  destruct (with_counter _ _ _ enters_D) as [n H].
+  eapply skip_halts.
+  - eassumption.
+  - apply D_nonhalt.
+Qed.
