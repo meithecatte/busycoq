@@ -1,6 +1,6 @@
 COQMFFLAGS := -Q . BusyCoq
 
-ALLVFILES := LibTactics.v Helper.v TM.v Compute.v Flip.v Cyclers.v TranslatedCyclers.v Extraction.v Individual.v FixedBin.v ShiftOverflow.v Skelet34.v
+ALLVFILES := LibTactics.v Helper.v TM.v Compute.v Flip.v Cyclers.v TranslatedCyclers.v Extraction.v Individual.v FixedBin.v ShiftOverflow.v Skelet34.v Skelet35.v
 
 all: build verify
 
