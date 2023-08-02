@@ -239,6 +239,15 @@ Proof. destruct a; introv; simpl; constructor. Qed.
 
 Hint Resolve has0_f : core.
 
+Lemma f_lt : forall m a k, exists x,
+  (P (f m a k) = 4 * (pow2 k - 1 :+ m) + x /\
+  x <= 3)%positive.
+Proof.
+  introv. destruct a.
+  - exists 1%positive. unfold f. lia.
+  - exists 3%positive. unfold f. lia.
+Qed.
+
 Lemma drop_KI : forall l m k a,
   (pow2 k - 1 <= b m)%N ->
   Lk (bin_min k) (l << 0 << 1 << 0 << 0) <{{C}} 1 >> 0 >> 1 >> a >> R m -->*
@@ -269,6 +278,26 @@ Proof.
     simpl. rewrite const_unfold at 1. reflexivity.
 Qed.
 
+Lemma pow4_shift : forall k n,
+  (pow4 k n~0~0 = (pow4 k n)~0~0)%positive.
+Proof.
+  induction k; introv.
+  - reflexivity.
+  - simpl. rewrite IHk. reflexivity.
+Qed.
+
+Lemma b_pow4 : forall k n,
+  (b (pow4 k n) = pow2 (2 * k) * (b n + 1) - 1)%N.
+Proof.
+  unfold pow2.
+  induction k; introv; simpl pow4; simpl pow2'.
+  - lia.
+  - rewrite pow4_shift. simpl b.
+    rewrite IHk.
+    rewrite <- plus_n_Sm. simpl pow2'.
+    lia.
+Qed.
+
 Theorem step_reset : forall n m a,
   (n <= b m)%N ->
   (n > 0)%N ->
@@ -283,8 +312,20 @@ Proof.
     follow drop_KI. { lia. }
     finish.
   - rewrite En'. unfold pow2. nia.
-  - admit.
-Admitted.
+  - destruct (f_lt m a k) as [x [E Hx]].
+    rewrite b_pow4, E.
+    replace (4 * (pow2 k - 1 :+ m) + x)%positive
+      with (N.pos x :+ 4 * (pow2 k - 1 :+ m))
+      by (unfold ":+" at 1; lia).
+    rewrite b_add by (simpl; lia).
+    replace (b (4 * (pow2 k - 1 :+ m)))
+      with (N.succ_double (N.succ_double (b (pow2 k - 1 :+ m))))
+      by reflexivity.
+    transitivity (b (pow2 k - 1 :+ m)).
+    + rewrite b_add by lia.
+      unfold pow2 in *. nia.
+    + unfold pow2. nia.
+Qed.
 
 Corollary do_reset : forall n m a,
   (n <= b m)%N ->
