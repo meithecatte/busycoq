@@ -64,7 +64,7 @@ Definition C1 (t : side) := t <: run 2 <: run 0 <: run 1.
 Definition C2 (t : side) := t <: run 4 <: run 2.
 Definition C3 (t : side) := t <: run 1 <: run 1.
 Notation C := C3.
-Definition R := run 2 :> const 0.
+Definition R := const 0.
 Definition L := const 0.
 Definition P  (t : side) := t <: run 2.
 Definition F0 (t : side) := t <: run 4 <: run 3 <: run 2.
@@ -85,8 +85,10 @@ Lemma rule_x_right : forall l r,       l |> x :> r -->* l <: x |> r.
 Proof. triv. Qed.
 Lemma rule_D_right : forall l r,      l |> Dr :> r -->* l <: Dl |> r.
 Proof. triv. Qed.
-Lemma rule_R       : forall l,              l |> R -->* l <| R.
-Proof. unfold R. triv. Qed.
+Lemma rule_xR      : forall l,         l <: x |> R -->* l <| C :> x :> P :> R.
+Proof. unfold R, C, x, P. triv. Qed.
+Lemma rule_DR      : forall l,        l <: Dl |> R -->* l <| x :> R.
+Proof. unfold R, x. triv. Qed.
 Lemma rule_L       : forall r,    L <| C :> x :> r -->* L <: C1 <: Dl |> P :> r.
 Proof. unfold L, C1, Dl, C. triv. Qed.
 Lemma rule_C30     : forall l r,  l <: x |> C :> r -->* l <: C0 |> r.
@@ -123,8 +125,8 @@ Lemma rule_P_P     : forall l r,  l |> P :> P :> r -->* l <: x |> r.
 Proof. triv. Qed.
 Lemma rule_P_x     : forall l r,  l |> P :> x :> r -->* l <: x |> P :> r.
 Proof. triv. Qed.
-Lemma rule_P_R     : forall l,         l |> P :> R -->* l <| C :> x :> R.
-Proof. unfold C, x, R. triv. Qed.
+Lemma rule_P_R     : forall l,         l |> P :> R -->* l <| P :> R.
+Proof. unfold P, R. triv. Qed.
 Lemma rule_P_Dx    : forall l r,
   l |> P :> Dr :> x :> r -->* l <: C1 <: Dl |> P :> r.
 Proof. triv. Qed.
@@ -214,7 +216,13 @@ Fixpoint lift_left (t : ltape) : side :=
   | l_C1 :: t => lift_left t <: C1
   | l_C2 :: t => lift_left t <: C2
   | l_C3 :: t => lift_left t <: C3
-  | _ => L
+  | l_F0 :: t => lift_left t <: F0
+  | l_F1 :: t => lift_left t <: F1
+  | l_F2 :: t => lift_left t <: F2
+  | l_F3 :: t => lift_left t <: F3
+  | l_G0 :: t => lift_left t <: G0
+  | l_G1 :: t => lift_left t <: G1
+  | l_G2 :: t => lift_left t <: G2
   end.
 
 Fixpoint lift (c : conf) : Q * tape :=
@@ -315,9 +323,16 @@ Definition step (c : conf) : option conf :=
   match c with
   | (right, l, r) =>
     match r with
-    (* > R    -->  < R *)
     | [] =>
-      Some (left, l, [])
+      match l with
+      (* x > R  -->  < C x P R *)
+      | l_xs n :: l =>
+        Some (left, lxs (decr n) l, [r_C; r_xs 1; r_P])
+      (* D > R  -->  < x R *)
+      | l_D :: l =>
+        Some (left, l, [r_xs 1])
+      | _ => None
+      end
     (* > x^n  -->  x^n > *)
     | r_xs n :: r =>
     Some (right, lxs (N.pos n) l, r)
@@ -332,23 +347,35 @@ Definition step (c : conf) : option conf :=
       (* D > C  -->  P x > *)
       | l_D :: l =>
         Some (right, l_xs 1 :: l_P :: l, r)
+      (* C0 > C --> G0 > *)
+      | l_C0 :: l =>
+        Some (right, l_G0 :: l, r)
       | _ => None
       end
-    (* > P R  --> < C x R *)
+    (* > P R    --> < P R *)
     | [r_P] =>
-      Some (left, l, [r_C; r_xs 1])
+      Some (left, l, [r_P])
     (* > P x^n  --> x^n > P *)
     | r_P :: r_xs n :: r =>
       Some (right, lxs (N.pos n) l, r_P :: r)
     (* > P D x  --> C1 D > P *)
     | r_P :: r_D :: r_xs n :: r =>
       Some (right, l_D :: l_C1 :: l, r_P :: rxs (decr n) r)
+    (* > P DDx  --> C2 C1 D > *)
+    | r_P :: r_D :: r_D :: r_xs n :: r =>
+      Some (right, l_D :: l_C1 :: l_C2 :: l, rxs (decr n) r)
+    (* > P DCx  --> G1 D > P *)
+    | r_P :: r_D :: r_C :: r_xs n :: r =>
+      Some (right, l_D :: l_G1 :: l, r_P :: rxs (decr n) r)
     (* > P D P  --> C1 D > *)
     | r_P :: r_D :: r_P :: r =>
       Some (right, l_D :: l_C1 :: l, r)
     (* > P C x  --> < P D P *)
     | r_P :: r_C :: r_xs n :: r =>
       Some (left, l, r_P :: r_D :: r_P :: rxs (decr n) r)
+    (* > P P    --> x > *)
+    | r_P :: r_P :: r =>
+      Some (right, lxs 1 l, r)
     | _ => None
     end
   | (left, l, r) =>
@@ -381,6 +408,15 @@ Definition step (c : conf) : option conf :=
     (* C <  -->  < C *)
     | l_C3 :: l =>
       Some (left, l, r_C :: r)
+    (* G0 < -->  G1 x > *)
+    | l_G0 :: l =>
+      Some (right, l_xs 1 :: l_G1 :: l, r)
+    (* G1 < -->  G2 > *)
+    | l_G1 :: l =>
+      Some (right, l_G2 :: l, r)
+    (* G2 < -->  P D x > *)
+    | l_G2 :: l =>
+      Some (right, l_xs 1 :: l_D :: l_P :: l, r)
     | _ => None
     end
   end.
@@ -410,10 +446,19 @@ Proof.
       apply rule_C23.
     + (* C <   --> < C *)
       apply rule_C_left.
+    + (* G0 <  --> G1 x > *)
+      apply rule_G0.
+    + (* G1 <  --> G2 > *)
+      apply rule_G1.
+    + (* G2 <  --> P D x > *)
+      apply rule_G2.
   - (* right *)
     destruct r as [| [] r]; inverts H as H; simp.
-    + (* > R    -->  < R *)
-      apply rule_R.
+    + destruct l as [| [] l]; inverts H; simp.
+      * (* x > R  -->  < C x P R *)
+        apply rule_xR.
+      * (* D > R  -->  < x R *)
+        apply rule_DR.
     + (* > x^n  -->  x^n > *)
       apply rule_xn_right.
     + (* > D    -->  D > *)
@@ -423,25 +468,35 @@ Proof.
         apply rule_C30.
       * (* D > C  -->  P x *)
         apply rule_DC.
+      * (* C0 > C -->  G0 > *)
+        apply rule_C03.
     + destruct r as [| [] r]; inverts H as H; simp.
-      * (* > P R --> < C x R *)
+      * (* > P R   --> < P R *)
         apply rule_P_R.
       * (* > P x^n --> x^n > P *)
         apply rule_P_xn.
       * destruct r as [| [] r]; inverts H as H; simp.
         ** (* > P D x --> C1 D > P *)
           apply rule_P_Dx.
+        ** (* > P DDx --> C2 C1 D > *)
+          destruct r as [| [] r]; inverts H as H; simp.
+          apply rule_P_DDx.
+        ** (* > P DCx --> G1 D > P *)
+          destruct r as [| [] r]; inverts H as H; simp.
+          apply rule_P_DCx.
         ** (* > P D P --> C1 D *)
           apply rule_P_DP.
       * destruct r as [| [] r]; inverts H as H; simp.
         (* > P C x --> < P D P *)
         apply rule_P_Cx.
+      * (* > P P --> x > *)
+        apply rule_P_P.
 Qed.
 
-Lemma init : c0 -->* L <: C1 |> R.
+Lemma init : c0 -->* L <: C1 |> P :> R.
 Proof. unfold L, C1, R. execute. Qed.
 
-Definition initial: conf := (right, [l_C1], []).
+Definition initial: conf := (right, [l_C1], [r_P]).
 
 Lemma init' : c0 -->* lift initial.
 Proof. exact init. Qed.
@@ -456,4 +511,4 @@ Fixpoint steps (n : nat) (c : conf) : option conf :=
     end
   end.
 
-Compute steps 132 initial.
+Compute steps 13367 initial.
