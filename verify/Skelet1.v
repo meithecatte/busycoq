@@ -101,7 +101,7 @@ Lemma rule_C23     : forall l r,      l <: C2 <| r -->* l <: C <: x |> r.
 Proof. triv. Qed.
 Lemma rule_DC      : forall l r, l <: Dl |> C :> r -->* l <: P <: x |> r.
 Proof. triv. Qed.
-Lemma rule_C20     : forall l r, l <: C2 |> C :> r -->* l <: F0 |> r.
+Lemma rule_C2_C    : forall l r, l <: C2 |> C :> r -->* l <: F0 |> r.
 Proof. triv. Qed.
 Lemma rule_F0      : forall l r,      l <: F0 <| r -->* l <: F1 <: x |> r.
 Proof. triv. Qed.
@@ -350,6 +350,9 @@ Definition step (c : conf) : option conf :=
       (* C0 > C --> G0 > *)
       | l_C0 :: l =>
         Some (right, l_G0 :: l, r)
+      (* C2 > C --> F0 > *)
+      | l_C2 :: l =>
+        Some (right, l_F0 :: l, r)
       | _ => None
       end
     (* > P R    --> < P R *)
@@ -408,6 +411,18 @@ Definition step (c : conf) : option conf :=
     (* C <  -->  < C *)
     | l_C3 :: l =>
       Some (left, l, r_C :: r)
+    (* F0 < -->  F1 x > *)
+    | l_F0 :: l =>
+      Some (right, l_xs 1 :: l_F1 :: l, r)
+    (* F1 < -->  F2 > *)
+    | l_F1 :: l =>
+      Some (right, l_F2 :: l, r)
+    (* F2 < --> F3 x > *)
+    | l_F2 :: l =>
+      Some (right, l_xs 1 :: l_F3 :: l, r)
+    (* x F3 < --> P C1 D > *)
+    | l_F3 :: l_xs n :: l =>
+      Some (right, l_D :: l_C1 :: l_P :: lxs (decr n) l, r)
     (* G0 < -->  G1 x > *)
     | l_G0 :: l =>
       Some (right, l_xs 1 :: l_G1 :: l, r)
@@ -446,6 +461,15 @@ Proof.
       apply rule_C23.
     + (* C <   --> < C *)
       apply rule_C_left.
+    + (* F0 <  --> F1 x > *)
+      apply rule_F0.
+    + (* F1 <  --> F2 > *)
+      apply rule_F1.
+    + (* F2 <  --> F3 x > *)
+      apply rule_F2.
+    + (* x F3 < --> P C1 D > *)
+      destruct l as [| [] l]; inverts H; simp.
+      apply rule_F3.
     + (* G0 <  --> G1 x > *)
       apply rule_G0.
     + (* G1 <  --> G2 > *)
@@ -470,6 +494,8 @@ Proof.
         apply rule_DC.
       * (* C0 > C -->  G0 > *)
         apply rule_C03.
+      * (* C2 > C -->  F0 > *)
+        apply rule_C2_C.
     + destruct r as [| [] r]; inverts H as H; simp.
       * (* > P R   --> < P R *)
         apply rule_P_R.
@@ -511,4 +537,6 @@ Fixpoint steps (n : nat) (c : conf) : option conf :=
     end
   end.
 
-Compute steps 13367 initial.
+(*
+Compute steps 100000000 initial.
+*)
