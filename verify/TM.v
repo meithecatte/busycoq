@@ -49,7 +49,7 @@ Definition tape : Type := Stream Sym * Sym * Stream Sym.
 (** We define a notation for tapes, evocative of a turing machine's head
     hovering over a particular symbol. **)
 Notation "l {{ s }} r" := (l, s, r)
-  (at level 30).
+  (at level 30, only parsing).
 
 (** Moreover the streams could use some more natural notation, to have
     the element at the start of the stream be on the right side, as necessary. *)
@@ -73,7 +73,7 @@ Definition move_right (t : tape) : tape :=
 (** Notation for the configuration of a machine. Note that the position
     of the head within the tape is implicit, since the tape is centered
     at the head. *)
-Notation "q ;; t" := (q, t) (at level 35).
+Notation "q ;; t" := (q, t) (at level 35, only parsing).
 
 (** The small-step semantics of Turing machines: *)
 Reserved Notation "c -[ tm ]-> c'" (at level 40).

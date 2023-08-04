@@ -30,7 +30,8 @@ Ltac prove_step := prove_step_left || prove_step_right.
 Ltac simpl_tape :=
   try rewrite move_left_const;
   try rewrite move_right_const;
-  simpl.
+  simpl;
+  try rewrite <- const_unfold.
 Ltac finish := apply evstep_refl.
 Ltac step := eapply evstep_step; [prove_step | simpl_tape].
 Ltac execute := repeat (try finish; step).
@@ -40,7 +41,7 @@ Ltac follow_hyp H := eapply evstep_trans; [apply H; eauto |].
 Tactic Notation "follow" := follow_assm.
 Tactic Notation "follow" constr(H) := follow_hyp H.
 
-Ltac triv := introv; repeat (step || follow); try finish.
+Ltac triv := introv; repeat (try finish; (step || follow)).
 
 Notation "l <{{ q }} r" := (q;; tl l {{hd l}} r)  (at level 30, q at next level).
 Notation "l {{ q }}> r" := (q;; l {{hd r}} tl r)  (at level 30, q at next level).
