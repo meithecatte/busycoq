@@ -277,26 +277,6 @@ Proof.
   rewrite repeat_add. reflexivity.
 Qed.
 
-Arguments lxs _ _ : simpl never.
-Arguments rxs _ _ : simpl never.
-
-(*
-Lemma decr_some : forall n m,
-  decr n = Some m ->
-  n = Pos.succ m.
-Proof. introv H; destruct n; inverts H; lia. Qed.
-
-Ltac match_decr :=
-  match goal with
-  | H: match decr ?n with | Some _ => _ | None => _ end = _ |- _ =>
-    let E := fresh in
-    let n' := fresh n in
-    destruct (decr n) as [n' |] eqn:E;
-      [apply decr_some in E; subst n |];
-    try discriminate
-  end.
-  *)
-
 Ltac pos_nat p :=
   let p' := fresh p in
   let E := fresh in
@@ -318,6 +298,189 @@ Ltac simp :=
   try handle_decr;
   try rewrite decr_nat;
   simpl.
+
+(** [max_stride] returns the maximum number of times the stride rule can
+    be applied to a tape before it becomes no longer possible. If [None]
+    is returned, that means the rule can be applied an arbitrarily high
+    amount of times – that happens for the very tail of the tape, without
+    any [r_C] symbols. *)
+Fixpoint max_stride (xs : N) (t : rtape) : option N :=
+  match t with
+  | [] => None
+  | r_xs xs' :: t => max_stride (xs + N.pos xs') t
+  | r_D :: t => max_stride 0 t
+  | r_P :: t => Some 0%N
+  | r_C :: t =>
+    match max_stride 0 t with
+    | Some n' => Some (N.min xs (N.shiftr n' 2))
+    | None => Some xs
+    end
+  end.
+
+Fixpoint stride (xs : N) (n : positive) (t : rtape) : rtape :=
+  match t with
+  | [] => rxs xs []
+  | r_xs xs' :: t => stride (xs + N.pos xs') n t
+  | r_D :: t => rxs xs (r_D :: stride 0 n t)
+  | r_P :: t => []
+  | r_C :: t =>
+    rxs (xs - N.pos n) (r_C :: rxs (N.pos n~0) (stride 0 n~0~0 t))
+  end.
+
+Lemma stride_rxs : forall t xs xs' n,
+  stride xs n (rxs xs' t) = stride (xs + xs') n t.
+Proof.
+  introv.
+  destruct xs'.
+  - rewrite N.add_0_r. reflexivity.
+  - destruct t as [| [] t]; try reflexivity.
+    simpl. f_equal. lia.
+Qed.
+
+Lemma max_stride_rxs : forall t xs xs',
+  max_stride xs (rxs xs' t) = max_stride (xs + xs') t.
+Proof.
+  introv. destruct xs'.
+  - rewrite N.add_0_r. reflexivity.
+  - destruct t as [| [] t]; try reflexivity.
+    simpl. f_equal. lia.
+Qed.
+
+Definition valid_stride xs n t : Prop :=
+  match max_stride xs t with
+  | None => True
+  | Some u => (N.pos n <= u)%N
+  end.
+
+Lemma valid_stride_C_tail : forall xs n t,
+  valid_stride xs n (r_C :: t) ->
+  valid_stride 0 n~0~0 t.
+Proof.
+  unfold valid_stride. introv H. simpl in H.
+  destruct (max_stride 0 t) as [u |].
+  - rewrite (N.div2_odd u).
+    rewrite (N.div2_odd (N.div2 u)).
+    lia.
+  - split.
+Qed.
+
+Lemma valid_stride_C_head : forall xs n t,
+  valid_stride xs n (r_C :: t) ->
+  (N.pos n <= xs)%N.
+Proof.
+  unfold valid_stride. introv H. simpl in H.
+  destruct (max_stride 0 t) as [u |]; lia.
+Qed.
+
+Lemma valid_stride_P : forall xs n t,
+  ~ valid_stride xs n (r_P :: t).
+Proof.
+  unfold valid_stride. introv H.
+  simpl in H. lia.
+Qed.
+
+Lemma rxs_rxs : forall n m t,
+  rxs n (rxs m t) = rxs (n + m) t.
+Proof.
+  introv.
+  destruct n, m; try reflexivity.
+  destruct t as [| [] t]; try reflexivity.
+  simpl.
+  f_equal. f_equal. lia.
+Qed.
+
+(* XXX do i need this *)
+Lemma valid_stride_less : forall xs n n' t,
+  valid_stride xs n t ->
+  (n' <= n)%positive ->
+  valid_stride xs n' t.
+Admitted.
+
+(* XXX do i need this *)
+Lemma valid_stride_more : forall xs xs' n t,
+  valid_stride xs n t ->
+  (xs <= xs')%N ->
+  valid_stride xs' n t.
+Admitted.
+
+Lemma stride_more : forall t xs xs' n,
+  valid_stride xs' n t ->
+  stride (xs + xs') n t = rxs xs (stride xs' n t).
+Proof.
+  induction t as [| s t IH]; introv H.
+  - (* [] *) simpl. rewrite rxs_rxs. reflexivity.
+  - destruct s as [xs'' | | |]; simpl.
+    + (* r_xs xs'' :: t *)
+      change (valid_stride (xs' + N.pos xs'') n t) in H.
+      rewrite <- N.add_assoc.
+      rewrite IH by apply H.
+      reflexivity.
+    + (* r_D :: t *)
+      rewrite rxs_rxs. reflexivity.
+    + (* r_C :: t *)
+      rewrite rxs_rxs.
+      f_equal.
+      apply valid_stride_C_head in H.
+      lia.
+    + (* r_P :: t *)
+      apply valid_stride_P in H. contradiction.
+Qed.
+
+Arguments lxs _ _ : simpl never.
+Arguments rxs _ _ : simpl never.
+
+Lemma valid_stride_stride : forall t xs n m,
+  valid_stride xs (n + m) t ->
+  valid_stride 0 n (stride xs m t).
+Proof.
+  induction t as [| s t IH]; introv H.
+  - (* [] *)
+    unfold valid_stride.
+    destruct xs; simpl; split.
+  - destruct s as [xs' | | |]; simpl.
+    + (* r_xs xs' :: t *)
+      apply IH, H.
+    + (* r_D :: t *)
+      destruct xs; apply IH, H.
+    + (* r_C :: t *)
+      pose proof H as H'.
+      apply valid_stride_C_tail in H.
+      replace (n + m)~0~0%positive with (n~0~0 + m~0~0)%positive in H by lia.
+      apply IH in H.
+      apply valid_stride_C_head in H'.
+      unfold valid_stride.
+      rewrite max_stride_rxs. simpl.
+      unfold valid_stride in H. simpl in H.
+Admitted.
+
+Lemma stride_add : forall t xs n m,
+  valid_stride xs (n + m) t ->
+  stride xs (n + m) t = stride 0 n (stride xs m t).
+Proof.
+  induction t as [| s t IH]; introv H.
+  - (* [] *)
+    simpl. rewrite stride_rxs. reflexivity.
+  - destruct s as [xs' | | |]; simpl.
+    + (* r_xs xs' :: t *)
+      rewrite IH by apply H.
+      reflexivity.
+    + (* r_D :: t *)
+      rewrite IH by apply H.
+      rewrite stride_rxs. reflexivity.
+    + (* r_C :: t *)
+      apply valid_stride_C_tail in H.
+      replace ((n + m)~0~0)%positive with (n~0~0 + m~0~0)%positive in * by lia.
+      rewrite IH by apply H.
+      repeat (rewrite stride_rxs; simpl).
+      apply valid_stride_stride in H.
+      apply stride_more with (xs := N.pos m~0) in H.
+      rewrite N.add_0_r in H.
+      rewrite H.
+      rewrite rxs_rxs.
+      f_equal; lia.
+    + (* r_P :: t *)
+      reflexivity.
+Qed.
 
 Definition step (c : conf) : option conf :=
   match c with

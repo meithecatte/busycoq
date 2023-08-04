@@ -32,8 +32,8 @@ Ltac simpl_tape :=
   try rewrite move_right_const;
   simpl;
   try rewrite <- const_unfold.
-Ltac finish := apply evstep_refl.
-Ltac step := eapply evstep_step; [prove_step | simpl_tape].
+Ltac finish := apply evstep_refl || apply progress_base; prove_step.
+Ltac step := (eapply evstep_step || eapply progress_step); [prove_step | simpl_tape].
 Ltac execute := repeat (try finish; step).
 Ltac follow_assm := eapply evstep_trans; [apply_assumption; eauto |].
 Ltac follow_hyp H := eapply evstep_trans; [apply H; eauto |].
