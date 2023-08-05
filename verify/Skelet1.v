@@ -161,21 +161,6 @@ Proof. induction n.
     finish.
 Qed.
 
-(*
-Inductive strider : nat -> side -> Prop :=
-  | strider_R n : strider n R
-  | strider_x n t : strider n t -> strider n (x :> t)
-  | strider_D n t : strider n t -> strider n (Dr :> t)
-  | strider_C n t : strider (4 * n) t -> strider n (repeat n x :> C :> t).
-
-Fixpoint stride_result (n : nat) (t : side) (s : strider (S n) t) :
-  {t' : side | strider n t'} :=
-  match s return {t' : side | strider n t'}%type with
-  | strider_R _ => exist _ R (strider_R n)
-  | _ => exist _ R (strider_R n)
-  end.
-*)
-
 Inductive lsym :=
   | l_xs (n : positive)
   | l_D
@@ -317,14 +302,25 @@ Fixpoint max_stride (xs : N) (t : rtape) : option N :=
     end
   end.
 
-Fixpoint stride (xs : N) (n : positive) (t : rtape) : rtape :=
+Fixpoint stride (xs : N) (n : positive) (t : rtape) : option rtape :=
   match t with
-  | [] => rxs xs []
+  | [r_P] => Some (rxs xs [r_P])
+  | r_P :: _ => None
+  | [] => None
   | r_xs xs' :: t => stride (xs + N.pos xs') n t
-  | r_D :: t => rxs xs (r_D :: stride 0 n t)
-  | r_P :: t => []
+  | r_D :: t =>
+    match stride 0 n t with
+    | Some t => Some (rxs xs (r_D :: t))
+    | None => None
+    end
   | r_C :: t =>
-    rxs (xs - N.pos n) (r_C :: rxs (N.pos n~0) (stride 0 n~0~0 t))
+    if (N.pos n <=? xs)%N then
+      match stride 0 n~0~0 t with
+      | Some t => Some (rxs (xs - N.pos n) (r_C :: rxs (N.pos n~0) t))
+      | None => None
+      end
+    else
+      None
   end.
 
 Lemma stride_rxs : forall t xs xs' n,
@@ -346,39 +342,6 @@ Proof.
     simpl. f_equal. lia.
 Qed.
 
-Definition valid_stride xs n t : Prop :=
-  match max_stride xs t with
-  | None => True
-  | Some u => (N.pos n <= u)%N
-  end.
-
-Lemma valid_stride_C_tail : forall xs n t,
-  valid_stride xs n (r_C :: t) ->
-  valid_stride 0 n~0~0 t.
-Proof.
-  unfold valid_stride. introv H. simpl in H.
-  destruct (max_stride 0 t) as [u |].
-  - rewrite (N.div2_odd u).
-    rewrite (N.div2_odd (N.div2 u)).
-    lia.
-  - split.
-Qed.
-
-Lemma valid_stride_C_head : forall xs n t,
-  valid_stride xs n (r_C :: t) ->
-  (N.pos n <= xs)%N.
-Proof.
-  unfold valid_stride. introv H. simpl in H.
-  destruct (max_stride 0 t) as [u |]; lia.
-Qed.
-
-Lemma valid_stride_P : forall xs n t,
-  ~ valid_stride xs n (r_P :: t).
-Proof.
-  unfold valid_stride. introv H.
-  simpl in H. lia.
-Qed.
-
 Lemma rxs_rxs : forall n m t,
   rxs n (rxs m t) = rxs (n + m) t.
 Proof.
@@ -389,100 +352,220 @@ Proof.
   f_equal. f_equal. lia.
 Qed.
 
-(* XXX do i need this *)
-Lemma valid_stride_less : forall xs n n' t,
-  valid_stride xs n t ->
-  (n' <= n)%positive ->
-  valid_stride xs n' t.
-Admitted.
-
-(* XXX do i need this *)
-Lemma valid_stride_more : forall xs xs' n t,
-  valid_stride xs n t ->
-  (xs <= xs')%N ->
-  valid_stride xs' n t.
-Admitted.
-
-Lemma stride_more : forall t xs xs' n,
-  valid_stride xs' n t ->
-  stride (xs + xs') n t = rxs xs (stride xs' n t).
-Proof.
-  induction t as [| s t IH]; introv H.
-  - (* [] *) simpl. rewrite rxs_rxs. reflexivity.
-  - destruct s as [xs'' | | |]; simpl.
-    + (* r_xs xs'' :: t *)
-      change (valid_stride (xs' + N.pos xs'') n t) in H.
-      rewrite <- N.add_assoc.
-      rewrite IH by apply H.
-      reflexivity.
-    + (* r_D :: t *)
-      rewrite rxs_rxs. reflexivity.
-    + (* r_C :: t *)
-      rewrite rxs_rxs.
-      f_equal.
-      apply valid_stride_C_head in H.
-      lia.
-    + (* r_P :: t *)
-      apply valid_stride_P in H. contradiction.
-Qed.
-
 Arguments lxs _ _ : simpl never.
 Arguments rxs _ _ : simpl never.
 
-Lemma valid_stride_stride : forall t xs n m,
-  valid_stride xs (n + m) t ->
-  valid_stride 0 n (stride xs m t).
+Lemma stride_more : forall t t' xs xs' n,
+  stride xs' n t = Some t' ->
+  stride (xs + xs') n t = Some (rxs xs t').
 Proof.
-  induction t as [| s t IH]; introv H.
-  - (* [] *)
-    unfold valid_stride.
-    destruct xs; simpl; split.
-  - destruct s as [xs' | | |]; simpl.
-    + (* r_xs xs' :: t *)
-      apply IH, H.
-    + (* r_D :: t *)
-      destruct xs; apply IH, H.
-    + (* r_C :: t *)
-      pose proof H as H'.
-      apply valid_stride_C_tail in H.
-      replace (n + m)~0~0%positive with (n~0~0 + m~0~0)%positive in H by lia.
-      apply IH in H.
-      apply valid_stride_C_head in H'.
-      unfold valid_stride.
-      rewrite max_stride_rxs. simpl.
-      unfold valid_stride in H. simpl in H.
-Admitted.
-
-Lemma stride_add : forall t xs n m,
-  valid_stride xs (n + m) t ->
-  stride xs (n + m) t = stride 0 n (stride xs m t).
-Proof.
-  induction t as [| s t IH]; introv H.
-  - (* [] *)
-    simpl. rewrite stride_rxs. reflexivity.
-  - destruct s as [xs' | | |]; simpl.
-    + (* r_xs xs' :: t *)
-      rewrite IH by apply H.
-      reflexivity.
-    + (* r_D :: t *)
-      rewrite IH by apply H.
-      rewrite stride_rxs. reflexivity.
-    + (* r_C :: t *)
-      apply valid_stride_C_tail in H.
-      replace ((n + m)~0~0)%positive with (n~0~0 + m~0~0)%positive in * by lia.
-      rewrite IH by apply H.
-      repeat (rewrite stride_rxs; simpl).
-      apply valid_stride_stride in H.
-      apply stride_more with (xs := N.pos m~0) in H.
-      rewrite N.add_0_r in H.
-      rewrite H.
-      rewrite rxs_rxs.
-      f_equal; lia.
-    + (* r_P :: t *)
-      reflexivity.
+  induction t as [| [xs'' | | |] t IH]; introv H; simpl; simpl in H.
+  - (* [] *) discriminate.
+  (* simpl. rewrite rxs_rxs. reflexivity. *)
+  - (* r_xs xs'' :: t *)
+    simpl in H.
+    eapply IH in H.
+    rewrite <- N.add_assoc.
+    apply H.
+  - (* r_D :: t *)
+    simpl in H.
+    destruct (stride 0 n t) as [t1 |] eqn:E; inverts H.
+    rewrite rxs_rxs. reflexivity.
+  - (* r_C :: t *)
+    destruct (N.leb_spec (N.pos n) xs') as [Hle |]; try discriminate.
+    destruct (N.leb_spec (N.pos n) (xs + xs')) as [Hle' |]; try lia.
+    destruct (stride 0 n~0~0 t) as [t1 |] eqn:E; inverts H.
+    rewrite rxs_rxs.
+    repeat (lia || f_equal).
+  - (* r_P :: t *)
+    destruct t; inverts H.
+    rewrite rxs_rxs. reflexivity.
 Qed.
 
-Definition step (c : conf) : option conf :=
+Lemma stride_add : forall t t2 xs n m,
+  stride xs (n + m) t = Some t2 ->
+  exists t1, stride xs n t = Some t1 /\ stride 0 m t1 = Some t2.
+Proof.
+  induction t as [| [xs' | | |] t IH]; introv H.
+  - (* [] *) discriminate.
+  - (* r_xs xs' :: t *)
+    simpl in H.
+    apply IH in H. destruct H as [t1 [H1 H2]].
+    exists t1. intuition.
+  - (* r_D :: t *)
+    simpl in H.
+    destruct (stride 0 (n + m) t) as [t2' |] eqn:E; inverts H.
+    apply IH in E. destruct E as [t1 [H1 H2]].
+    exists (rxs xs (r_D :: t1)).
+    simpl. rewrite H1.
+    repeat split.
+    rewrite stride_rxs. simpl.
+    rewrite H2. reflexivity.
+  - (* r_C :: t *)
+    simpl in H. simpl.
+    destruct (N.leb_spec (N.pos (n + m)) xs) as [Hle |]; try discriminate.
+    destruct (stride 0 (n + m)~0~0 t) as [t2' |] eqn:E; inverts H.
+    destruct (N.leb_spec (N.pos n) xs) as [Hle' |]; try lia.
+    replace (n + m)~0~0%positive with (n~0~0 + m~0~0)%positive in E by lia.
+    apply IH in E. destruct E as [t1 [H1 H2]].
+    rewrite H1.
+    eexists. repeat split.
+    rewrite stride_rxs. simpl.
+    destruct (N.leb_spec (N.pos m) (xs - N.pos n)) as [Hle'' |]; try lia.
+    rewrite stride_rxs. simpl.
+    eapply stride_more in H2.
+    rewrite N.add_0_r in H2. rewrite H2.
+    rewrite rxs_rxs.
+    repeat (lia || f_equal).
+  - (* r_P :: t *)
+    simpl in H.
+    destruct t; inverts H.
+    eexists. repeat split.
+    rewrite stride_rxs. reflexivity.
+Qed.
+
+Fixpoint stride_level (t : rtape) : nat :=
+  match t with
+  | [] => 0
+  | r_C :: t => S (stride_level t)
+  | _ :: t => stride_level t
+  end.
+
+Lemma stride_level_rxs : forall xs t,
+  stride_level (rxs xs t) = stride_level t.
+Proof.
+  introv. destruct xs; try reflexivity.
+  destruct t as [| [] t]; reflexivity.
+Qed.
+
+Lemma stride_same_level : forall t t' xs n,
+  stride xs n t = Some t' ->
+  stride_level t = stride_level t'. 
+Proof.
+  induction t as [| [] t IH]; introv H.
+  - (* [] *) discriminate.
+  - (* r_xs n :: t *)
+    eapply IH, H.
+  - (* r_D :: t *)
+    simpl in H.
+    destruct (stride 0 n t) as [t1 |] eqn:E; inverts H.
+    rewrite stride_level_rxs. simpl.
+    eapply IH, E.
+  - (* r_C :: t *)
+    simpl in H.
+    destruct (N.leb_spec (N.pos n) xs) as [Hle |]; try discriminate.
+    destruct (stride 0 n~0~0 t) as [t1 |] eqn:E; inverts H.
+    repeat (rewrite stride_level_rxs; simpl).
+    f_equal.
+    eapply IH, E.
+  - (* r_P :: t *)
+    simpl in H.
+    destruct t; inverts H.
+    rewrite stride_level_rxs.
+    reflexivity.
+Qed.
+
+Theorem stride_correct' : forall k t t' xs l,
+  stride_level t = k ->
+  stride xs 1 t = Some t' ->
+  l <: repeat (N.to_nat xs) x |> lift_right t -->* l <| lift_right t'.
+Proof.
+  (* We do induction on k, and then on t. This duplicates most of the cases,
+     so we hoist them here manually. *)
+  assert (case_xs : forall t t' xs xs' l,
+    (forall t' xs l, stride xs 1 t = Some t' ->
+      l <: repeat (N.to_nat xs) x |> lift_right t -->* l <| lift_right t') ->
+    stride xs 1 (r_xs xs' :: t) = Some t' ->
+    l <: repeat (N.to_nat xs) x |> lift_right (r_xs xs' :: t)
+      -->* l <| lift_right t').
+  { introv IH H.
+    simpl in H. eapply IH in H.
+    simpl. follow rule_xn_right.
+    rewrite <- repeat_add.
+    replace (Pos.to_nat xs' + N.to_nat xs)
+      with (N.to_nat (xs + N.pos xs')) by lia.
+    apply H. }
+
+  assert (case_D : forall t t' xs l,
+    (forall t' xs l, stride xs 1 t = Some t' ->
+      l <: repeat (N.to_nat xs) x |> lift_right t -->* l <| lift_right t') ->
+    stride xs 1 (r_D :: t) = Some t' ->
+    l <: repeat (N.to_nat xs) x |> lift_right (r_D :: t)
+      -->* l <| lift_right t').
+  { introv IH H.
+    simpl in H.
+    destruct (stride 0 1 t) as [t1 |] eqn:E; inverts H.
+    eapply IH in E.
+    simpl lift_right. follow rule_D_right.
+    simpl repeat in E. follow E.
+    follow rule_D_left.
+    follow rule_xn_left.
+    simp. finish. }
+
+  assert (case_P : forall t t' xs l,
+    stride xs 1 (r_P :: t) = Some t' ->
+    l <: repeat (N.to_nat xs) x |> lift_right (r_P :: t)
+      -->* l <| lift_right t').
+  { introv H. destruct t; inverts H.
+    follow rule_P_R. follow rule_xn_left.
+    simp. finish. }
+
+  induction k; induction t as [| [xs' | | |] t IHt]; introv Hlevel H;
+    try discriminate;
+    try (apply case_xs; intuition);
+    try (apply case_D; intuition);
+    try (apply case_P; intuition);
+    clear case_xs case_D case_P.
+
+  (* r_C :: t *)
+  clear IHt. inverts Hlevel.
+  simpl in H.
+  destruct (N.leb_spec 1 xs) as [Hle |]; try discriminate.
+  destruct (stride 0 4 t) as [tfin |] eqn:E; inverts H.
+  destruct (N.to_nat xs) as [| u] eqn:Eu; try lia.
+  simpl repeat. simpl lift_right.
+  follow rule_C30.
+  
+  change 4%positive with (1 + 3)%positive in E. apply stride_add in E.
+  destruct E as [t1 [H1 E]].
+  pose proof H1 as Hlevel1. apply stride_same_level in Hlevel1.
+  eapply IHk in H1; try reflexivity.
+  simpl in H1. follow H1. clear H1.
+  follow rule_C01.
+
+  change 3%positive with (1 + 2)%positive in E. apply stride_add in E.
+  destruct E as [t2 [H1 E]].
+  pose proof H1 as Hlevel2. apply stride_same_level in Hlevel2.
+  eapply IHk in H1; try congruence.
+  simpl in H1. follow H1. clear H1.
+  follow rule_x_left. follow rule_C12. follow rule_x_right.
+
+  change 2%positive with (1 + 1)%positive in E. apply stride_add in E.
+  destruct E as [t3 [H1 E]].
+  pose proof H1 as Hlevel3. apply stride_same_level in Hlevel3.
+  eapply IHk in H1; try congruence.
+  simpl in H1. follow H1. clear H1.
+  follow rule_x_left. follow rule_C23. follow rule_x_right.
+
+  eapply IHk in E; try congruence.
+  simpl in E. follow E. clear E.
+
+  repeat follow rule_x_left.
+  follow rule_C_left.
+  follow rule_xn_left.
+  repeat simp.
+  replace (N.to_nat (xs - 1)) with u by lia.
+  finish.
+Qed.
+
+Corollary stride_correct : forall t t' xs l,
+  stride xs 1 t = Some t' ->
+  l <: repeat (N.to_nat xs) x |> lift_right t -->* l <| lift_right t'.
+Proof.
+  introv. eapply stride_correct'; intuition.
+Qed.
+
+Definition simple_step (c : conf) : option conf :=
   match c with
   | (right, l, r) =>
     match r with
@@ -599,8 +682,8 @@ Definition step (c : conf) : option conf :=
     end
   end.
 
-Lemma step_spec : forall c c',
-  step c = Some c' ->
+Lemma simple_step_spec : forall c c',
+  simple_step c = Some c' ->
   lift c -->* lift c'.
 Proof.
   introv H.
@@ -682,6 +765,45 @@ Proof.
         apply rule_P_P.
 Qed.
 
+Definition try_stride (c : conf) : option conf :=
+  match c with
+  | (left, l, r) => None
+  | (right, l, r) =>
+    match stride 0 1 r with
+    | Some r => Some (left, l, r)
+    | None => None
+    end
+  end.
+
+Definition step (c : conf) : option conf :=
+  match try_stride c with
+  | Some c' => Some c'
+  | None => simple_step c
+  end.
+
+Lemma try_stride_spec : forall c c',
+  try_stride c = Some c' ->
+  lift c -->* lift c'.
+Proof.
+  introv H.
+  destruct c as [[[] l] r]; try discriminate.
+  simpl in H.
+  destruct (stride 0 1 r) as [r' |] eqn:E; inverts H.
+  eapply stride_correct in E. simpl in E.
+  apply E.
+Qed.
+
+Lemma step_spec : forall c c',
+  step c = Some c' ->
+  lift c -->* lift c'.
+Proof.
+  introv H.
+  unfold step in H.
+  destruct (try_stride c) as [c0 |] eqn:E.
+  - inverts H. apply try_stride_spec, E.
+  - apply simple_step_spec, H.
+Qed.
+
 Lemma init : c0 -->* L <: C1 |> P :> R.
 Proof. unfold L, C1, R. execute. Qed.
 
@@ -700,6 +822,4 @@ Fixpoint steps (n : nat) (c : conf) : option conf :=
     end
   end.
 
-(*
-Compute steps 100000000 initial.
-*)
+Compute steps 1000000 initial.
