@@ -178,6 +178,25 @@ Inductive rsym :=
 Notation ltape := (list lsym).
 Notation rtape := (list rsym).
 
+Definition eqb_l (a b : lsym) : bool :=
+  match a, b with
+  | l_xs n, l_xs m => (n =? m)%positive
+  | l_D, l_D => true
+  | l_P, l_P => true
+  | l_C0, l_C0 => true
+  | l_C1, l_C1 => true
+  | l_C2, l_C2 => true
+  | l_C3, l_C3 => true
+  | l_F0, l_F0 => true
+  | l_F1, l_F1 => true
+  | l_F2, l_F2 => true
+  | l_F3, l_F3 => true
+  | l_G0, l_G0 => true
+  | l_G1, l_G1 => true
+  | l_G2, l_G2 => true
+  | _, _ => false
+  end.
+
 Inductive direction := left | right.
 
 Notation conf := (direction * ltape * rtape)%type.
@@ -565,6 +584,13 @@ Proof.
   introv. eapply stride_correct'; intuition.
 Qed.
 
+Corollary stride_correct_0 : forall t t' l,
+  stride 0 1 t = Some t' ->
+  l |> lift_right t -->* l <| lift_right t'.
+Proof.
+  introv H. eapply stride_correct in H. apply H.
+Qed.
+
 Definition simple_step (c : conf) : option conf :=
   match c with
   | (right, l, r) =>
@@ -789,8 +815,7 @@ Proof.
   destruct c as [[[] l] r]; try discriminate.
   simpl in H.
   destruct (stride 0 1 r) as [r' |] eqn:E; inverts H.
-  eapply stride_correct in E. simpl in E.
-  apply E.
+  apply stride_correct_0, E.
 Qed.
 
 Lemma step_spec : forall c c',
@@ -804,13 +829,21 @@ Proof.
   - apply simple_step_spec, H.
 Qed.
 
-Lemma init : c0 -->* L <: C1 |> P :> R.
-Proof. unfold L, C1, R. execute. Qed.
+Definition F := [l_xs 10344; l_D; l_xs 7640; l_C2].
+Definition G := [r_xs 300; r_D; r_xs 30876; r_D; r_xs 72142; r_D;
+              r_xs 3076; r_D; r_xs 1538; r_D].
+Definition J := [l_D; l_C2; l_xs 95; l_C0;
+                 l_xs 7713; l_D; l_D; l_xs 1866; l_C1;
+                 l_xs 13231; l_D; l_xs 6197; l_C3;
+                 l_xs 11066; l_D; l_xs 7279; l_C0;
+                 l_xs 10524; l_D; l_xs 7550; l_C2;
+                 l_xs 10389; l_D; l_xs 7618; l_C1;
+                 l_xs 10355; l_D; l_xs 7635; l_C3;
+                 l_xs 10347; l_D; l_xs 7639; l_C3;
+                 l_xs 10345; l_D; l_xs 7640; l_C1].
 
-Definition initial: conf := (right, [l_C1], [r_P]).
-
-Lemma init' : c0 -->* lift initial.
-Proof. exact init. Qed.
+Definition uni_P : positive := 53946.
+Definition uni_T : positive := 4 * uni_P - 5.
 
 Fixpoint steps (n : nat) (c : conf) : option conf :=
   match n with
@@ -822,4 +855,162 @@ Fixpoint steps (n : nat) (c : conf) : option conf :=
     end
   end.
 
-Compute steps 1000000 initial.
+Arguments lxs _ _ /.
+Arguments rxs _ _ /.
+
+Ltac apply_stride :=
+  lazymatch goal with
+  | H: stride 0 ?N ?R = Some ?R' |- lift (right, ?l, ?r) -->* _ =>
+    let r' := eval cbn in (stride 0 1 r) in
+    lazymatch r' with
+    | None => fail
+    | context G [stride ?xs ?n R] =>
+      let N' := eval vm_compute in (N - n)%positive in
+      change (stride 0 (n + N') R = Some R') in H;
+      apply stride_add in H;
+      destruct H as [r0 [H0 H]];
+      apply (stride_more _ _ xs) in H0; rewrite N.add_0_r in H0;
+      idtac "meow";
+      eassert (H1 : stride 0 1 r = Some _); [
+        change (stride 0 1 r) with r';
+        replace (stride xs n R) with (Some (rxs xs r0))
+          by (symmetry; apply H0);
+        reflexivity
+      |];
+      lazymatch type of H1 with
+      | stride 0 1 r = Some ?r'' =>
+        let r''' := eval vm_compute in r'' in
+        clear H0; apply (stride_correct_0 _ _ (lift_left l)) in H1;
+        change (lift_left l |> lift_right r) with (lift (right, l, r)) in H1;
+        change (lift_left l <| lift_right r'') with (lift (left, l, r''')) in H1;
+        follow H1; clear H1; clear R;
+        rename r0 into R
+      end
+    end
+  end.
+
+Lemma decr_rearrange : forall xs k,
+  k <> 1%positive ->
+  N.pos (xs :+ Pos.pred k) = decr (xs :+ k).
+Proof.
+  introv H.
+  destruct xs; unfold decr, het_add; lia.
+Qed.
+
+Ltac apply_simple :=
+  lazymatch goal with
+  | |- lift ?c -->* _ =>
+    let c' := eval cbn in (simple_step c) in
+    lazymatch c' with
+    | Some ?c' =>
+      assert (H0: simple_step c = Some c') by reflexivity;
+      lazymatch c' with
+      | context G [decr (?a :+ ?b)] =>
+        let b' := eval vm_compute in (Pos.pred b) in
+        replace (decr (a :+ b)) with (N.pos (a :+ Pos.pred b)) in H0
+          by (apply decr_rearrange; discriminate);
+        change (Pos.pred b) with b' in H0
+      | _ => idtac
+      end;
+      apply simple_step_spec in H0;
+      follow H0; clear H0
+    end
+  end.
+
+Ltac apply_step := apply_stride || apply_simple.
+Ltac steps10 :=
+  apply_step; apply_step; apply_step; apply_step; apply_step;
+  apply_step; apply_step; apply_step; apply_step; apply_step.
+Ltac steps100 :=
+  steps10; steps10; steps10; steps10; steps10;
+  steps10; steps10; steps10; steps10; steps10.
+Ltac steps1000 :=
+  steps100; steps100; steps100; steps100; steps100;
+  steps100; steps100; steps100; steps100; steps100.
+
+Theorem uni_cycle : forall l r r',
+  stride 0 uni_T r = Some r' ->
+  lift (right, l_D :: l_C1 :: l_xs uni_P :: J ++ l, r) -->*
+    lift (right, l_D :: l_C1 :: J ++ F ++ l, G ++ r').
+Proof.
+  unfold uni_T, uni_P.
+  introv H.
+  Time steps100. (* 1.5 s *)
+  Time steps100. (* 0.5s *)
+  Time apply_step.
+  Time apply_step.
+
+  Time apply_step. (* 7.6 s *)
+  Time apply_step.
+  Time steps100. (* 8.5s *)
+  Time apply_step.
+  Time apply_step.
+  Time apply_step.
+  Time apply_step.
+  Time steps10.
+  Time steps100.
+  Time steps100.
+  Time steps1000.
+  repeat (apply_stride || apply_simple).
+  apply_stride.  apply_simple.  apply_simple.  apply_simple.
+  apply_stride.  apply_simple.  apply_simple.  apply_simple.
+  apply_stride.  apply_simple.  apply_simple.  apply_simple.
+  apply_simple.  apply_simple.  apply_simple.
+  apply_stride.
+  apply_simple.
+  apply_simple.
+  apply_simple.
+
+(*
+Goal forall l r u, l <: repeat 10 x <: C1 <: Dl <| lift_right r -->* u.
+  introv.
+  follow rule_D_left.
+  follow rule_C12.
+  follow rule_D_right.
+  assert (H: exists r', stride 0 1 r = Some r') by admit.
+  destruct H as [r' H]. eapply stride_correct in H. simpl in H. follow H. clear H.
+
+  follow rule_D_left.
+  follow rule_C23.
+  follow rule_D_right.
+  assert (H: exists r1, stride 0 1 r' = Some r1) by admit.
+  destruct H as [r1 H]. eapply stride_correct in H. simpl in H. follow H. clear H.
+
+  follow rule_D_left.
+  follow rule_x_left.
+  follow rule_C_left.
+*)
+
+Lemma init : c0 -->* L <: C1 |> P :> R.
+Proof. unfold L, C1, R. execute. Qed.
+
+Definition initial: conf := (right, [l_C1], [r_P]).
+
+Lemma init' : c0 -->* lift initial.
+Proof. exact init. Qed.
+
+Fixpoint startswith (xs ys : ltape) : bool :=
+  match xs, ys with
+  | [], _ => true
+  | _, [] => false
+  | x :: xs, y :: ys =>
+    eqb_l x y && startswith xs ys
+  end.
+
+Fixpoint steps (n : nat) (c : conf) (k : N) : N * option conf :=
+  match c with
+  | (d, l, r) =>
+    if startswith J l then
+      (k, Some c)
+    else
+      match n with
+      | O => (k, Some c)
+      | S n =>
+        match step c with
+        | Some c' => steps n c' (N.succ k)
+        | None => (k, None)
+        end
+      end
+  end.
+
+Compute steps 100000 initial 0.
