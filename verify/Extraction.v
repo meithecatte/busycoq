@@ -1,6 +1,5 @@
 (** * Extraction to OCaml *)
 
-Set Warnings "-notation-overriden,-parsing,-deprecated-hint-without-locality".
 From Coq Require Extraction.
 Require Import ExtrOcamlBasic.
 Require Import ExtrOcamlIntConv.

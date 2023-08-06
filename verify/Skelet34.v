@@ -2,7 +2,6 @@
 
 (** Following https://www.sligocki.com/2023/02/02/skelet-34.html *)
 
-Set Warnings "-notation-overriden,-parsing,-deprecated-hint-without-locality".
 From Coq Require Import PeanoNat.
 From Coq Require Import List. Import ListNotations.
 From Coq Require Import Lia.
@@ -237,7 +236,7 @@ Definition f (m : positive) (a : sym) (k : nat) : positive :=
 Lemma has0_f : forall m a k, has0 (f m a k).
 Proof. destruct a; introv; simpl; constructor. Qed.
 
-Hint Resolve has0_f : core.
+Local Hint Resolve has0_f : core.
 
 Lemma f_lt : forall m a k, exists x,
   (P (f m a k) = 4 * (pow2 k - 1 :+ m) + x /\

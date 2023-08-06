@@ -1,6 +1,5 @@
 (** * Cyclers *)
 
-Set Warnings "-notation-overriden,-parsing,-deprecated-hint-without-locality".
 From Coq Require Import Bool.Bool.
 From Coq Require Import Arith.Arith.
 From Coq Require Import Lia.
@@ -9,7 +8,7 @@ From BusyCoq Require Export Flip.
 Set Default Goal Selector "!".
 
 Module Cyclers (Ctx : Ctx).
-  Local Module Flip := Flip Ctx. Export Flip.
+  Module Flip := Flip Ctx. Export Flip.
 
 Definition verify_cycler (tm : TM) (n k : nat) : bool :=
   match cmultistep tm n starting with

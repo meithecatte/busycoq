@@ -1,6 +1,5 @@
 (** * TM: Definition of Turing Machines *)
 
-Set Warnings "-notation-overriden,-parsing,-deprecated-hint-without-locality".
 From Coq Require Export Lists.Streams.
 From Coq Require Import PeanoNat.
 From Coq Require Import Lia.

@@ -3,7 +3,6 @@
 (** This is mostly the [b] function, which expresses the distance to the
     next power of two. *)
 
-Set Warnings "-notation-overriden,-parsing,-deprecated-hint-without-locality".
 From BusyCoq Require Import Helper.
 From Coq Require Import Lia.
 From Coq Require Import PArith.BinPos PArith.Pnat.
@@ -24,7 +23,7 @@ Inductive has0 : positive -> Prop :=
   | has0_0 n: has0 (n~0)
   | has0_1 n: has0 n -> has0 (n~1).
 
-Hint Constructors has0 : core.
+#[export] Hint Constructors has0 : core.
 
 Inductive all1 : positive -> Prop :=
   | all1_H:   all1 1

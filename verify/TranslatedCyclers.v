@@ -1,6 +1,5 @@
 (** * Translated Cyclers *)
 
-Set Warnings "-notation-overriden,-parsing,-deprecated-hint-without-locality".
 From Coq Require Import Bool.Bool.
 From Coq Require Import Arith.Arith.
 From Coq Require Import Lia.
@@ -9,7 +8,7 @@ From BusyCoq Require Export Cyclers.
 Set Default Goal Selector "!".
 
 Module TranslatedCyclers (Ctx : Ctx).
-  Local Module Cyclers := Cyclers Ctx. Export Cyclers.
+  Module Cyclers := Cyclers Ctx. Export Cyclers.
 
 (** [EqTake] holds if the first [n] symbols on a particular side of the
     tape match. *)

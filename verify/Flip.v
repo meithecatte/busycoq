@@ -1,6 +1,5 @@
 (** * Flip: swapping left and right *)
 
-Set Warnings "-notation-overriden,-parsing,-deprecated-hint-without-locality".
 From Coq Require Import Logic.FunctionalExtensionality.
 From Coq Require Import Bool.
 From Coq Require Import Lists.List. Import ListNotations.
@@ -9,7 +8,7 @@ From BusyCoq Require Export Compute.
 Set Default Goal Selector "!".
 
 Module Flip (Ctx : Ctx).
-  Local Module Compute := Compute Ctx. Export Compute.
+  Module Compute := Compute Ctx. Export Compute.
 
 Definition flip_dir (d : dir) :=
   match d with

@@ -1,6 +1,5 @@
 (** * Various generic lemmas that aren't present in the standard library *)
 
-Set Warnings "-notation-overriden,-parsing,-deprecated-hint-without-locality".
 From Coq Require Import Bool.
 From Coq Require Import Lists.List. Import ListNotations.
 From Coq Require Import Lists.Streams.

@@ -1,6 +1,5 @@
 (** * Utilities for proving individual machines *)
 
-Set Warnings "-notation-overriden,-parsing,-deprecated-hint-without-locality".
 From BusyCoq Require Export Extraction. Export ETranslatedCyclers.
 Set Default Goal Selector "!".
 

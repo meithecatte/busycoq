@@ -1,6 +1,5 @@
 (** * Fixed-width binary words *)
 
-Set Warnings "-notation-overriden,-parsing,-deprecated-hint-without-locality".
 From Coq Require Import Lia.
 From Coq Require Import PArith.BinPos PArith.Pnat.
 From Coq Require Import NArith.BinNat NArith.Nnat.
@@ -27,7 +26,7 @@ Inductive bin_plus {k} : N -> bin k -> bin k -> Prop :=
     bin_plus         u  n' n'' ->
     bin_plus (N.succ u) n n''.
 
-Hint Constructors bin_succ bin_plus : core.
+Local Hint Constructors bin_succ bin_plus : core.
 
 Lemma plus_S' : forall k u (n n' n'' : bin k),
   bin_plus u n n' ->
