@@ -910,23 +910,6 @@ Proof.
   apply E.
 Qed.
 
-Ltac apply_stride :=
-  lazymatch goal with
-  | H: stride 0 ?N ?R = Some ?R' |- lift (right, ?l, ?r) -->* _ =>
-    let r' := eval cbn in (stride' 0 1 r id) in
-    lazymatch r' with
-    | stride' ?xs ?n R ?k =>
-      let N' := eval vm_compute in (N - n)%positive in
-      destruct (prepare_apply_stride n N' xs H eq_refl) as [t1 [H1 H2]];
-      clear H; rename H2 into H;
-      let r' := eval cbv in (k t1) in
-      assert (H2 : stride' 0 1 r id = Some r')
-        by (exact (H1 k)); clear H1;
-      eapply evstep_trans; [apply use_stride', H2 |];
-      clear H2; clear R; rename t1 into R
-    end
-  end.
-
 Lemma decr_rearrange : forall xs k,
   k <> 1%positive ->
   N.pos (xs :+ Pos.pred k) = decr (xs :+ k).
@@ -935,10 +918,74 @@ Proof.
   destruct xs; unfold decr, het_add; lia.
 Qed.
 
+Lemma le_het_add : forall a b c,
+  (a <=? N.pos c)%N = true ->
+  true = (a <=? N.pos (b :+ c))%N.
+Proof.
+  introv H. rewrite pos_het_add.
+  destruct (N.leb_spec a (N.pos c)); try discriminate.
+  destruct (N.leb_spec a (b + N.pos c)%N); try reflexivity.
+  lia.
+Qed.
+
+Lemma het_add_sub : forall b c d,
+  (d <? c)%positive = true ->
+  N.pos (b :+ (c - d)) = (0 + N.pos (b :+ c) - N.pos d)%N.
+Proof.
+  introv H.
+  destruct (Pos.ltb_spec d c); inverts H.
+  repeat rewrite pos_het_add. lia.
+Qed.
+
+Ltac apply_stride_at H N R R' l r r' Hr :=
+  lazymatch r' with
+  | if ?cond then ?THEN else _ =>
+    let cond' := eval cbn in cond in
+    lazymatch cond' with
+    | (?a <=? N.pos (?b :+ ?c))%N =>
+      replace cond with true in Hr
+        by (exact (le_het_add a b c eq_refl));
+      let then' := eval hnf in THEN in
+      change (stride' 0 1 r id = then') in Hr;
+      apply_stride_at H N R R' l r then' Hr
+    end
+  | context G [ (0 + N.pos (?b :+ ?c) - ?d)%N ] =>
+    lazymatch d with
+    | Npos ?d' =>
+      let a := eval vm_compute in (c - d')%positive in
+      replace (0 + N.pos (b :+ c) - d)%N
+        with (N.pos (b :+ a)) in Hr
+        by (exact (het_add_sub b c d' eq_refl));
+      let r' := context G [ N.pos (b :+ a) ] in
+      apply_stride_at H N R R' l r r' Hr
+    end
+  | stride' ?xs ?n R ?k =>
+    let N' := eval vm_compute in (N - n)%positive in
+    destruct (prepare_apply_stride n N' xs H eq_refl) as [t1 [H1 H2]];
+    clear H; rename H2 into H;
+    let rfin := eval cbn in (k t1) in
+    assert (H2 : stride' 0 1 r id = Some rfin)
+      by (transitivity r'; [exact Hr | exact (H1 k)]);
+      clear H1;
+    unfold id in H2;
+    eapply evstep_trans; [apply use_stride', H2 |];
+    clear Hr;
+    clear H2; clear R; rename t1 into R
+  end.
+
+Ltac apply_stride :=
+  lazymatch goal with
+  | H: stride 0 ?N ?R = Some ?R' |- lift (right, ?l, ?r) -->* _ =>
+    let r' := eval hnf in (stride' 0 1 r id) in
+    let Hr := fresh in
+    assert (Hr : stride' 0 1 r id = r') by reflexivity;
+    apply_stride_at H N R R' l r r' Hr
+  end.
+
 Ltac apply_simple :=
   lazymatch goal with
   | |- lift ?c -->* _ =>
-    let c' := eval cbn in (simple_step c) in
+    let c' := eval hnf in (simple_step c) in
     lazymatch c' with
     | Some ?c' =>
       assert (H0: simple_step c = Some c') by reflexivity;
@@ -950,6 +997,8 @@ Ltac apply_simple :=
         change (Pos.pred b) with b' in H0
       | _ => idtac
       end;
+      let c'' := eval cbn in c' in
+      change c' with c'' in H0;
       apply simple_step_spec in H0;
       follow H0; clear H0
     end
@@ -963,20 +1012,11 @@ Ltac maybe_finish :=
   end.
 
 Ltac apply_step := apply_stride || apply_simple.
-Ltac steps10 :=
-  apply_step; apply_step; apply_step; apply_step; apply_step;
-  apply_step; apply_step; apply_step; apply_step; apply_step.
-Ltac steps100 :=
-  steps10; steps10; steps10; steps10; steps10;
-  steps10; steps10; steps10; steps10; steps10.
-Ltac steps1000 :=
-  steps100; steps100; steps100; steps100; steps100;
-  steps100; steps100; steps100; steps100; steps100.
 
-Theorem uni_cycle : forall l r r',
+Theorem uni_cycle : forall l r r' xs,
   stride 0 uni_T r = Some r' ->
-  lift (right, l_D :: l_C1 :: l_xs uni_P :: J ++ l, r) -->*
-    lift (right, l_D :: l_C1 :: J ++ F ++ l, G ++ r').
+  lift (right, l_D :: l_C1 :: l_xs (xs :+ (uni_P + 1)) :: J ++ l, r) -->*
+    lift (right, l_D :: l_C1 :: l_xs (xs :+ 1) :: J ++ F ++ l, G ++ r').
 Proof.
   unfold uni_T, uni_P.
   introv H.
