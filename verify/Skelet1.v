@@ -303,6 +303,209 @@ Ltac simp :=
   try rewrite decr_nat;
   simpl.
 
+Definition simple_step (c : conf) : option conf :=
+  match c with
+  | (right, l, r) =>
+    match r with
+    | [] =>
+      match l with
+      (* x > R  -->  < C x P R *)
+      | l_xs n :: l =>
+        Some (left, lxs (decr n) l, [r_C; r_xs 1; r_P])
+      (* D > R  -->  < x R *)
+      | l_D :: l =>
+        Some (left, l, [r_xs 1])
+      | _ => None
+      end
+    (* > x^n  -->  x^n > *)
+    | r_xs n :: r =>
+    Some (right, lxs (N.pos n) l, r)
+    (* > D    -->  D > *)
+    | r_D :: r =>
+      Some (right, l_D :: l, r)
+    | r_C :: r =>
+      match l with
+      (* x > C  -->  C0 > *)
+      | l_xs n :: l =>
+        Some (right, l_C0 :: lxs (decr n) l, r)
+      (* D > C  -->  P x > *)
+      | l_D :: l =>
+        Some (right, l_xs 1 :: l_P :: l, r)
+      (* C0 > C --> G0 > *)
+      | l_C0 :: l =>
+        Some (right, l_G0 :: l, r)
+      (* C2 > C --> F0 > *)
+      | l_C2 :: l =>
+        Some (right, l_F0 :: l, r)
+      | _ => None
+      end
+    (* > P R    --> < P R *)
+    | [r_P] =>
+      Some (left, l, [r_P])
+    (* > P x^n  --> x^n > P *)
+    | r_P :: r_xs n :: r =>
+      Some (right, lxs (N.pos n) l, r_P :: r)
+    (* > P D x  --> C1 D > P *)
+    | r_P :: r_D :: r_xs n :: r =>
+      Some (right, l_D :: l_C1 :: l, r_P :: rxs (decr n) r)
+    (* > P DDx  --> C2 C1 D > *)
+    | r_P :: r_D :: r_D :: r_xs n :: r =>
+      Some (right, l_D :: l_C1 :: l_C2 :: l, rxs (decr n) r)
+    (* > P DCx  --> G1 D > P *)
+    | r_P :: r_D :: r_C :: r_xs n :: r =>
+      Some (right, l_D :: l_G1 :: l, r_P :: rxs (decr n) r)
+    (* > P D P  --> C1 D > *)
+    | r_P :: r_D :: r_P :: r =>
+      Some (right, l_D :: l_C1 :: l, r)
+    (* > P C x  --> < P D P *)
+    | r_P :: r_C :: r_xs n :: r =>
+      Some (left, l, r_P :: r_D :: r_P :: rxs (decr n) r)
+    (* > P P    --> x > *)
+    | r_P :: r_P :: r =>
+      Some (right, lxs 1 l, r)
+    | _ => None
+    end
+  | (left, l, r) =>
+    match l with
+    (* L < C x --> L C1 D > P *)
+    | [] =>
+      match r with
+      | r_C :: r_xs n :: r =>
+        Some (right, [l_D; l_C1], r_P :: rxs (decr n) r)
+      | _ => None
+      end
+    (* x^n <  --> < x^n *)
+    | l_xs n :: l =>
+      Some (left, l, rxs (N.pos n) r)
+    (* D <   --> < D *)
+    | l_D :: l =>
+      Some (left, l, r_D :: r)
+    (* P <   --> < P *)
+    | l_P :: l =>
+      Some (left, l, r_P :: r)
+    (* C0 <  -->  C1 x > *)
+    | l_C0 :: l =>
+      Some (right, l_xs 1 :: l_C1 :: l, r)
+    (* C1 <  -->  C2 > *)
+    | l_C1 :: l =>
+      Some (right, l_C2 :: l, r)
+    (* C2 <  -->  C3 x > *)
+    | l_C2 :: l =>
+      Some (right, l_xs 1 :: l_C3 :: l, r)
+    (* C <  -->  < C *)
+    | l_C3 :: l =>
+      Some (left, l, r_C :: r)
+    (* F0 < -->  F1 x > *)
+    | l_F0 :: l =>
+      Some (right, l_xs 1 :: l_F1 :: l, r)
+    (* F1 < -->  F2 > *)
+    | l_F1 :: l =>
+      Some (right, l_F2 :: l, r)
+    (* F2 < --> F3 x > *)
+    | l_F2 :: l =>
+      Some (right, l_xs 1 :: l_F3 :: l, r)
+    (* x F3 < --> P C1 D > *)
+    | l_F3 :: l_xs n :: l =>
+      Some (right, l_D :: l_C1 :: l_P :: lxs (decr n) l, r)
+    (* G0 < -->  G1 x > *)
+    | l_G0 :: l =>
+      Some (right, l_xs 1 :: l_G1 :: l, r)
+    (* G1 < -->  G2 > *)
+    | l_G1 :: l =>
+      Some (right, l_G2 :: l, r)
+    (* G2 < -->  P D x > *)
+    | l_G2 :: l =>
+      Some (right, l_xs 1 :: l_D :: l_P :: l, r)
+    | _ => None
+    end
+  end.
+
+Arguments lxs _ _ : simpl never.
+Arguments rxs _ _ : simpl never.
+
+Lemma simple_step_spec : forall c c',
+  simple_step c = Some c' ->
+  lift c -->* lift c'.
+Proof.
+  introv H.
+  destruct c as [[[] l] r]; simpl in H.
+  - (* left *)
+    destruct l as [| [] l]; inverts H as H; simp.
+    + (* L < C x --> L C1 D > P *)
+      destruct r as [| [] [| [] r]]; inverts H; simp.
+      apply rule_L.
+    + (* x^n < --> < x^n *)
+      apply rule_xn_left.
+    + (* D <   --> < D *)
+      apply rule_D_left.
+    + (* P <   --> < P *)
+      apply rule_P_left.
+    + (* C0 <  --> C1 x > *)
+      apply rule_C01.
+    + (* C1 <  --> C2 > *)
+      apply rule_C12.
+    + (* C2 <  --> C3 x > *)
+      apply rule_C23.
+    + (* C <   --> < C *)
+      apply rule_C_left.
+    + (* F0 <  --> F1 x > *)
+      apply rule_F0.
+    + (* F1 <  --> F2 > *)
+      apply rule_F1.
+    + (* F2 <  --> F3 x > *)
+      apply rule_F2.
+    + (* x F3 < --> P C1 D > *)
+      destruct l as [| [] l]; inverts H; simp.
+      apply rule_F3.
+    + (* G0 <  --> G1 x > *)
+      apply rule_G0.
+    + (* G1 <  --> G2 > *)
+      apply rule_G1.
+    + (* G2 <  --> P D x > *)
+      apply rule_G2.
+  - (* right *)
+    destruct r as [| [] r]; inverts H as H; simp.
+    + destruct l as [| [] l]; inverts H; simp.
+      * (* x > R  -->  < C x P R *)
+        apply rule_xR.
+      * (* D > R  -->  < x R *)
+        apply rule_DR.
+    + (* > x^n  -->  x^n > *)
+      apply rule_xn_right.
+    + (* > D    -->  D > *)
+      apply rule_D_right.
+    + destruct l as [| [] l]; inverts H; simp.
+      * (* x > C  -->  C0 > *)
+        apply rule_C30.
+      * (* D > C  -->  P x *)
+        apply rule_DC.
+      * (* C0 > C -->  G0 > *)
+        apply rule_C03.
+      * (* C2 > C -->  F0 > *)
+        apply rule_C2_C.
+    + destruct r as [| [] r]; inverts H as H; simp.
+      * (* > P R   --> < P R *)
+        apply rule_P_R.
+      * (* > P x^n --> x^n > P *)
+        apply rule_P_xn.
+      * destruct r as [| [] r]; inverts H as H; simp.
+        ** (* > P D x --> C1 D > P *)
+          apply rule_P_Dx.
+        ** (* > P DDx --> C2 C1 D > *)
+          destruct r as [| [] r]; inverts H as H; simp.
+          apply rule_P_DDx.
+        ** (* > P DCx --> G1 D > P *)
+          destruct r as [| [] r]; inverts H as H; simp.
+          apply rule_P_DCx.
+        ** (* > P D P --> C1 D *)
+          apply rule_P_DP.
+      * destruct r as [| [] r]; inverts H as H; simp.
+        (* > P C x --> < P D P *)
+        apply rule_P_Cx.
+      * (* > P P --> x > *)
+        apply rule_P_P.
+Qed.
+
 (** [max_stride] returns the maximum number of times the stride rule can
     be applied to a tape before it becomes no longer possible. If [None]
     is returned, that means the rule can be applied an arbitrarily high
@@ -367,12 +570,9 @@ Proof.
   introv.
   destruct n, m; try reflexivity.
   destruct t as [| [] t]; try reflexivity.
-  simpl.
-  f_equal. f_equal. lia.
+  unfold rxs. simpl.
+  repeat (lia || f_equal).
 Qed.
-
-Arguments lxs _ _ : simpl never.
-Arguments rxs _ _ : simpl never.
 
 (** A "tail recursive" implementation of [stride] that hopefully, perhaps,
     possibly, might be better performance-wise when evaluating within Coq.
@@ -626,206 +826,6 @@ Proof.
   introv H. eapply stride_correct in H. apply H.
 Qed.
 
-Definition simple_step (c : conf) : option conf :=
-  match c with
-  | (right, l, r) =>
-    match r with
-    | [] =>
-      match l with
-      (* x > R  -->  < C x P R *)
-      | l_xs n :: l =>
-        Some (left, lxs (decr n) l, [r_C; r_xs 1; r_P])
-      (* D > R  -->  < x R *)
-      | l_D :: l =>
-        Some (left, l, [r_xs 1])
-      | _ => None
-      end
-    (* > x^n  -->  x^n > *)
-    | r_xs n :: r =>
-    Some (right, lxs (N.pos n) l, r)
-    (* > D    -->  D > *)
-    | r_D :: r =>
-      Some (right, l_D :: l, r)
-    | r_C :: r =>
-      match l with
-      (* x > C  -->  C0 > *)
-      | l_xs n :: l =>
-        Some (right, l_C0 :: lxs (decr n) l, r)
-      (* D > C  -->  P x > *)
-      | l_D :: l =>
-        Some (right, l_xs 1 :: l_P :: l, r)
-      (* C0 > C --> G0 > *)
-      | l_C0 :: l =>
-        Some (right, l_G0 :: l, r)
-      (* C2 > C --> F0 > *)
-      | l_C2 :: l =>
-        Some (right, l_F0 :: l, r)
-      | _ => None
-      end
-    (* > P R    --> < P R *)
-    | [r_P] =>
-      Some (left, l, [r_P])
-    (* > P x^n  --> x^n > P *)
-    | r_P :: r_xs n :: r =>
-      Some (right, lxs (N.pos n) l, r_P :: r)
-    (* > P D x  --> C1 D > P *)
-    | r_P :: r_D :: r_xs n :: r =>
-      Some (right, l_D :: l_C1 :: l, r_P :: rxs (decr n) r)
-    (* > P DDx  --> C2 C1 D > *)
-    | r_P :: r_D :: r_D :: r_xs n :: r =>
-      Some (right, l_D :: l_C1 :: l_C2 :: l, rxs (decr n) r)
-    (* > P DCx  --> G1 D > P *)
-    | r_P :: r_D :: r_C :: r_xs n :: r =>
-      Some (right, l_D :: l_G1 :: l, r_P :: rxs (decr n) r)
-    (* > P D P  --> C1 D > *)
-    | r_P :: r_D :: r_P :: r =>
-      Some (right, l_D :: l_C1 :: l, r)
-    (* > P C x  --> < P D P *)
-    | r_P :: r_C :: r_xs n :: r =>
-      Some (left, l, r_P :: r_D :: r_P :: rxs (decr n) r)
-    (* > P P    --> x > *)
-    | r_P :: r_P :: r =>
-      Some (right, lxs 1 l, r)
-    | _ => None
-    end
-  | (left, l, r) =>
-    match l with
-    (* L < C x --> L C1 D > P *)
-    | [] =>
-      match r with
-      | r_C :: r_xs n :: r =>
-        Some (right, [l_D; l_C1], r_P :: rxs (decr n) r)
-      | _ => None
-      end
-    (* x^n <  --> < x^n *)
-    | l_xs n :: l =>
-      Some (left, l, rxs (N.pos n) r)
-    (* D <   --> < D *)
-    | l_D :: l =>
-      Some (left, l, r_D :: r)
-    (* P <   --> < P *)
-    | l_P :: l =>
-      Some (left, l, r_P :: r)
-    (* C0 <  -->  C1 x > *)
-    | l_C0 :: l =>
-      Some (right, l_xs 1 :: l_C1 :: l, r)
-    (* C1 <  -->  C2 > *)
-    | l_C1 :: l =>
-      Some (right, l_C2 :: l, r)
-    (* C2 <  -->  C3 x > *)
-    | l_C2 :: l =>
-      Some (right, l_xs 1 :: l_C3 :: l, r)
-    (* C <  -->  < C *)
-    | l_C3 :: l =>
-      Some (left, l, r_C :: r)
-    (* F0 < -->  F1 x > *)
-    | l_F0 :: l =>
-      Some (right, l_xs 1 :: l_F1 :: l, r)
-    (* F1 < -->  F2 > *)
-    | l_F1 :: l =>
-      Some (right, l_F2 :: l, r)
-    (* F2 < --> F3 x > *)
-    | l_F2 :: l =>
-      Some (right, l_xs 1 :: l_F3 :: l, r)
-    (* x F3 < --> P C1 D > *)
-    | l_F3 :: l_xs n :: l =>
-      Some (right, l_D :: l_C1 :: l_P :: lxs (decr n) l, r)
-    (* G0 < -->  G1 x > *)
-    | l_G0 :: l =>
-      Some (right, l_xs 1 :: l_G1 :: l, r)
-    (* G1 < -->  G2 > *)
-    | l_G1 :: l =>
-      Some (right, l_G2 :: l, r)
-    (* G2 < -->  P D x > *)
-    | l_G2 :: l =>
-      Some (right, l_xs 1 :: l_D :: l_P :: l, r)
-    | _ => None
-    end
-  end.
-
-Lemma simple_step_spec : forall c c',
-  simple_step c = Some c' ->
-  lift c -->* lift c'.
-Proof.
-  introv H.
-  destruct c as [[[] l] r]; simpl in H.
-  - (* left *)
-    destruct l as [| [] l]; inverts H as H; simp.
-    + (* L < C x --> L C1 D > P *)
-      destruct r as [| [] [| [] r]]; inverts H; simp.
-      apply rule_L.
-    + (* x^n < --> < x^n *)
-      apply rule_xn_left.
-    + (* D <   --> < D *)
-      apply rule_D_left.
-    + (* P <   --> < P *)
-      apply rule_P_left.
-    + (* C0 <  --> C1 x > *)
-      apply rule_C01.
-    + (* C1 <  --> C2 > *)
-      apply rule_C12.
-    + (* C2 <  --> C3 x > *)
-      apply rule_C23.
-    + (* C <   --> < C *)
-      apply rule_C_left.
-    + (* F0 <  --> F1 x > *)
-      apply rule_F0.
-    + (* F1 <  --> F2 > *)
-      apply rule_F1.
-    + (* F2 <  --> F3 x > *)
-      apply rule_F2.
-    + (* x F3 < --> P C1 D > *)
-      destruct l as [| [] l]; inverts H; simp.
-      apply rule_F3.
-    + (* G0 <  --> G1 x > *)
-      apply rule_G0.
-    + (* G1 <  --> G2 > *)
-      apply rule_G1.
-    + (* G2 <  --> P D x > *)
-      apply rule_G2.
-  - (* right *)
-    destruct r as [| [] r]; inverts H as H; simp.
-    + destruct l as [| [] l]; inverts H; simp.
-      * (* x > R  -->  < C x P R *)
-        apply rule_xR.
-      * (* D > R  -->  < x R *)
-        apply rule_DR.
-    + (* > x^n  -->  x^n > *)
-      apply rule_xn_right.
-    + (* > D    -->  D > *)
-      apply rule_D_right.
-    + destruct l as [| [] l]; inverts H; simp.
-      * (* x > C  -->  C0 > *)
-        apply rule_C30.
-      * (* D > C  -->  P x *)
-        apply rule_DC.
-      * (* C0 > C -->  G0 > *)
-        apply rule_C03.
-      * (* C2 > C -->  F0 > *)
-        apply rule_C2_C.
-    + destruct r as [| [] r]; inverts H as H; simp.
-      * (* > P R   --> < P R *)
-        apply rule_P_R.
-      * (* > P x^n --> x^n > P *)
-        apply rule_P_xn.
-      * destruct r as [| [] r]; inverts H as H; simp.
-        ** (* > P D x --> C1 D > P *)
-          apply rule_P_Dx.
-        ** (* > P DDx --> C2 C1 D > *)
-          destruct r as [| [] r]; inverts H as H; simp.
-          apply rule_P_DDx.
-        ** (* > P DCx --> G1 D > P *)
-          destruct r as [| [] r]; inverts H as H; simp.
-          apply rule_P_DCx.
-        ** (* > P D P --> C1 D *)
-          apply rule_P_DP.
-      * destruct r as [| [] r]; inverts H as H; simp.
-        (* > P C x --> < P D P *)
-        apply rule_P_Cx.
-      * (* > P P --> x > *)
-        apply rule_P_P.
-Qed.
-
 Definition try_stride (c : conf) : option conf :=
   match c with
   | (left, l, r) => None
@@ -985,7 +985,7 @@ Proof.
   { introv. eapply stride_correct in H. apply H. }
   follow H'. clear H H'.
   repeat (maybe_finish || apply_simple).
-Qed.
+Time Qed.
 
 Lemma init : c0 -->* L <: C1 |> P :> R.
 Proof. unfold L, C1, R. execute. Qed.
