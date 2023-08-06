@@ -374,6 +374,41 @@ Qed.
 Arguments lxs _ _ : simpl never.
 Arguments rxs _ _ : simpl never.
 
+(** A "tail recursive" implementation of [stride] that hopefully, perhaps,
+    possibly, might be better performance-wise when evaluating within Coq.
+    Actual tail recursion would be a huge pain with smart constructors like
+    [rxs], so let's try explicit continuations first. *)
+Fixpoint stride' (xs : N) (n :positive) (t : rtape)
+    (k : rtape -> rtape) : option rtape :=
+  match t with
+  | [r_P] => Some (k (rxs xs [r_P]))
+  | r_P :: _ => None
+  | [] => None
+  | r_xs xs' :: t => stride' (xs + N.pos xs') n t k
+  | r_D :: t => stride' 0 n t (fun t => k (rxs xs (r_D :: t)))
+  | r_C :: t =>
+    if (N.pos n <=? xs)%N then
+      stride' 0 n~0~0 t (fun t => k (rxs (xs - N.pos n)
+        (r_C :: rxs (N.pos n~0) t)))
+    else
+      None
+  end.
+
+Lemma stride'_spec : forall t xs n k,
+  stride' xs n t k = option_map k (stride xs n t).
+Proof.
+  induction t as [| [xs | | |] t IH]; introv.
+  - reflexivity.
+  - simpl. rewrite IH. reflexivity.
+  - simpl. rewrite IH.
+    destruct (stride 0 n t); reflexivity.
+  - simpl.
+    destruct (N.pos n <=? xs)%N; try reflexivity.
+    rewrite IH. simpl.
+    destruct (stride 0 n~0~0 t); reflexivity.
+  - destruct t; reflexivity.
+Qed.
+
 Lemma stride_more : forall t t' xs xs' n,
   stride xs' n t = Some t' ->
   stride (xs + xs') n t = Some (rxs xs t').
@@ -830,7 +865,7 @@ Proof.
 Qed.
 
 Definition F := [l_xs 10344; l_D; l_xs 7640; l_C2].
-Definition G := [r_xs 300; r_D; r_xs 30876; r_D; r_xs 72142; r_D;
+Definition G := [r_xs 300; r_D; r_xs 30826; r_D; r_xs 72142; r_D;
               r_xs 3076; r_D; r_xs 1538; r_D].
 Definition J := [l_D; l_C2; l_xs 95; l_C0;
                  l_xs 7713; l_D; l_D; l_xs 1866; l_C1;
@@ -845,47 +880,50 @@ Definition J := [l_D; l_C2; l_xs 95; l_C0;
 Definition uni_P : positive := 53946.
 Definition uni_T : positive := 4 * uni_P - 5.
 
-Fixpoint steps (n : nat) (c : conf) : option conf :=
-  match n with
-  | O => Some c
-  | S n =>
-    match step c with
-    | Some c' => steps n c'
-    | None => None
-    end
-  end.
-
 Arguments lxs _ _ /.
 Arguments rxs _ _ /.
+
+Lemma prepare_apply_stride : forall n1 n2 xs {n} {t} {t'},
+  stride 0 n t = Some t' ->
+  (n1 + n2 = n)%positive ->
+  exists t1, (forall k, stride' xs n1 t k = Some (k (rxs xs t1)))
+    /\ stride 0 n2 t1 = Some t'.
+Proof.
+  introv H En. subst n.
+  apply stride_add in H.
+  destruct H as [t1 [H1 H2]].
+  eapply stride_more in H1.
+  rewrite N.add_0_r in H1.
+  exists t1. intuition.
+  rewrite stride'_spec, H1.
+  reflexivity.
+Qed.
+
+Lemma use_stride' : forall t t' l,
+  stride' 0 1 t id = Some t' ->
+  lift (right, l, t) -->* lift (left, l, t').
+Proof.
+  introv H.
+  rewrite stride'_spec in H.
+  destruct (stride 0 1 t) as [t1 |] eqn:E; inverts H.
+  eapply stride_correct in E.
+  apply E.
+Qed.
 
 Ltac apply_stride :=
   lazymatch goal with
   | H: stride 0 ?N ?R = Some ?R' |- lift (right, ?l, ?r) -->* _ =>
-    let r' := eval cbn in (stride 0 1 r) in
+    let r' := eval cbn in (stride' 0 1 r id) in
     lazymatch r' with
-    | None => fail
-    | context G [stride ?xs ?n R] =>
+    | stride' ?xs ?n R ?k =>
       let N' := eval vm_compute in (N - n)%positive in
-      change (stride 0 (n + N') R = Some R') in H;
-      apply stride_add in H;
-      destruct H as [r0 [H0 H]];
-      apply (stride_more _ _ xs) in H0; rewrite N.add_0_r in H0;
-      idtac "meow";
-      eassert (H1 : stride 0 1 r = Some _); [
-        change (stride 0 1 r) with r';
-        replace (stride xs n R) with (Some (rxs xs r0))
-          by (symmetry; apply H0);
-        reflexivity
-      |];
-      lazymatch type of H1 with
-      | stride 0 1 r = Some ?r'' =>
-        let r''' := eval vm_compute in r'' in
-        clear H0; apply (stride_correct_0 _ _ (lift_left l)) in H1;
-        change (lift_left l |> lift_right r) with (lift (right, l, r)) in H1;
-        change (lift_left l <| lift_right r'') with (lift (left, l, r''')) in H1;
-        follow H1; clear H1; clear R;
-        rename r0 into R
-      end
+      destruct (prepare_apply_stride n N' xs H eq_refl) as [t1 [H1 H2]];
+      clear H; rename H2 into H;
+      let r' := eval cbv in (k t1) in
+      assert (H2 : stride' 0 1 r id = Some r')
+        by (exact (H1 k)); clear H1;
+      eapply evstep_trans; [apply use_stride', H2 |];
+      clear H2; clear R; rename t1 into R
     end
   end.
 
@@ -917,6 +955,13 @@ Ltac apply_simple :=
     end
   end.
 
+Ltac maybe_finish :=
+  lazymatch goal with
+  | |- lift ?c -->* lift ?c' =>
+    replace c with c' by reflexivity;
+    apply evstep_refl
+  end.
+
 Ltac apply_step := apply_stride || apply_simple.
 Ltac steps10 :=
   apply_step; apply_step; apply_step; apply_step; apply_step;
@@ -935,51 +980,12 @@ Theorem uni_cycle : forall l r r',
 Proof.
   unfold uni_T, uni_P.
   introv H.
-  Time steps100. (* 1.5 s *)
-  Time steps100. (* 0.5s *)
-  Time apply_step.
-  Time apply_step.
-
-  Time apply_step. (* 7.6 s *)
-  Time apply_step.
-  Time steps100. (* 8.5s *)
-  Time apply_step.
-  Time apply_step.
-  Time apply_step.
-  Time apply_step.
-  Time steps10.
-  Time steps100.
-  Time steps100.
-  Time steps1000.
-  repeat (apply_stride || apply_simple).
-  apply_stride.  apply_simple.  apply_simple.  apply_simple.
-  apply_stride.  apply_simple.  apply_simple.  apply_simple.
-  apply_stride.  apply_simple.  apply_simple.  apply_simple.
-  apply_simple.  apply_simple.  apply_simple.
-  apply_stride.
-  apply_simple.
-  apply_simple.
-  apply_simple.
-
-(*
-Goal forall l r u, l <: repeat 10 x <: C1 <: Dl <| lift_right r -->* u.
-  introv.
-  follow rule_D_left.
-  follow rule_C12.
-  follow rule_D_right.
-  assert (H: exists r', stride 0 1 r = Some r') by admit.
-  destruct H as [r' H]. eapply stride_correct in H. simpl in H. follow H. clear H.
-
-  follow rule_D_left.
-  follow rule_C23.
-  follow rule_D_right.
-  assert (H: exists r1, stride 0 1 r' = Some r1) by admit.
-  destruct H as [r1 H]. eapply stride_correct in H. simpl in H. follow H. clear H.
-
-  follow rule_D_left.
-  follow rule_x_left.
-  follow rule_C_left.
-*)
+  Time repeat apply_step.
+  assert (H': forall l, lift (right, l, r) -->* lift (left, l, r')).
+  { introv. eapply stride_correct in H. apply H. }
+  follow H'. clear H H'.
+  repeat (maybe_finish || apply_simple).
+Qed.
 
 Lemma init : c0 -->* L <: C1 |> P :> R.
 Proof. unfold L, C1, R. execute. Qed.
@@ -1013,4 +1019,6 @@ Fixpoint steps (n : nat) (c : conf) (k : N) : N * option conf :=
       end
   end.
 
+(*
 Compute steps 100000 initial 0.
+*)
