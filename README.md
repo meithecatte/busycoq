@@ -24,6 +24,9 @@ considered hard to decide automatically. At the moment, these include:
 
  - [Skelet #34](https://www.sligocki.com/2023/02/02/skelet-34.html)
  - [Skelet #35](https://www.sligocki.com/2023/02/05/shift-overflow.html)
+ - [Skelet #1](https://www.sligocki.com/2023/03/13/skelet-1-infinite.html)
+    (due to the nature of the proof, the final computation is done by an
+    extracted OCaml program)
 
 ## Running the deciders
 
