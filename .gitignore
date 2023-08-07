@@ -10,6 +10,7 @@ Makefile.coq.conf
 *.ml
 *.mli
 !verify/main.ml
+!verify/skelet1_main.ml
 *.o
 *.cmx
 *.cmi
@@ -17,3 +18,4 @@ Makefile.coq.conf
 *.dat
 *.log
 verify/verify
+verify/skelet1
