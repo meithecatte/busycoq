@@ -145,7 +145,7 @@ impl Decide {
         thread::scope(|s| {
             let progress_thread = s.spawn(|| {
                 let style = ProgressStyle::with_template(
-                    "[{elapsed_precise}] {bar:30.cyan} {pos:>8}/{len:8} {msg}"
+                    "[{elapsed_precise}] {bar:30.cyan} {pos:>8}/{len:8} {msg} ETA {eta}"
                 ).unwrap();
                 let bar = ProgressBar::new(num as u64)
                     .with_style(style);
