@@ -16,7 +16,7 @@ verify: extraction.mli extraction.ml main.ml
 	ocamlopt.opt -o $@ $^
 
 skelet1: skelet1.mli skelet1.ml skelet1_main.ml
-	ocamlfind ocamlopt -o $@ -linkpkg -package zarith $^
+	ocamlopt -o $@ $^
 
 extraction.mli extraction.ml: Extraction.vo
 skelet1.mli skelet1.ml: Skelet1.vo

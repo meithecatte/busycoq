@@ -1,5 +1,6 @@
 open Skelet1
 
+(*
 type conf = (direction * lsym list) * rsym list
 type result = Ok of conf | Failed of int * conf
 
@@ -65,6 +66,7 @@ let show_result res =
     | Failed (k, c) ->
         show_config c;
         Printf.printf "%d steps to go\n" k
+*)
 
 let rec doit n c =
     if is_cycling c then
