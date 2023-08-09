@@ -9,10 +9,12 @@ mod turing;
 use certificate::{Certificate, CertList};
 use cyclers::Cyclers;
 use database::Database;
+use index::IndexReader;
 use tcyclers::TCyclers;
 use turing::TM;
 
 use argh::FromArgs;
+use bitvec::bitvec;
 use std::collections::HashMap;
 use std::fmt;
 use std::path::PathBuf;
@@ -32,6 +34,7 @@ trait Decider {
 }
 
 struct DeciderStats<D: Decider> {
+    skip: bool,
     decided: AtomicU32,
     fail_stats: EnumMap<D::Error, AtomicU32>,
 }
@@ -48,14 +51,19 @@ impl<D: Decider> fmt::Display for DeciderStats<D> {
 }
 
 impl<D: Decider> DeciderStats<D> {
-    fn new() -> Self {
+    fn new(skip: bool) -> Self {
         Self {
+            skip,
             decided: AtomicU32::new(0),
             fail_stats: enum_map! { _ => AtomicU32::new(0) },
         }
     }
 
     fn decide(&self, tm: &TM) -> Option<Certificate> {
+        if self.skip {
+            return None;
+        }
+
         match D::decide(tm) {
             Ok(cert) => {
                 self.decided.fetch_add(1, Ordering::Relaxed);
@@ -69,10 +77,12 @@ impl<D: Decider> DeciderStats<D> {
     }
 
     fn print_stats(&self) {
-        println!("{}:", D::NAME);
-        println!("  {:8?} Decided", self.decided);
-        for (k, v) in self.fail_stats.iter() {
-            println!("  {v:8?} {k:?}");
+        if !self.skip {
+            println!("{}:", D::NAME);
+            println!("  {:8?} Decided", self.decided);
+            for (k, v) in self.fail_stats.iter() {
+                println!("  {v:8?} {k:?}");
+            }
         }
     }
 }
@@ -104,6 +114,18 @@ struct Decide {
     /// path to the output certificate file
     #[argh(positional)]
     certs: PathBuf,
+
+    /// list of indexes to skip
+    #[argh(option, short='x')]
+    exclude: Option<PathBuf>,
+
+    /// don't run the Cyclers decider
+    #[argh(switch)]
+    no_cyclers: bool,
+
+    /// don't run the Translated Cyclers decider
+    #[argh(switch)]
+    no_tcyclers: bool,
 }
 
 fn main() {
@@ -119,6 +141,16 @@ fn main() {
 impl Decide {
     fn run(&self) {
         let mut db = Database::open(&self.database).unwrap();
+        let mut total_count = db.num_total;
+        let mut skiplist = bitvec![0; db.num_total as usize];
+
+        if let Some(exclude) = &self.exclude {
+            for idx in IndexReader::open(exclude).unwrap() {
+                skiplist.set(idx as usize, true);
+                total_count -= 1;
+            }
+        }
+
         let mut certs = CertList::create(&self.certs).unwrap();
         let (tx, rx) = mpsc::channel();
         let write_certs = thread::spawn(move || {
@@ -137,23 +169,22 @@ impl Decide {
         });
 
         let processed = AtomicU32::new(0);
-        let num = db.num_total;
 
-        let cyclers = DeciderStats::<Cyclers>::new();
-        let tcyclers = DeciderStats::<TCyclers>::new();
+        let cyclers = DeciderStats::<Cyclers>::new(self.no_cyclers);
+        let tcyclers = DeciderStats::<TCyclers>::new(self.no_tcyclers);
 
         thread::scope(|s| {
             let progress_thread = s.spawn(|| {
                 let style = ProgressStyle::with_template(
                     "[{elapsed_precise}] {bar:30.cyan} {pos:>8}/{len:8} {msg} ETA {eta}"
                 ).unwrap();
-                let bar = ProgressBar::new(num as u64)
+                let bar = ProgressBar::new(total_count as u64)
                     .with_style(style);
                 loop {
                     let processed = processed.load(Ordering::Relaxed);
                     bar.set_message(format!("C {cyclers} TC {tcyclers}"));
                     bar.set_position(processed as u64);
-                    if processed == num {
+                    if processed == total_count {
                         return;
                     }
 
@@ -162,6 +193,10 @@ impl Decide {
             });
 
             db.iter().par_bridge().for_each(|tm| {
+                if skiplist[tm.index as usize] {
+                    return;
+                }
+
                 let cert = cyclers.decide(&tm)
                     .or_else(|| tcyclers.decide(&tm));
                 processed.fetch_add(1, Ordering::Relaxed);

@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 argh = "0.1.10"
+bitvec = "1.0.1"
 byteorder = "1.4.3"
 enum-map = "2.6.0"
 indicatif = { version = "0.17.5", features = ["rayon"] }
