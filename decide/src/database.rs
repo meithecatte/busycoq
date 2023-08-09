@@ -1,5 +1,5 @@
 use std::io::prelude::*;
-use std::io::{BufReader, Error, ErrorKind, Result};
+use std::io::{BufReader, Error, ErrorKind, Result, SeekFrom};
 use std::fs::File;
 use std::path::Path;
 use byteorder::{BE, ReadBytesExt};
@@ -17,6 +17,11 @@ pub struct Database {
 pub struct Iter<'a> {
     db: &'a mut Database,
     index: u32,
+}
+
+pub struct Indices<'a, I> {
+    iter: Iter<'a>,
+    indices: I,
 }
 
 impl Database {
@@ -49,13 +54,19 @@ impl Database {
     }
 
     pub fn iter(&mut self) -> Iter<'_> {
-        let position = self.reader.stream_position().unwrap();
-        assert_eq!(position % 30, 0);
-        assert!(position >= 30);
-        let index = position / 30 - 1;
+        self.reader.seek(SeekFrom::Start(30)).unwrap();
         Iter {
             db: self,
-            index: index.try_into().unwrap(),
+            index: 0,
+        }
+    }
+
+    pub fn indices<I: Iterator<Item=u32>>(&mut self, indices: I)
+        -> Indices<'_, I>
+    {
+        Indices {
+            iter: self.iter(),
+            indices,
         }
     }
 }
@@ -86,5 +97,16 @@ impl<'a> Iterator for Iter<'a> {
         self.index += n as u32;
         self.db.reader.seek_relative(30 * n as i64).unwrap();
         self.next()
+    }
+}
+
+impl<'a, I: Iterator<Item=u32>> Iterator for Indices<'a, I> {
+    type Item = TM;
+
+    fn next(&mut self) -> Option<TM> {
+        let index = self.indices.next()?;
+        let tm = self.iter.nth((index - self.iter.index) as usize)?;
+        assert_eq!(tm.index, index);
+        Some(tm)
     }
 }

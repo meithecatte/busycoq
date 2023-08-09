@@ -192,7 +192,9 @@ impl Decide {
                 }
             });
 
-            db.iter().par_bridge().for_each(|tm| {
+            let indices = (0..db.num_total).filter(|&x| !skiplist[x as usize]);
+
+            db.indices(indices).par_bridge().for_each(|tm| {
                 if skiplist[tm.index as usize] {
                     return;
                 }
