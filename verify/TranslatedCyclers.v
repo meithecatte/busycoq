@@ -4,6 +4,7 @@ From Coq Require Import Bool.Bool.
 From Coq Require Import Arith.Arith.
 From Coq Require Import Lia.
 From Coq Require Import Lists.List. Import ListNotations.
+From Coq Require Import Lists.Streams.
 From BusyCoq Require Export Cyclers.
 Set Default Goal Selector "!".
 
@@ -12,7 +13,7 @@ Module TranslatedCyclers (Ctx : Ctx).
 
 (** [EqTake] holds if the first [n] symbols on a particular side of the
     tape match. *)
-Fixpoint EqTake (n : nat) (xs ys : Stream Sym): Prop :=
+Fixpoint EqTake (n : nat) (xs ys : side): Prop :=
   match n with
   | 0 => True
   | S n =>

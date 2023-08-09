@@ -9,6 +9,7 @@
 
 From Coq Require Import Bool.
 From Coq Require Import Lists.List. Import ListNotations.
+From Coq Require Import Lists.Streams.
 From Coq Require Import Lia.
 From BusyCoq Require Export TM.
 Set Default Goal Selector "!".

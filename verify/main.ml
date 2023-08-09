@@ -13,6 +13,10 @@ let verify_tcycler tm dir n0 n1 k =
     and k = nat_of_int k in
     ETranslatedCyclers.verify_tcycler tm dir n0 n1 k
 
+let verify_backwards tm n =
+    let n = nat_of_int n in
+    EBackwardsReasoning.verify_backwards tm n
+
 let seed_file = open_in_bin "../seed.dat"
 let cert_file = open_in_bin "../certs.dat"
 let index_file = open_out_bin "../decided.dat"
@@ -90,6 +94,7 @@ let read_tm (index: int): tm =
 type cert =
     | CertCyclers of int
     | CertTCyclers of dir * int * int * int
+    | CertBackwards of int
 
 exception BadCert of int * cert
 
@@ -101,6 +106,8 @@ let show_cert (cert: cert): string =
         Printf.sprintf "CertTCyclers (L, %d, %d, %d)" n0 n1 k
     | CertTCyclers (R, n0, n1, k) ->
         Printf.sprintf "CertTCyclers (R, %d, %d, %d)" n0 n1 k
+    | CertBackwards n ->
+        Printf.sprintf "CertBackwards %d" n
 
 let show_exn (e: exn): string option =
     match e with
@@ -120,6 +127,7 @@ let read_cert (): int * cert =
         and n1 = read_u32 cert_file
         and k = read_u32 cert_file in
         CertTCyclers (dir, n0, n1, k)
+    | 2 -> CertBackwards (read_u32 cert_file)
     | _ -> failwith "unknown certificate type"
     in (index, cert)
 
@@ -128,6 +136,7 @@ let verify_cert (index: int) (cert: cert): unit =
     let ok = match cert with
     | CertCyclers n -> verify_cycler tm n
     | CertTCyclers (dir, n0, n1, k) -> verify_tcycler tm dir n0 n1 k
+    | CertBackwards n -> verify_backwards tm n
     in
     if ok then
         write_u32 index_file index

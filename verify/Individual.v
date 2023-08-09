@@ -1,11 +1,11 @@
 (** * Utilities for proving individual machines *)
 
+From Coq Require Export Lists.Streams.
 From BusyCoq Require Export Extraction. Export ETranslatedCyclers.
 Set Default Goal Selector "!".
 
 Notation "0" := S0.
 Notation "1" := S1.
-Notation side := (Stream sym).
 
 (** Trivial lemmas, but [simpl] in these situations leaves a mess. *)
 Lemma move_left_const : forall s0 s r,

@@ -1,12 +1,17 @@
 COQMFFLAGS := -Q . BusyCoq
 
-ALLVFILES := LibTactics.v Helper.v TM.v Compute.v Flip.v Cyclers.v TranslatedCyclers.v Extraction.v \
+ALLVFILES := LibTactics.v Helper.v TM.v Compute.v Flip.v Cyclers.v TranslatedCyclers.v BackwardsReasoning.v Extraction.v \
 		Individual.v FixedBin.v ShiftOverflow.v Skelet34.v Skelet35.v Skelet1.v
 
-all: build verify skelet1
+all: check verify skelet1
 
-build: Makefile.coq
+Makefile.coq: Makefile
+	coq_makefile $(COQMFFLAGS) -o Makefile.coq $(ALLVFILES)
+
+check: Makefile.coq
 	$(MAKE) -f Makefile.coq
+
+%.vo: %.v Makefile.coq
 
 clean::
 	if [ -e Makefile.coq ]; then $(MAKE) -f Makefile.coq cleanall; fi
@@ -20,8 +25,6 @@ skelet1: skelet1.mli skelet1.ml skelet1_main.ml
 
 extraction.mli extraction.ml: Extraction.vo
 skelet1.mli skelet1.ml: Skelet1.vo
-Makefile.coq:
-	coq_makefile $(COQMFFLAGS) -o Makefile.coq $(ALLVFILES)
 
 -include Makefile.coq
 
