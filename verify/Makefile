@@ -5,7 +5,7 @@ ALLVFILES := LibTactics.v Helper.v TM.v Compute.v Flip.v Cyclers.v TranslatedCyc
 
 all: check verify skelet1
 
-Makefile.coq: Makefile
+Makefile.coq: Makefile $(ALLVFILES)
 	coq_makefile $(COQMFFLAGS) -o Makefile.coq $(ALLVFILES)
 
 check: Makefile.coq
