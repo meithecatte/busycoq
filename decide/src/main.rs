@@ -195,10 +195,6 @@ impl Decide {
             let indices = (0..db.num_total).filter(|&x| !skiplist[x as usize]);
 
             db.indices(indices).par_bridge().for_each(|tm| {
-                if skiplist[tm.index as usize] {
-                    return;
-                }
-
                 let cert = cyclers.decide(&tm)
                     .or_else(|| tcyclers.decide(&tm));
                 processed.fetch_add(1, Ordering::Relaxed);
