@@ -33,7 +33,7 @@ pub struct TM {
     /// Records which limit the machine triggered during the initial
     /// evaluation.
     pub limit: Limit,
-    code: [[Command; 2]; 5],
+    pub code: [[Command; 2]; 5],
 }
 
 #[derive(Clone, PartialEq, Eq)]

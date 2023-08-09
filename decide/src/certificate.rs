@@ -6,11 +6,13 @@ use std::path::Path;
 use byteorder::{BE, WriteBytesExt};
 use crate::cyclers;
 use crate::tcyclers;
+use crate::backwards;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Certificate {
     Cyclers(cyclers::Cert),
     TCyclers(tcyclers::Cert),
+    Backwards(backwards::Cert),
 }
 
 pub struct CertList {
@@ -36,6 +38,10 @@ impl CertList {
                 self.writer.write_u8(1)?;
                 self.writer.write_all(&cert.to_bytes())?;
             }
+            Backwards(cert) => {
+                self.writer.write_u8(2)?;
+                self.writer.write_all(&cert.to_bytes())?;
+            }
         }
 
         Ok(())
@@ -51,5 +57,11 @@ impl From<cyclers::Cert> for Certificate {
 impl From<tcyclers::Cert> for Certificate {
     fn from(cert: tcyclers::Cert) -> Certificate {
         Certificate::TCyclers(cert)
+    }
+}
+
+impl From<backwards::Cert> for Certificate {
+    fn from(cert: backwards::Cert) -> Certificate {
+        Certificate::Backwards(cert)
     }
 }

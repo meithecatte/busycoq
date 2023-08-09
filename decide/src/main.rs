@@ -1,11 +1,14 @@
 mod api;
+mod backwards;
 mod certificate;
 mod cyclers;
 mod database;
 mod index;
 mod tcyclers;
 mod turing;
+mod undo;
 
+use backwards::BackwardsReasoning;
 use certificate::{Certificate, CertList};
 use cyclers::Cyclers;
 use database::Database;
@@ -126,6 +129,10 @@ struct Decide {
     /// don't run the Translated Cyclers decider
     #[argh(switch)]
     no_tcyclers: bool,
+
+    /// don't run the Backwards Reasoning decider
+    #[argh(switch)]
+    no_backwards: bool,
 }
 
 fn main() {
@@ -151,29 +158,39 @@ impl Decide {
             }
         }
 
+        let indices = (0..db.num_total).filter(|&x| !skiplist[x as usize]);
         let mut certs = CertList::create(&self.certs).unwrap();
         let (tx, rx) = mpsc::channel();
-        let write_certs = thread::spawn(move || {
-            let mut staging = HashMap::new();
-            let mut next = 0;
-            for (index, cert) in rx {
-                staging.insert(index, cert);
-                while let Some(cert) = staging.remove(&next) {
-                    if let Some(cert) = cert {
-                        certs.write_entry(next, &cert).unwrap();
-                    }
-
-                    next += 1;
-                }
-            }
-        });
 
         let processed = AtomicU32::new(0);
 
         let cyclers = DeciderStats::<Cyclers>::new(self.no_cyclers);
         let tcyclers = DeciderStats::<TCyclers>::new(self.no_tcyclers);
+        let backwards = DeciderStats::<BackwardsReasoning>::new(self.no_backwards);
 
         thread::scope(|s| {
+            s.spawn({
+                let indices = indices.clone();
+                move || {
+                    let mut indices = indices.peekable();
+                    let mut staging = HashMap::new();
+                    for (index, cert) in rx {
+                        staging.insert(index, cert);
+                        while let Some(&index) = indices.peek() {
+                            if let Some(cert) = staging.remove(&index) {
+                                if let Some(cert) = cert {
+                                    certs.write_entry(index, &cert).unwrap();
+                                }
+
+                                indices.next();
+                            } else {
+                                break
+                            }
+                        }
+                    }
+                }
+            });
+
             let progress_thread = s.spawn(|| {
                 let style = ProgressStyle::with_template(
                     "[{elapsed_precise}] {bar:30.cyan} {pos:>8}/{len:8} {msg} ETA {eta}"
@@ -182,7 +199,8 @@ impl Decide {
                     .with_style(style);
                 loop {
                     let processed = processed.load(Ordering::Relaxed);
-                    bar.set_message(format!("C {cyclers} TC {tcyclers}"));
+                    bar.set_message(format!("C {} TC {} BR {}",
+                        cyclers, tcyclers, backwards));
                     bar.set_position(processed as u64);
                     if processed == total_count {
                         return;
@@ -192,22 +210,20 @@ impl Decide {
                 }
             });
 
-            let indices = (0..db.num_total).filter(|&x| !skiplist[x as usize]);
-
             db.indices(indices).par_bridge().for_each(|tm| {
                 let cert = cyclers.decide(&tm)
-                    .or_else(|| tcyclers.decide(&tm));
+                    .or_else(|| tcyclers.decide(&tm))
+                    .or_else(|| backwards.decide(&tm));
                 processed.fetch_add(1, Ordering::Relaxed);
                 tx.send((tm.index, cert)).unwrap();
             });
 
+            drop(tx);
             progress_thread.thread().unpark();
         });
 
-        drop(tx);
-        write_certs.join().unwrap();
-
         cyclers.print_stats();
         tcyclers.print_stats();
+        backwards.print_stats();
     }
 }
