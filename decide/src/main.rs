@@ -18,11 +18,9 @@ use turing::TM;
 
 use argh::FromArgs;
 use bitvec::bitvec;
-use std::collections::HashMap;
 use std::fmt;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU32, Ordering};
-use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
 use rayon::prelude::*;
@@ -159,8 +157,7 @@ impl Decide {
         }
 
         let indices = (0..db.num_total).filter(|&x| !skiplist[x as usize]);
-        let mut certs = CertList::create(&self.certs).unwrap();
-        let (tx, rx) = mpsc::channel();
+        let mut certfile = CertList::create(&self.certs).unwrap();
 
         let processed = AtomicU32::new(0);
 
@@ -169,28 +166,6 @@ impl Decide {
         let backwards = DeciderStats::<BackwardsReasoning>::new(self.no_backwards);
 
         thread::scope(|s| {
-            s.spawn({
-                let indices = indices.clone();
-                move || {
-                    let mut indices = indices.peekable();
-                    let mut staging = HashMap::new();
-                    for (index, cert) in rx {
-                        staging.insert(index, cert);
-                        while let Some(&index) = indices.peek() {
-                            if let Some(cert) = staging.remove(&index) {
-                                if let Some(cert) = cert {
-                                    certs.write_entry(index, &cert).unwrap();
-                                }
-
-                                indices.next();
-                            } else {
-                                break
-                            }
-                        }
-                    }
-                }
-            });
-
             let progress_thread = s.spawn(|| {
                 let style = ProgressStyle::with_template(
                     "[{elapsed_precise}] {bar:30.cyan} {pos:>8}/{len:8} {msg} ETA {eta}"
@@ -210,15 +185,22 @@ impl Decide {
                 }
             });
 
-            db.indices(indices).par_bridge().for_each(|tm| {
+            let tms = db.indices(indices).collect::<Vec<_>>();
+
+            let certs = tms.par_iter().map(|tm| {
                 let cert = cyclers.decide(&tm)
                     .or_else(|| tcyclers.decide(&tm))
                     .or_else(|| backwards.decide(&tm));
                 processed.fetch_add(1, Ordering::Relaxed);
-                tx.send((tm.index, cert)).unwrap();
-            });
+                (tm.index, cert)
+            }).collect::<Vec<_>>();
 
-            drop(tx);
+            for (index, cert) in certs {
+                if let Some(cert) = cert {
+                    certfile.write_entry(index, &cert).unwrap();
+                }
+            }
+
             progress_thread.thread().unpark();
         });
 
