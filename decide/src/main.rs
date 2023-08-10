@@ -145,18 +145,21 @@ fn main() {
 
 impl Decide {
     fn run(&self) {
-        let mut db = Database::open(&self.database).unwrap();
+        let db = Database::open(&self.database).unwrap();
         let mut total_count = db.num_total;
-        let mut skiplist = bitvec![0; db.num_total as usize];
+        let indices: Vec<u32> = {
+            let mut skiplist = bitvec![0; db.num_total as usize];
 
-        if let Some(exclude) = &self.exclude {
-            for idx in IndexReader::open(exclude).unwrap() {
-                skiplist.set(idx as usize, true);
-                total_count -= 1;
+            if let Some(exclude) = &self.exclude {
+                for idx in IndexReader::open(exclude).unwrap() {
+                    skiplist.set(idx as usize, true);
+                    total_count -= 1;
+                }
             }
-        }
 
-        let indices = (0..db.num_total).filter(|&x| !skiplist[x as usize]);
+            (0..db.num_total).filter(|&x| !skiplist[x as usize]).collect()
+        };
+
         let mut certfile = CertList::create(&self.certs).unwrap();
 
         let processed = AtomicU32::new(0);
@@ -185,9 +188,8 @@ impl Decide {
                 }
             });
 
-            let tms = db.indices(indices).collect::<Vec<_>>();
-
-            let certs = tms.par_iter().map(|tm| {
+            let certs = indices.par_iter().map(|&index| {
+                let tm = db.get(index);
                 let cert = cyclers.decide(&tm)
                     .or_else(|| tcyclers.decide(&tm))
                     .or_else(|| backwards.decide(&tm));
