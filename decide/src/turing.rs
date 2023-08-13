@@ -110,6 +110,28 @@ impl<'a> Configuration<'a> {
     }
 }
 
+impl fmt::Display for Configuration<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.pos != usize::MAX {
+            for &sym in self.tape.iter().take(self.pos) {
+                write!(f, "{} ", if sym { "1" } else { "0" })?;
+            }
+        }
+
+        let state = b"ABCDE"[self.state as usize] as char;
+        match self.tape.get(self.pos) {
+            Some(&sym) => write!(f, "{state}[{}]", if sym { "1" } else { "0" })?,
+            None => write!(f, "{state}[]")?,
+        }
+
+        for &sym in self.tape.iter().skip(self.pos + 1) {
+            write!(f, "{} ", if sym { "1" } else { "0" })?;
+        }
+
+        Ok(())
+    }
+}
+
 impl TryFrom<u8> for Dir {
     type Error = &'static str;
 
