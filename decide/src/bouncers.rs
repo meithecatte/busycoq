@@ -1,7 +1,10 @@
-use crate::turing::{Configuration, Dir, TM, OutOfSpace};
+use crate::turing::{Command, Configuration, Dir, TM, OutOfSpace};
 use crate::memo::Memo;
 use enum_map::Enum;
 use itertools::Itertools;
+use bumpalo::Bump;
+use std::collections::VecDeque;
+use std::fmt;
 
 const SPACE_LIMIT: usize = 1024;
 const TIME_LIMIT: u32 = 20000;
@@ -16,10 +19,213 @@ pub fn decide_bouncer(tm: &TM) {
     }
 
     for progression in find_progressions(&records) {
+        let state = progression[1].state;
+        let dir = progression[1].direction;
         if let Some(symbolic) = split_tapes(progression) {
-            dbg!(symbolic);
+            SymbolicTM::with(tm, &symbolic, state, dir, |mut tm|
+                -> Result<(), ()>
+            {
+                println!("{tm}");
+
+                while let Ok(()) = tm.step() {
+                    println!("{tm}");
+                }
+
+                Ok(())
+            }).unwrap();
             break;
         }
+    }
+}
+
+#[derive(Debug)]
+struct SymbolicTM<'a> {
+    tm: &'a TM,
+    bump: &'a Bump,
+    tape: VecDeque<Segment<'a>>,
+    state: u8,
+    direction: Dir,
+    position: usize,
+    shift_buf: Vec<bool>,
+}
+
+impl<'bump> SymbolicTM<'bump> {
+    fn with<U>(
+        tm: &TM,
+        tape: &[Segment<'_>],
+        state: u8,
+        direction: Dir,
+        f: impl for<'a> FnOnce(SymbolicTM<'a>) -> U,
+    ) -> U {
+        let bump = Bump::new();
+        let position = match direction {
+            Dir::L => 0,
+            Dir::R => tape.len(),
+        };
+
+        let mut tm = SymbolicTM {
+            tm,
+            bump: &bump,
+            tape: tape.iter().copied().collect(),
+            state,
+            direction,
+            position,
+            shift_buf: vec![],
+        };
+
+        tm.align();
+
+        f(tm)
+    }
+
+    /// Given a `Segment::Repeat` at index `i`, shift it left as far as possible.
+    fn align_segment_left(&mut self, i: usize) {
+        let Segment::Repeat(seg) = self.tape[i] else {
+            panic!("align_segment_left: invalid index");
+        };
+
+        let shift = self.tape.iter().copied()
+            .take(i).rev()
+            .zip(seg.iter().copied().rev().cycle())
+            .take_while(|&(seg, s)| seg == Segment::Sym(s))
+            .count();
+
+        if shift == 0 {
+            return;
+        }
+
+        for k in (i - shift..i).rev() {
+            self.tape[k + 1] = self.tape[k];
+        }
+
+        let seg = self.bump.alloc_slice_copy(seg);
+        seg.rotate_right(shift % seg.len());
+
+        self.tape[i - shift] = Segment::Repeat(seg);
+    }
+
+    /// Given a `Segment::Repeat` at index `i`, shift it right as far as possible.
+    fn align_segment_right(&mut self, i: usize) {
+        let Segment::Repeat(seg) = self.tape[i] else {
+            panic!("align_segment_right: invalid index");
+        };
+
+        let shift = self.tape.iter().copied()
+            .skip(i + 1)
+            .zip(seg.iter().copied().cycle())
+            .take_while(|&(seg, s)| seg == Segment::Sym(s))
+            .count();
+
+        if shift == 0 {
+            return;
+        }
+
+        for k in i..i + shift {
+            self.tape[k] = self.tape[k + 1];
+        }
+
+        let seg = self.bump.alloc_slice_copy(seg);
+        seg.rotate_left(shift % seg.len());
+
+        self.tape[i + shift] = Segment::Repeat(seg);
+    }
+
+    fn align(&mut self) {
+        for i in 0..self.position {
+            if let Segment::Repeat(_) = self.tape[i] {
+                self.align_segment_left(i);
+            }
+        }
+
+        for i in (self.position..self.tape.len()).rev() {
+            if let Segment::Repeat(_) = self.tape[i] {
+                self.align_segment_right(i);
+            }
+        }
+    }
+
+    fn head_segment(&mut self) -> Segment<'_> {
+        match self.direction {
+            Dir::L => {
+                if self.position == 0 {
+                    self.tape.push_front(Segment::Sym(false));
+                    self.position = 1;
+                }
+
+                self.tape[self.position - 1]
+            }
+            Dir::R => {
+                if self.position == self.tape.len() {
+                    self.tape.push_back(Segment::Sym(false));
+                }
+
+                self.tape[self.position]
+            }
+        }
+    }
+
+    fn write_head(&mut self, seg: Segment<'bump>) {
+        match self.direction {
+            Dir::L => self.tape[self.position - 1] = seg,
+            Dir::R => self.tape[self.position] = seg,
+        }
+    }
+
+    fn move_head(&mut self, dir: Dir) {
+        if dir != self.direction {
+            self.direction = dir;
+        } else {
+            match dir {
+                Dir::L => self.position -= 1,
+                Dir::R => self.position += 1,
+            }
+        }
+    }
+
+    fn step(&mut self) -> Result<(), ()> {
+        let seg = self.head_segment();
+
+        match seg {
+            Segment::Sym(sym) => {
+                match self.tm.code[self.state as usize][sym as usize] {
+                    Command::Halt => return Err(()),
+                    Command::Step { write, dir, next } => {
+                        self.write_head(Segment::Sym(write));
+                        self.move_head(dir);
+                        self.state = next;
+                    }
+                }
+            }
+            Segment::Repeat(seg) => {
+                let seg = self.bump.alloc_slice_copy(&[true]);
+                self.write_head(Segment::Repeat(seg));
+                todo!()
+            }
+            Segment::End => unreachable!(),
+        }
+
+        Ok(())
+    }
+}
+
+impl fmt::Display for SymbolicTM<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for seg in self.tape.range(0..self.position) {
+            write!(f, "{seg} ")?;
+        }
+
+        let state = b"ABCDE"[self.state as usize] as char;
+
+        match self.direction {
+            Dir::L => write!(f, "<{state}")?,
+            Dir::R => write!(f, "{state}>")?,
+        }
+
+        for seg in self.tape.range(self.position..) {
+            write!(f, " {seg}")?;
+        }
+
+        Ok(())
     }
 }
 
@@ -68,11 +274,31 @@ fn find_progressions(records: &[Record]) -> Vec<[&Record; 3]> {
     progressions
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 enum Segment<'a> {
     Repeat(&'a [bool]),
     Sym(bool),
     End,
+}
+
+impl fmt::Display for Segment<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match *self {
+            Segment::Sym(false) => f.write_str("0"),
+            Segment::Sym(true) => f.write_str("1"),
+            Segment::Repeat(seg) => {
+                f.write_str("(")?;
+                for s in seg {
+                    match s {
+                        false => f.write_str("0")?,
+                        true => f.write_str("1")?,
+                    }
+                }
+                f.write_str(")")
+            }
+            Segment::End => f.write_str("$"),
+        }
+    }
 }
 
 /// Find a symbolic tape matching a sequence of 3 records meeting the heuristic.
@@ -191,11 +417,13 @@ impl RecordDetect {
             let pos = self.conf.pos;
 
             if self.record_right < pos {
+                let record = self.make_record(Dir::R);
                 self.record_right = pos;
-                return Ok(self.make_record(Dir::R));
+                return Ok(record);
             } else if pos < self.record_left {
+                let record = self.make_record(Dir::L);
                 self.record_left = pos;
-                return Ok(self.make_record(Dir::L))
+                return Ok(record);
             }
         }
 

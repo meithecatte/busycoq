@@ -7,6 +7,7 @@ edition = "2021"
 argh = "0.1.10"
 array-init = "2.1.0"
 bitvec = "1.0.1"
+bumpalo = "3.13.0"
 byteorder = "1.4.3"
 enum-map = "2.6.0"
 indicatif = { version = "0.17.5", features = ["rayon"] }
