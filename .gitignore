@@ -19,3 +19,5 @@ Makefile.coq.conf
 *.log
 verify/verify
 verify/skelet1
+perf.data*
+flamegraph.svg

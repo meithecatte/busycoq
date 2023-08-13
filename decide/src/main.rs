@@ -11,6 +11,7 @@ mod turing;
 mod undo;
 
 use backwards::BackwardsReasoning;
+use bouncers::Bouncers;
 use certificate::{Certificate, CertList};
 use cyclers::Cyclers;
 use database::Database;
@@ -118,9 +119,13 @@ struct Decide {
     #[argh(positional)]
     certs: PathBuf,
 
-    /// list of indexes to skip
+    /// list of indices to skip
     #[argh(option, short='x')]
     exclude: Option<PathBuf>,
+
+    /// list of indices to check
+    #[argh(option, short='i')]
+    indices: Option<PathBuf>,
 
     /// don't run the Cyclers decider
     #[argh(switch)]
@@ -133,6 +138,10 @@ struct Decide {
     /// don't run the Backwards Reasoning decider
     #[argh(switch)]
     no_backwards: bool,
+
+    /// don't run the Bouncers decider
+    #[argh(switch)]
+    no_bouncers: bool,
 }
 
 fn main() {
@@ -147,19 +156,26 @@ fn main() {
 
 impl Decide {
     fn run(&self) {
-        let db = Database::open(&self.database).unwrap();
-        let mut total_count = db.num_total;
-        let indices: Vec<u32> = {
-            let mut skiplist = bitvec![0; db.num_total as usize];
+        if self.exclude.is_some() && self.indices.is_some() {
+            eprintln!("Cannot use both --exclude and --indices");
+            return;
+        }
 
-            if let Some(exclude) = &self.exclude {
+        let db = Database::open(&self.database).unwrap();
+        let indices: Vec<u32> = {
+            if let Some(indices) = &self.indices {
+                IndexReader::open(indices).unwrap().collect()
+            } else if let Some(exclude) = &self.exclude {
+                let mut skiplist = bitvec![0; db.num_total as usize];
+
                 for idx in IndexReader::open(exclude).unwrap() {
                     skiplist.set(idx as usize, true);
-                    total_count -= 1;
                 }
-            }
 
-            (0..db.num_total).filter(|&x| !skiplist[x as usize]).collect()
+                (0..db.num_total).filter(|&x| !skiplist[x as usize]).collect()
+            } else {
+                (0..db.num_total).collect()
+            }
         };
 
         let mut certfile = CertList::create(&self.certs).unwrap();
@@ -169,20 +185,21 @@ impl Decide {
         let cyclers = DeciderStats::<Cyclers>::new(self.no_cyclers);
         let tcyclers = DeciderStats::<TCyclers>::new(self.no_tcyclers);
         let backwards = DeciderStats::<BackwardsReasoning>::new(self.no_backwards);
+        let bouncers = DeciderStats::<Bouncers>::new(self.no_bouncers);
 
         thread::scope(|s| {
             let progress_thread = s.spawn(|| {
                 let style = ProgressStyle::with_template(
                     "[{elapsed_precise}] {bar:30.cyan} {pos:>8}/{len:8} {msg} ETA {eta}"
                 ).unwrap();
-                let bar = ProgressBar::new(total_count as u64)
+                let bar = ProgressBar::new(indices.len() as u64)
                     .with_style(style);
                 loop {
                     let processed = processed.load(Ordering::Relaxed);
-                    bar.set_message(format!("C {} TC {} BR {}",
-                        cyclers, tcyclers, backwards));
+                    bar.set_message(format!("C {} TC {} BR {} B {}",
+                        cyclers, tcyclers, backwards, bouncers));
                     bar.set_position(processed as u64);
-                    if processed == total_count {
+                    if processed == indices.len() as u32 {
                         return;
                     }
 
@@ -192,12 +209,10 @@ impl Decide {
 
             let certs = indices.par_iter().map(|&index| {
                 let tm = db.get(index);
-                if false {
-                    bouncers::decide_bouncer(&tm);
-                }
                 let cert = cyclers.decide(&tm)
                     .or_else(|| tcyclers.decide(&tm))
-                    .or_else(|| backwards.decide(&tm));
+                    .or_else(|| backwards.decide(&tm))
+                    .or_else(|| bouncers.decide(&tm));
                 processed.fetch_add(1, Ordering::Relaxed);
                 (tm.index, cert)
             }).collect::<Vec<_>>();
@@ -214,6 +229,7 @@ impl Decide {
         cyclers.print_stats();
         tcyclers.print_stats();
         backwards.print_stats();
+        bouncers.print_stats();
     }
 }
 

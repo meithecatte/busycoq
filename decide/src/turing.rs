@@ -37,7 +37,7 @@ pub struct TM {
     pub code: [[Command; 2]; 5],
 }
 
-#[derive(PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Configuration<'a> {
     pub state: u8,
     pub pos: usize,

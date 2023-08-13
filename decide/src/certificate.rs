@@ -7,12 +7,14 @@ use byteorder::{BE, WriteBytesExt};
 use crate::cyclers;
 use crate::tcyclers;
 use crate::backwards;
+use crate::bouncers;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug)]
 pub enum Certificate {
     Cyclers(cyclers::Cert),
     TCyclers(tcyclers::Cert),
     Backwards(backwards::Cert),
+    Bouncers(bouncers::Cert),
 }
 
 pub struct CertList {
@@ -42,6 +44,10 @@ impl CertList {
                 self.writer.write_u8(2)?;
                 self.writer.write_all(&cert.to_bytes())?;
             }
+            Bouncers(cert) => {
+                self.writer.write_u8(3)?;
+                self.writer.write_all(&cert.to_bytes())?;
+            }
         }
 
         Ok(())
@@ -63,5 +69,11 @@ impl From<tcyclers::Cert> for Certificate {
 impl From<backwards::Cert> for Certificate {
     fn from(cert: backwards::Cert) -> Certificate {
         Certificate::Backwards(cert)
+    }
+}
+
+impl From<bouncers::Cert> for Certificate {
+    fn from(cert: bouncers::Cert) -> Certificate {
+        Certificate::Bouncers(cert)
     }
 }
