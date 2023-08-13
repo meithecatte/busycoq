@@ -1,9 +1,11 @@
 mod api;
 mod backwards;
+mod bouncers;
 mod certificate;
 mod cyclers;
 mod database;
 mod index;
+mod memo;
 mod tcyclers;
 mod turing;
 mod undo;
@@ -190,6 +192,7 @@ impl Decide {
 
             let certs = indices.par_iter().map(|&index| {
                 let tm = db.get(index);
+                bouncers::decide_bouncer(&tm);
                 let cert = cyclers.decide(&tm)
                     .or_else(|| tcyclers.decide(&tm))
                     .or_else(|| backwards.decide(&tm));
@@ -210,4 +213,12 @@ impl Decide {
         tcyclers.print_stats();
         backwards.print_stats();
     }
+}
+
+fn running_min(x: &mut usize, y: usize) {
+    *x = y.min(*x);
+}
+
+fn running_max(x: &mut usize, y: usize) {
+    *x = y.max(*x);
 }

@@ -1,5 +1,6 @@
 use std::array;
 use std::fmt;
+use std::str::FromStr;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct OutOfSpace;
@@ -187,5 +188,49 @@ impl fmt::Display for Command {
 impl fmt::Display for TM {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "#{} {}", self.index, self.compact())
+    }
+}
+
+impl FromStr for TM {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, ()> {
+        let code = s.split('_').map(|state| {
+            state.as_bytes().chunks(3).map(|cmd| {
+                match cmd {
+                    b"---" => Command::Halt,
+                    _ => {
+                        let write = match cmd[0] {
+                            b'0' => false,
+                            b'1' => true,
+                            _ => panic!(),
+                        };
+
+                        let dir = match cmd[1] {
+                            b'L' => Dir::L,
+                            b'R' => Dir::R,
+                            _ => panic!(),
+                        };
+
+                        let next = match cmd[2] {
+                            b'A' => 0,
+                            b'B' => 1,
+                            b'C' => 2,
+                            b'D' => 3,
+                            b'E' => 4,
+                            _ => panic!(),
+                        };
+
+                        Command::Step { write, dir, next }
+                    }
+                }
+            }).collect::<Vec<_>>().try_into().unwrap()
+        }).collect::<Vec<_>>().try_into().unwrap();
+
+        Ok(TM { 
+            index: 0,
+            limit: Limit::Time,
+            code,
+        })
     }
 }

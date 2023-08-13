@@ -1,4 +1,4 @@
-use crate::{Certificate, Decider};
+use crate::{Certificate, Decider, running_min, running_max};
 use crate::turing::{Configuration, Dir, Limit, OutOfSpace, TM};
 use byteorder::{BE, WriteBytesExt};
 use enum_map::Enum;
@@ -19,6 +19,14 @@ pub struct Cert {
     k: u32,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Enum)]
+pub enum FailReason {
+    OutOfSpace,
+    OutOfTime,
+    Halted,
+    NotApplicable,
+}
+
 #[derive(Clone)]
 struct RecordDetect {
     conf: Configuration,
@@ -29,14 +37,6 @@ struct RecordDetect {
     record_right: usize,
     leftmost_since_record: usize,
     rightmost_since_record: usize,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Enum)]
-pub enum FailReason {
-    OutOfSpace,
-    OutOfTime,
-    Halted,
-    NotApplicable,
 }
 
 #[derive(Debug)]
@@ -173,14 +173,6 @@ fn decide_tcyclers(tm: &TM) -> Result<Cert, FailReason> {
             });
         }
     }
-}
-
-fn running_min(x: &mut usize, y: usize) {
-    *x = y.min(*x);
-}
-
-fn running_max(x: &mut usize, y: usize) {
-    *x = y.max(*x);
 }
 
 impl Cert {
