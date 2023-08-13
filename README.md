@@ -50,6 +50,27 @@ will be generated at `decided.dat`.
 ## Results
 
 ```
+Cyclers:
+  11229238 Decided
+         0 OutOfSpace
+   3092791 OutOfTime
+         0 Halted
+  74342035 NotApplicable
+Translated Cyclers:
+  73860624 Decided
+         0 OutOfSpace
+    481411 OutOfTime
+         0 Halted
+   3092791 NotApplicable
+Backwards Reasoning:
+   2035576 Decided
+    979028 OutOfSpace
+    559598 OutOfTime
+```
+
+With high limits for the Translated Cyclers decider:
+
+```
 chikara:~/dev/busycoq/decide$ \time target/release/decide
 Cyclers:
   11229238 Decided

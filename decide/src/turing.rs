@@ -77,42 +77,32 @@ impl<'a> Configuration<'a> {
         }
     }
 
-    pub fn head_symbol(&self) -> bool {
-        self.tape[self.pos]
+    pub fn head_symbol(&self) -> Result<bool, OutOfSpace> {
+        self.tape.get(self.pos).copied().ok_or(OutOfSpace)
     }
 
     pub fn write_at_head(&mut self, symbol: bool) {
         self.tape[self.pos] = symbol;
     }
 
-    pub fn move_head(&mut self, dir: Dir) -> Result<(), OutOfSpace> {
-        match dir {
-            Dir::L => {
-                if self.pos == 0 {
-                    Err(OutOfSpace)
-                } else {
-                    self.pos -= 1;
-                    Ok(())
-                }
-            }
-            Dir::R => {
-                if self.pos + 1 == self.tape.len() {
-                    Err(OutOfSpace)
-                } else {
-                    self.pos += 1;
-                    Ok(())
-                }
-            }
-        }
+    pub fn move_head(&mut self, dir: Dir) {
+        // If we're running out of buffer space, move out of bounds and let it
+        // be detected at the next step. This allows `Configuration` to be used
+        // when we want to be able to represent "the head is pointing outside
+        // of the tape buffer" in the "head with direction" view.
+        self.pos = match dir {
+            Dir::L => self.pos.wrapping_sub(1),
+            Dir::R => self.pos + 1,
+        };
     }
 
     pub fn step(&mut self, tm: &TM) -> Result<bool, OutOfSpace> {
-        let cmd = tm.code[self.state as usize][self.head_symbol() as usize];
+        let cmd = tm.code[self.state as usize][self.head_symbol()? as usize];
         match cmd {
             Command::Halt => Ok(false),
             Command::Step { write, dir, next } => {
                 self.write_at_head(write);
-                self.move_head(dir)?;
+                self.move_head(dir);
                 self.state = next;
                 Ok(true)
             }

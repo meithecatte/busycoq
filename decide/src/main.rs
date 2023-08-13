@@ -192,6 +192,9 @@ impl Decide {
 
             let certs = indices.par_iter().map(|&index| {
                 let tm = db.get(index);
+                if false {
+                    bouncers::decide_bouncer(&tm);
+                }
                 let cert = cyclers.decide(&tm)
                     .or_else(|| tcyclers.decide(&tm))
                     .or_else(|| backwards.decide(&tm));

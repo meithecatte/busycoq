@@ -197,8 +197,6 @@ impl<'bump> SymbolicTM<'bump> {
                 }
             }
             Segment::Repeat(seg) => {
-                let seg = self.bump.alloc_slice_copy(&[true]);
-                self.write_head(Segment::Repeat(seg));
                 todo!()
             }
             Segment::End => unreachable!(),
