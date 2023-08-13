@@ -8,7 +8,7 @@ use std::collections::VecDeque;
 use std::fmt;
 
 const SPACE_LIMIT: usize = 1024;
-const TIME_LIMIT: u32 = 10000;
+const TIME_LIMIT: u32 = 100000;
 
 #[derive(Clone, Debug)]
 pub struct Cert {
@@ -54,8 +54,6 @@ pub fn decide_bouncer(tm: &TM) -> Result<Cert, FailReason> {
 
             return Ok(cert);
         }
-
-        return Err(reason)
     }
 
     Err(reason)
@@ -600,6 +598,7 @@ fn split_tapes(records: [&Record; 3]) -> Option<Vec<Segment<'_>>> {
             return Some(Segment::Sym(s0[i0]));
         }
 
+        let mut best = None;
         for k in 1.. {
             if i1 + k > s1.len() || i2 + 2 * k > s2.len() {
                 break;
@@ -612,11 +611,11 @@ fn split_tapes(records: [&Record; 3]) -> Option<Vec<Segment<'_>>> {
             if s2[i2..i2 + k] == s2[i2 + k..i2 + 2 * k] &&
                 memo.get((i0, i1 + k)).is_some()
             {
-                return Some(Segment::Repeat(&s2[i2..i2 + k]));
+                best = Some(Segment::Repeat(&s2[i2..i2 + k]));
             }
         }
 
-        None
+        best
     };
 
     let memo = Memo::new((s0.len() + 1, s1.len() + 1), &f);
@@ -731,11 +730,39 @@ impl Decider for Bouncers {
 mod tests {
     use super::*;
 
+/*
+    #[test]
+    fn check_segment_size() {
+        #[derive(Clone, Copy, Debug, PartialEq)]
+        enum Segment<'a> {
+            Repeat(&'a [bool]),
+            Sym(Option<bool>),
+        }
+        assert_eq!(std::mem::size_of::<Segment<'_>>(), 16);
+    }
+    */
+
     #[test]
     fn basic_bouncer() {
         let tm: TM = "1RB1LE_1RC0LC_1LD0RA_0LA1RA_---0LB".parse().unwrap();
+        assert!(decide_bouncer(&tm).is_ok());
+    }
 
-        decide_bouncer(&tm);
-        panic!("show us the output :<")
+    #[test]
+    fn four_partitions_bouncer() {
+        let tm: TM = "1RB0RD_1LC1LE_1RA1LB_---0RC_1LB0LE".parse().unwrap();
+        assert!(decide_bouncer(&tm).is_ok());
+    }
+
+    #[test]
+    fn moving_bouncer() {
+        let tm: TM = "1RB0LC_0LA1RC_0LD0LE_1LA1RA_---1LC".parse().unwrap();
+        assert!(decide_bouncer(&tm).is_ok());
+    }
+
+    #[test]
+    fn asymmetric_bouncer() {
+        let tm: TM = "1RB---_0RC0RA_0LD0RD_1LE0LE_0LA0LB".parse().unwrap();
+        assert!(decide_bouncer(&tm).is_ok());
     }
 }
