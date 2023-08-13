@@ -27,9 +27,8 @@ pub enum FailReason {
     NotApplicable,
 }
 
-#[derive(Clone)]
-struct RecordDetect {
-    conf: Configuration,
+struct RecordDetect<'a> {
+    conf: Configuration<'a>,
     num_records: usize,
     steps_taken: u32,
     // invariant: record_left <= record_right
@@ -55,8 +54,8 @@ impl Record {
     }
 }
 
-impl RecordDetect {
-    fn new(conf: Configuration) -> Self {
+impl<'a> RecordDetect<'a> {
+    fn new(conf: Configuration<'a>) -> Self {
         let pos = conf.pos;
         Self {
             conf,
@@ -146,8 +145,10 @@ fn decide_tcyclers(tm: &TM) -> Result<Cert, FailReason> {
         return Err(FailReason::NotApplicable);
     }
 
-    let mut tortoise = RecordDetect::new(Configuration::new(SPACE_LIMIT));
-    let mut hare = RecordDetect::new(Configuration::new(SPACE_LIMIT));
+    let mut tortoise = [false; SPACE_LIMIT];
+    let mut tortoise = RecordDetect::new(Configuration::new(&mut tortoise));
+    let mut hare = [false; SPACE_LIMIT];
+    let mut hare = RecordDetect::new(Configuration::new(&mut hare));
 
     // Records the range of cells that were visited between two consecutive
     // records.

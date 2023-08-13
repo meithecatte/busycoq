@@ -10,8 +10,8 @@ const SPACE_LIMIT: usize = 1024;
 const TIME_LIMIT: u32 = 20000;
 
 pub fn decide_bouncer(tm: &TM) {
-    let conf = Configuration::new(SPACE_LIMIT);
-    let mut detector = RecordDetect::new(conf);
+    let mut buf = [false; SPACE_LIMIT];
+    let mut detector = RecordDetect::new(Configuration::new(&mut buf));
 
     let mut records = vec![];
     while let Ok(record) = detector.next_record(tm) {
@@ -367,9 +367,8 @@ pub enum FailReason {
     Halted,
 }
 
-#[derive(Clone)]
-struct RecordDetect {
-    conf: Configuration,
+struct RecordDetect<'a> {
+    conf: Configuration<'a>,
     steps_taken: u32,
     // invariant: record_left <= record_right
     record_left: usize,
@@ -384,8 +383,8 @@ struct Record {
     tape: Vec<bool>,
 }
 
-impl RecordDetect {
-    fn new(conf: Configuration) -> Self {
+impl<'a> RecordDetect<'a> {
+    fn new(conf: Configuration<'a>) -> Self {
         let pos = conf.pos;
         Self {
             conf,

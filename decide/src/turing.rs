@@ -37,11 +37,11 @@ pub struct TM {
     pub code: [[Command; 2]; 5],
 }
 
-#[derive(Clone, PartialEq, Eq)]
-pub struct Configuration {
+#[derive(PartialEq, Eq)]
+pub struct Configuration<'a> {
     pub state: u8,
     pub pos: usize,
-    pub tape: Box<[bool]>,
+    pub tape: &'a mut [bool],
 }
 
 impl TM {
@@ -68,12 +68,12 @@ impl TM {
     }
 }
 
-impl Configuration {
-    pub fn new(size: usize) -> Self {
+impl<'a> Configuration<'a> {
+    pub fn new(buf: &'a mut [bool]) -> Self {
         Self {
             state: 0,
-            pos: size / 2,
-            tape: vec![false; size].into_boxed_slice(),
+            pos: buf.len() / 2,
+            tape: buf,
         }
     }
 

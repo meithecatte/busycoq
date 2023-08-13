@@ -38,8 +38,11 @@ fn decide_cyclers(tm: &TM) -> Result<Cert, FailReason> {
         return Err(FailReason::NotApplicable);
     }
 
-    let mut tortoise = Configuration::new(SPACE_LIMIT);
-    let mut hare = Configuration::new(SPACE_LIMIT);
+    let mut tortoise = [false; SPACE_LIMIT];
+    let mut tortoise = Configuration::new(&mut tortoise);
+
+    let mut hare = [false; SPACE_LIMIT];
+    let mut hare = Configuration::new(&mut hare);
 
     for n in 1..=TIME_LIMIT {
         check(tortoise.step(tm))?;
