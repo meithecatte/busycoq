@@ -21,14 +21,15 @@ use turing::TM;
 
 use argh::FromArgs;
 use bitvec::bitvec;
+use enum_map::{EnumArray, EnumMap, enum_map};
+use indicatif::{ProgressBar, ProgressStyle};
+use itertools::Itertools;
 use std::fmt;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::thread;
 use std::time::Duration;
 use rayon::prelude::*;
-use enum_map::{EnumArray, EnumMap, enum_map};
-use indicatif::{ProgressBar, ProgressStyle};
 
 trait Decider {
     type Error: Clone + Copy + fmt::Debug + EnumArray<AtomicU32>;
@@ -127,6 +128,10 @@ struct Decide {
     #[argh(option, short='i')]
     indices: Option<PathBuf>,
 
+    /// check a specific machine index
+    #[argh(option, short='a')]
+    ad_hoc: Vec<u32>,
+
     /// don't run the Cyclers decider
     #[argh(switch)]
     no_cyclers: bool,
@@ -155,7 +160,7 @@ fn main() {
 }
 
 impl Decide {
-    fn run(&self) {
+    fn run(self) {
         if self.exclude.is_some() && self.indices.is_some() {
             eprintln!("Cannot use both --exclude and --indices");
             return;
@@ -164,8 +169,15 @@ impl Decide {
         let db = Database::open(&self.database).unwrap();
         let indices: Vec<u32> = {
             if let Some(indices) = &self.indices {
-                IndexReader::open(indices).unwrap().collect()
+                let mut indices = IndexReader::open(indices).unwrap()
+                    .collect_vec();
+                indices.extend_from_slice(&self.ad_hoc);
+                indices
             } else if let Some(exclude) = &self.exclude {
+                if !self.ad_hoc.is_empty() {
+                    eprintln!("Cannot use both --exclude and --ad-hoc");
+                }
+
                 let mut skiplist = bitvec![0; db.num_total as usize];
 
                 for idx in IndexReader::open(exclude).unwrap() {
@@ -173,8 +185,10 @@ impl Decide {
                 }
 
                 (0..db.num_total).filter(|&x| !skiplist[x as usize]).collect()
-            } else {
+            } else if self.ad_hoc.is_empty() {
                 (0..db.num_total).collect()
+            } else {
+                self.ad_hoc
             }
         };
 
