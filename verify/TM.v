@@ -190,6 +190,8 @@ Definition halts_in (tm : TM) (c : Q * tape) (n : nat) :=
 Definition halts (tm : TM) (c0 : Q * tape) :=
   exists n, halts_in tm c0 n.
 
+#[export] Hint Unfold halts halts_in : core.
+
 (** We prove that the "syntactic" notion of [halting] corresponds
     to the behavior of [step]. *)
 Lemma halting_no_step :
@@ -446,7 +448,7 @@ Proof.
   apply (rewind_split' n (k - n)) in Hrunch; try lia.
   destruct Hrunch as [cm [H1 H2]].
   deterministic.
-  exists ch. auto.
+  eauto.
 Qed.
 
 Lemma skip_halts: forall tm c c' n,
@@ -455,11 +457,9 @@ Lemma skip_halts: forall tm c c' n,
   ~ halts tm c.
 Proof.
   introv Hexec Hnonhalt [k Hhalt].
-  (* destruct Hhalt as [k [ch [Hrunch Hhalting]]]. *)
   destruct (Nat.ltb_spec k n).
-  - eapply exceeds_halt; eassumption.
-  - apply Hnonhalt.
-    eexists. eapply preceeds_halt; eassumption.
+  - eauto using exceeds_halt.
+  - eauto using preceeds_halt.
 Qed.
 
 Lemma progress_nonhalt' : forall tm (P : Q * tape -> Prop),
@@ -472,12 +472,12 @@ Proof.
   apply Hstep in H0. destruct H0 as [c' [HP Hrun]].
   apply progress_multistep in Hrun. destruct Hrun as [n Hrun].
   destruct (Nat.leb_spec (S n) k).
-  - assert (Hhalts' : halts_in tm c' (k - S n)).
-    { eapply preceeds_halt; eassumption. }
+  - assert (Hhalts' : halts_in tm c' (k - S n))
+      by eauto using preceeds_halt.
     assert (Hnhalts : ~ halts_in tm c' (k - S n)).
     { apply H; [lia | assumption]. }
     contradiction.
-  - eapply exceeds_halt; eassumption.
+  - eauto using exceeds_halt.
 Qed.
 
 Lemma progress_nonhalt : forall tm (P : Q * tape -> Prop) c,
@@ -487,8 +487,8 @@ Lemma progress_nonhalt : forall tm (P : Q * tape -> Prop) c,
 Proof.
   introv Hstep H0 Hhalts.
   destruct Hhalts as [k Hhalts].
-  assert (Hnhalts : ~ halts_in tm c k).
-  { apply (progress_nonhalt' tm P); assumption. }
+  assert (Hnhalts : ~ halts_in tm c k)
+    by eauto using progress_nonhalt'.
   contradiction.
 Qed.
 

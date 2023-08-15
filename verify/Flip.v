@@ -46,26 +46,33 @@ Proof.
   intros [q [[l s] r]]. reflexivity.
 Qed.
 
+Lemma flip_some : forall tm q s s' d q',
+  tm (q, s) = Some (s', flip_dir d, q') ->
+  flip tm (q, s) = Some (s', d, q').
+Proof.
+  introv H. unfold flip. rewrite H. destruct d; reflexivity.
+Qed.
+
+#[export] Hint Resolve flip_some : core.
+
 Lemma flip_step : forall tm c c',
   c -[ tm ]-> c' ->
   flip_conf c -[ flip tm ]-> flip_conf c'.
 Proof.
   introv H.
-  inverts H as E.
-  - simpl. apply step_right.
-    unfold flip. rewrite E. reflexivity.
-  - simpl. apply step_left.
-    unfold flip. rewrite E. reflexivity.
+  inverts H as E; [apply step_right | apply step_left]; auto.
 Qed.
+
+#[export] Hint Resolve flip_step : core.
 
 Lemma flip_multistep : forall tm n c c',
   c -[ tm ]->> n / c' ->
   flip_conf c -[ flip tm ]->> n / flip_conf c'.
 Proof.
-  induction n; introv H; inverts H as Hstep Hrest.
-  - apply multistep_0.
-  - eauto using flip_step, multistep_S.
+  induction n; introv H; inverts H as Hstep Hrest; eauto.
 Qed.
+
+#[export] Hint Resolve flip_multistep : core.
 
 Lemma flip_halting : forall tm c,
   halting tm c -> halting (flip tm) (flip_conf c).
@@ -76,21 +83,22 @@ Proof.
   reflexivity.
 Qed.
 
+#[export] Hint Resolve flip_halting : core.
+
 Lemma flip_halts_in : forall tm c n,
   halts_in tm c n -> halts_in (flip tm) (flip_conf c) n.
 Proof.
   introv H.
   destruct H as [ch [Hexec Hhalting]].
-  apply flip_multistep in Hexec.
-  apply flip_halting in Hhalting.
-  eexists. split; eassumption.
+  eauto 6.
 Qed.
+
+#[export] Hint Resolve flip_halts_in : core.
 
 Lemma flip_halts : forall tm c,
   halts tm c -> halts (flip tm) (flip_conf c).
 Proof.
-  introv H. destruct H as [n H].
-  exists n. apply flip_halts_in. assumption.
+  introv H. destruct H as [n H]. eauto.
 Qed.
 
 Lemma flip_halts_iff : forall tm c,
