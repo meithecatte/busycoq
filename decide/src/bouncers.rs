@@ -7,6 +7,7 @@ use bumpalo::Bump;
 use std::collections::VecDeque;
 use std::fmt;
 use std::num::NonZeroU32;
+use std::iter;
 
 const SPACE_LIMIT: usize = 1024;
 const TIME_LIMIT: u32 = 250000;
@@ -507,13 +508,15 @@ impl fmt::Display for SymbolicTM<'_> {
 ///  - the tape lengths are in an arithmetic progression
 ///  - the step counts are in a quadratic progression
 ///  - the pattern extends until the end of the list of records
-fn find_progressions(records: &[Record]) -> Vec<[&Record; 3]> {
-    let mut progressions = vec![];
-
-    for k in 1..=(records.len() / 3) {
-        for i0 in 0..k {
+fn find_progressions(records: &[Record]) -> impl Iterator<Item=[&Record; 3]> {
+    (1..=(records.len() / 3)).flat_map(move |k| {
+        (0..k).flat_map(move |i0| {
             let mut i = i0;
-            while i < records.len() {
+            iter::from_fn(move || {
+                if i >= records.len() {
+                    return None;
+                }
+
                 let state = records[i].state;
                 let dir = records[i].dir;
 
@@ -527,27 +530,27 @@ fn find_progressions(records: &[Record]) -> Vec<[&Record; 3]> {
                     .map(|(a, b)| b - a)
                     .tuple_windows()
                     .map(|(a, b)| b - a);
-                let Some(diff) = diffs.next() else { break };
+                let diff = diffs.next()?;
                 let length = diffs.take_while(|&d| d == diff).count();
                 // The index that would be included if we wanted to extend
                 // the progression.
                 let next_index = i + (length + 4) * k;
 
-                if length > 0 && next_index >= records.len() {
+                let progression = if length > 0 && next_index >= records.len() {
                     let records = records.iter()
                         .skip(i).step_by(k).take(3);
-                    let records = array_init::from_iter(records).unwrap();
-                    progressions.push(records);
-                }
+                    Some(array_init::from_iter(records).unwrap())
+                } else {
+                    None
+                };
 
                 // We allow for an overlap of two elements, since that is the
                 // maximum two different quadratic progressions can overlap by.
                 i += k * (length + 1);
-            }
-        }
-    }
-
-    progressions
+                Some(progression)
+            }).filter_map(|x| x)
+        })
+    })
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
