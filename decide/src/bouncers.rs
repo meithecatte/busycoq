@@ -588,21 +588,29 @@ fn split_tapes(records: [&Record; 3]) -> Option<Vec<Segment<'_>>> {
     let s1 = &records[1].tape;
     let s2 = &records[2].tape;
 
-    let f = |(i0, i1), memo: &Memo<Option<Segment>, _, _>| -> Option<Segment> {
+    // We index the DP array by the pair of
+    //   (symbols consumed from s0, symbols used in repeaters).
+    // The indices into all three tapes can be recovered from this.
+    let f = |(i0, d), memo: &Memo<Option<Segment>, _, _>| -> Option<Segment> {
+        let i1 = i0 + d;
+        let i2 = i0 + 2 * d;
+
+        // If i0 and i1 point to the end, then i2 also does
         if i0 == s0.len() && i1 == s1.len() {
             return Some(Segment::End);
         }
 
-        let i2 = i1 + (i1 - i0);
         if i0 < s0.len() && i1 < s1.len() && i2 < s2.len() &&
             s0[i0] == s1[i1] && s1[i1] == s2[i2] &&
-            memo.get((i0 + 1, i1 + 1)).is_some()
+            memo.get((i0 + 1, d)).is_some()
         {
             return Some(Segment::Sym(s0[i0]));
         }
 
         let mut best = None;
-        for k in 1.. {
+        let remaining_s0 = s0.len() - i0;
+        let remaining_s1 = s1.len() - i1;
+        for k in 1..=remaining_s1 - remaining_s0 {
             if i1 + k > s1.len() || i2 + 2 * k > s2.len() {
                 break;
             }
@@ -612,7 +620,7 @@ fn split_tapes(records: [&Record; 3]) -> Option<Vec<Segment<'_>>> {
             }
 
             if s2[i2..i2 + k] == s2[i2 + k..i2 + 2 * k] &&
-                memo.get((i0, i1 + k)).is_some()
+                memo.get((i0, d + k)).is_some()
             {
                 best = Some(Segment::Repeat(&s2[i2..i2 + k]));
             }
@@ -621,18 +629,19 @@ fn split_tapes(records: [&Record; 3]) -> Option<Vec<Segment<'_>>> {
         best
     };
 
-    let memo = Memo::new((s0.len() + 1, s1.len() + 1), &f);
+    let memo = Memo::new((s0.len() + 1, s1.len() - s0.len() + 1), &f);
     let mut result = vec![];
-    let mut pos = (0, 0);
+    let mut i0 = 0;
+    let mut d = 0;
 
     loop {
-        match memo.get(pos)? {
+        match memo.get((i0, d))? {
             Segment::Sym(s) => {
-                pos = (pos.0 + 1, pos.1 + 1);
+                i0 += 1;
                 result.push(Segment::Sym(s));
             }
             Segment::Repeat(seg) => {
-                pos.1 += seg.len();
+                d += seg.len();
                 result.push(Segment::Repeat(seg));
             }
             Segment::End => break
