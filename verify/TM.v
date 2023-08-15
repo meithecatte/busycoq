@@ -121,7 +121,7 @@ Ltac destruct_dir tm q s :=
 
 #[export] Hint Extern 1 =>
   match goal with
-  | |- context G [?q;; _ {{?s}} _ -[ ?tm ]-> _] => destruct_dir tm q s
+  | |- context [?q;; _ {{?s}} _ -[ ?tm ]-> _] => destruct_dir tm q s
   end : core.
 
 (** Executing a specified number of steps: *)

@@ -484,7 +484,7 @@ Ltac pos_nat p :=
 
 Ltac handle_decr :=
   lazymatch goal with
-  | |- context G [decr ?p] => pos_nat p; try rewrite decr_nat
+  | |- context [decr ?p] => pos_nat p; try rewrite decr_nat
   end.
 
 Ltac simp :=
@@ -672,7 +672,7 @@ Arguments Hls _ _ : simpl never.
 
 Ltac unrxs :=
   lazymatch goal with
-  | H: context G [unrxs ?r] |- _ =>
+  | H: context [unrxs ?r] |- _ =>
     let E := fresh "E" in
     let r' := fresh "r'" in
     destruct (unrxs r) as [r' |] eqn:E; try discriminate;
@@ -1320,7 +1320,7 @@ Ltac apply_simple :=
     | Some ?c' =>
       assert (H0: simple_step c = Some c') by reflexivity;
       lazymatch c' with
-      | context G [decr (?a :+ ?b)] =>
+      | context [decr (?a :+ ?b)] =>
         let b' := eval vm_compute in (Pos.pred b) in
         replace (decr (a :+ b)) with (N.pos (a :+ Pos.pred b)) in H0
           by (apply decr_rearrange; discriminate);
