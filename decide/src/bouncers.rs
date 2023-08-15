@@ -6,6 +6,7 @@ use itertools::Itertools;
 use bumpalo::Bump;
 use std::collections::VecDeque;
 use std::fmt;
+use std::num::NonZeroU32;
 
 const SPACE_LIMIT: usize = 1024;
 const TIME_LIMIT: u32 = 250000;
@@ -90,10 +91,8 @@ fn is_special_case_left<'a, 'b>(
                             }
                         }
                     }
-                    Some(Segment::End) => unreachable!(),
                 }
             }
-            Segment::End => unreachable!(),
         }
     }
 
@@ -131,10 +130,8 @@ fn is_special_case_right<'a, 'b>(
                             }
                         }
                     }
-                    Some(Segment::End) => unreachable!(),
                 }
             }
-            Segment::End => unreachable!(),
         }
     }
 
@@ -420,7 +417,6 @@ impl<'bump> SymbolicTM<'bump> {
                 }
                 */
             }
-            Segment::End => unreachable!(),
         }
 
         Ok(())
@@ -468,7 +464,6 @@ impl<'bump> SymbolicTM<'bump> {
                 Segment::Repeat(seg) => {
                     buf.extend_from_slice(seg);
                 }
-                Segment::End => unreachable!(),
             }
         }
 
@@ -559,7 +554,6 @@ fn find_progressions(records: &[Record]) -> Vec<[&Record; 3]> {
 enum Segment<'a> {
     Repeat(&'a [bool]),
     Sym(bool),
-    End,
 }
 
 impl fmt::Display for Segment<'_> {
@@ -577,7 +571,6 @@ impl fmt::Display for Segment<'_> {
                 }
                 f.write_str(")")
             }
-            Segment::End => f.write_str("$"),
         }
     }
 }
@@ -588,26 +581,76 @@ fn split_tapes(records: [&Record; 3]) -> Option<Vec<Segment<'_>>> {
     let s1 = &records[1].tape;
     let s2 = &records[2].tape;
 
+    #[derive(Clone, Copy)]
+    struct DPResult(NonZeroU32);
+
+    enum Step {
+        Sym,
+        Repeat(usize),
+        End,
+    }
+
+    impl DPResult {
+        const NO_SOLUTION: u32 = u32::MAX;
+        const SYMBOL: u32 = u32::MAX - 1;
+        const END: u32 = u32::MAX - 2;
+        const MAX_REPEATER: u32 = u32::MAX - 3;
+
+        fn ok(self) -> bool {
+            self.0.get() != Self::NO_SOLUTION
+        }
+
+        fn fail() -> Self {
+            DPResult(NonZeroU32::new(Self::NO_SOLUTION).unwrap())
+        }
+
+        fn symbol() -> Self {
+            DPResult(NonZeroU32::new(Self::SYMBOL).unwrap())
+        }
+
+        fn repeater(k: usize) -> Self {
+            let k: u32 = k.try_into().unwrap();
+            if k > Self::MAX_REPEATER {
+                panic!("Repeater too large");
+            }
+
+            DPResult(NonZeroU32::new(k).unwrap())
+        }
+
+        fn end() -> Self {
+            DPResult(NonZeroU32::new(Self::END).unwrap())
+        }
+
+        fn decode(self) -> Option<Step> {
+            match self.0.get() {
+                Self::NO_SOLUTION => None,
+                Self::SYMBOL => Some(Step::Sym),
+                Self::END => Some(Step::End),
+                k => Some(Step::Repeat(k as usize)),
+            }
+        }
+    }
+
     // We index the DP array by the pair of
     //   (symbols consumed from s0, symbols used in repeaters).
     // The indices into all three tapes can be recovered from this.
-    let f = |(i0, d), memo: &Memo<Option<Segment>, _, _>| -> Option<Segment> {
+    let f = |(i0, d), memo: &Memo<DPResult, _, _>| -> DPResult {
         let i1 = i0 + d;
         let i2 = i0 + 2 * d;
 
         // If i0 and i1 point to the end, then i2 also does
         if i0 == s0.len() && i1 == s1.len() {
-            return Some(Segment::End);
+            return DPResult::end();
         }
 
         if i0 < s0.len() && i1 < s1.len() && i2 < s2.len() &&
             s0[i0] == s1[i1] && s1[i1] == s2[i2] &&
-            memo.get((i0 + 1, d)).is_some()
+            memo.get((i0 + 1, d)).ok()
         {
-            return Some(Segment::Sym(s0[i0]));
+            return DPResult::symbol();
         }
 
-        let mut best = None;
+        let mut best = DPResult::fail();
         let remaining_s0 = s0.len() - i0;
         let remaining_s1 = s1.len() - i1;
         for k in 1..=remaining_s1 - remaining_s0 {
@@ -620,9 +663,9 @@ fn split_tapes(records: [&Record; 3]) -> Option<Vec<Segment<'_>>> {
             }
 
             if s2[i2..i2 + k] == s2[i2 + k..i2 + 2 * k] &&
-                memo.get((i0, d + k)).is_some()
+                memo.get((i0, d + k)).ok()
             {
-                best = Some(Segment::Repeat(&s2[i2..i2 + k]));
+                best = DPResult::repeater(k);
             }
         }
 
@@ -635,16 +678,16 @@ fn split_tapes(records: [&Record; 3]) -> Option<Vec<Segment<'_>>> {
     let mut d = 0;
 
     loop {
-        match memo.get((i0, d))? {
-            Segment::Sym(s) => {
+        match memo.get((i0, d)).decode()? {
+            Step::Sym => {
+                result.push(Segment::Sym(s0[i0]));
                 i0 += 1;
-                result.push(Segment::Sym(s));
             }
-            Segment::Repeat(seg) => {
-                d += seg.len();
-                result.push(Segment::Repeat(seg));
+            Step::Repeat(k) => {
+                result.push(Segment::Repeat(&s1[i0 + d..i0 + d + k]));
+                d += k;
             }
-            Segment::End => break
+            Step::End => break
         }
     }
 
