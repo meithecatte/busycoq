@@ -650,26 +650,21 @@ fn split_tapes(records: [&Record; 3]) -> Option<Vec<Segment<'_>>> {
             return DPResult::symbol();
         }
 
-        let mut best = DPResult::fail();
         let remaining_s0 = s0.len() - i0;
         let remaining_s1 = s1.len() - i1;
-        for k in 1..=remaining_s1 - remaining_s0 {
-            if i1 + k > s1.len() || i2 + 2 * k > s2.len() {
-                break;
-            }
-
-            if s1[i1 + k - 1] != s2[i2 + k - 1] {
-                break;
-            }
-
+        let longest_match = s1.iter().skip(i1)
+            .zip(s2.iter().skip(i2))
+            .take(remaining_s1 - remaining_s0)
+            .take_while(|&(a, b)| a == b).count();
+        for k in (1..=longest_match).rev() {
             if s2[i2..i2 + k] == s2[i2 + k..i2 + 2 * k] &&
                 memo.get((i0, d + k)).ok()
             {
-                best = DPResult::repeater(k);
+                return DPResult::repeater(k);
             }
         }
 
-        best
+        DPResult::fail()
     };
 
     let memo = Memo::new((s0.len() + 1, s1.len() - s0.len() + 1), &f);
