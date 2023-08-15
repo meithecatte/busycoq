@@ -182,8 +182,7 @@ Proof.
     by eauto using within_halt.
 
   destruct Hhalts as [ch [Hhaltrun Hhalting]].
-  replace m with ((m - n) + n) in Hhaltrun by lia.
-  apply rewind_split in Hhaltrun.
+  apply (rewind_split' (m - n) n) in Hhaltrun; try lia.
   destruct Hhaltrun as [c1 [Hrun1 Hrun2]].
 
   apply haltings_spec in Hhalting.

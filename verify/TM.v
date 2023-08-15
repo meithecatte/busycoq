@@ -61,7 +61,7 @@ Notation side := (Stream Sym).
 (** The state of the tape is represented abstractly as a tuple [(l, s, r)],
     where [v] is the symbol under the head, while [l] and [r] are infinite
     streams of symbols on the left and right side of the head, respectively. *)
-Definition tape : Type := side * Sym * side.
+Notation tape := (side * Sym * side)%type.
 
 (** We define a notation for tapes, evocative of a turing machine's head
     hovering over a particular symbol. **)
@@ -105,6 +105,25 @@ Inductive step (tm : TM) : Q * tape -> Q * tape -> Prop :=
 
   where "c -[ tm ]-> c'" := (step tm c c').
 
+#[export] Hint Constructors step : core.
+
+(** If we have an assumption of the form [tm (q, s) = Some (s', d, q')],
+   perform case analysis on [d]. *)
+Ltac destruct_dir tm q s :=
+  lazymatch goal with
+  | H: tm (q, s) = Some (?s', ?d, ?q') |- _ =>
+    lazymatch d with
+    | L => fail
+    | R => fail
+    | _ => destruct d
+    end
+  end.
+
+#[export] Hint Extern 1 =>
+  match goal with
+  | |- context G [?q;; _ {{?s}} _ -[ ?tm ]-> _] => destruct_dir tm q s
+  end : core.
+
 (** Executing a specified number of steps: *)
 Reserved Notation "c -[ tm ]->> n / c'" (at level 40, n at next level).
 
@@ -118,6 +137,11 @@ Inductive multistep (tm : TM) : nat -> Q * tape -> Q * tape -> Prop :=
   where "c -[ tm ]->> n / c'" := (multistep tm n c c').
 
 #[export] Hint Constructors multistep : core.
+
+#[export] Hint Extern 1 =>
+  lazymatch goal with
+  | H: _ -[ _ ]->> _ / _ |- _ => inverts H
+  end : core.
 
 (** Executing an unspecified number of steps (the "eventually
     reaches" relation): *)
@@ -187,9 +211,7 @@ Proof.
   destruct c as [q [[l s] r]].
   destruct (tm (q, s)) as [[[s' d] q'] |] eqn:E.
   - (* tm (q, s) = Some (s', d, q') *)
-    destruct d; eexists.
-    + (* L *) apply step_left. eassumption.
-    + (* R *) apply step_right. eassumption.
+    eauto 6.
   - (* tm (q, s) = None *)
     congruence.
 Qed.
@@ -202,9 +224,18 @@ Lemma step_deterministic :
   c' = c''.
 Proof.
   introv H1 H2.
-  inverts H1 as E1; inverts H2 as E2; try congruence;
-    rewrite E2 in E1; inverts E1; auto.
+  inverts H1; inverts H2; congruence.
 Qed.
+
+Ltac step_deterministic :=
+  lazymatch goal with
+  | H1: ?c -[ ?tm ]-> ?c',
+    H2: ?c -[ ?tm ]-> ?c''
+    |- _ =>
+    pose proof (step_deterministic tm c c' c'' H1 H2); subst c''; clear H2
+  end.
+
+#[export] Hint Extern 1 => step_deterministic : core.
 
 Lemma multistep_trans :
   forall tm n m c c' c'',
@@ -213,9 +244,7 @@ Lemma multistep_trans :
   c  -[ tm ]->> (n + m) / c''.
 Proof.
   introv H1 H2.
-  induction H1.
-  - exact H2.
-  - simpl. destruct c''. eapply multistep_S; eauto.
+  induction H1; simpl; eauto.
 Qed.
 
 Lemma multistep_deterministic :
@@ -225,12 +254,20 @@ Lemma multistep_deterministic :
   c' = c''.
 Proof.
   introv H1 H2.
-  induction H1 as [| n c0 c1 c2 H01 H12 IH]; inverts H2 as H0a Hab.
-  - reflexivity.
-  - apply IH.
-    rewrite (step_deterministic _ _ _ _ H01 H0a).
-    assumption.
+  induction H1; inverts H2; auto.
 Qed.
+
+Ltac multistep_deterministic :=
+  lazymatch goal with
+  | H1: ?c -[ ?tm ]->> ?n / ?c',
+    H2: ?c -[ ?tm ]->> ?n / ?c''
+    |- _ =>
+    pose proof (multistep_deterministic tm n c c' c'' H1 H2); subst c''; clear H2
+  end.
+
+#[export] Hint Extern 1 => multistep_deterministic : core.
+
+Ltac deterministic := repeat (step_deterministic || multistep_deterministic).
 
 Lemma multistep_last :
   forall tm n c c'',
@@ -238,7 +275,7 @@ Lemma multistep_last :
   exists c', c -[ tm ]->> n / c' /\ c' -[ tm ]-> c''.
 Proof.
   induction n; introv H; inverts H as H1 H2.
-  - inverts H2. eauto.
+  - eauto.
   - apply IHn in H2. destruct H2 as [cmid [H2 H3]].
     eauto.
 Qed.
@@ -266,10 +303,10 @@ Lemma multistep_progress :
   c -[ tm ]->> S n / c' ->
   c -[ tm ]->+ c'.
 Proof.
-  induction n; introv H; inverts H as Hstep Hrest.
-  - inverts Hrest. auto.
-  - eauto.
+  induction n; introv H; inverts H; eauto.
 Qed.
+
+#[export] Hint Immediate multistep_progress : core.
 
 Lemma progress_multistep :
   forall tm c c',
@@ -312,7 +349,7 @@ Proof.
   apply with_counter in Hrun.
   destruct Hrun as [[| n] Hrun].
   - inverts Hrun. contradiction.
-  - apply multistep_progress in Hrun. assumption.
+  - eauto.
 Qed.
 
 Lemma evstep_progress_trans :
@@ -321,9 +358,7 @@ Lemma evstep_progress_trans :
   c' -[ tm ]->+ c'' ->
   c  -[ tm ]->+ c''.
 Proof.
-  introv H1 H2. induction H1.
-  - exact H2.
-  - eauto.
+  introv H1 H2. induction H1; eauto.
 Qed.
 
 Lemma progress_evstep_trans :
@@ -334,9 +369,7 @@ Lemma progress_evstep_trans :
 Proof.
   introv H1 H2. induction H1.
   - apply with_counter in H2.
-    destruct H2 as [[| n] H2].
-    + inverts H2. auto.
-    + apply multistep_progress in H2. eauto.
+    destruct H2 as [[| n] H2]; eauto.
   - eauto.
 Qed.
 
@@ -354,6 +387,17 @@ Proof.
     eauto.
 Qed.
 
+(** When using [rewind_split], it is often more convenient to have the arithmetic
+    show up as a separate goal, to be easily discharged with [lia]. *)
+Lemma rewind_split':
+  forall k1 k2 tm n c c'',
+  c -[ tm ]->> n / c'' ->
+  n = k1 + k2 ->
+  exists c', c -[ tm ]->> k1 / c' /\ c' -[ tm ]->> k2 / c''.
+Proof.
+  introv H E. subst n. apply rewind_split; assumption.
+Qed.
+
 Lemma halting_no_multistep:
   forall tm c c' n,
   n > 0 ->
@@ -363,8 +407,7 @@ Proof.
   introv Hgt0 Hhalting Hrun.
   inverts Hrun as Hstep Hrest.
   - inverts Hgt0.
-  - eapply halting_no_step in Hhalting.
-    apply Hhalting. exact Hstep.
+  - eapply halting_no_step in Hhalting. eauto.
 Qed.
 
 Lemma exceeds_halt : forall tm c c' n k,
@@ -374,12 +417,11 @@ Lemma exceeds_halt : forall tm c c' n k,
   False.
 Proof.
   introv [ch [Hch Hhalting]] Hnk Hexec.
-  replace n with (k + (n - k)) in Hexec by lia.
-  eapply rewind_split in Hexec.
+  eapply (rewind_split' k (n - k)) in Hexec; try lia.
   destruct Hexec as [ch' [H1 H2]].
-  replace ch' with ch in * by (eapply multistep_deterministic; eassumption).
+  deterministic.
   eapply halting_no_multistep in Hhalting.
-  - apply Hhalting. eassumption.
+  - eauto.
   - lia.
 Qed.
 
@@ -401,11 +443,9 @@ Lemma preceeds_halt : forall tm c c' n k,
 Proof.
   introv Hhalt Hexec Hle.
   destruct Hhalt as [ch [Hrunch Hhalting]].
-  replace k with (n + (k - n)) in Hrunch by lia.
-  apply rewind_split in Hrunch.
+  apply (rewind_split' n (k - n)) in Hrunch; try lia.
   destruct Hrunch as [cm [H1 H2]].
-  replace cm with c' in *
-    by (eapply multistep_deterministic; eassumption).
+  deterministic.
   exists ch. auto.
 Qed.
 
