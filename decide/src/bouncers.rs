@@ -403,20 +403,6 @@ impl<'bump> SymbolicTM<'bump> {
                         self.align_segment_left(self.pos - tail_len - 1);
                     }
                 }
-
-                /*
-                let if config.pos == usize::MAX {
-                    if self.dir != Dir::L {
-                        return Err(());
-                    }
-                } else if config.pos == config.tape.len() {
-                    if self.dir != Dir::R {
-                        return Err(());
-                    }
-                } else {
-                    unreachable!();
-                }
-                */
             }
         }
 
@@ -781,18 +767,6 @@ impl Decider for Bouncers {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-/*
-    #[test]
-    fn check_segment_size() {
-        #[derive(Clone, Copy, Debug, PartialEq)]
-        enum Segment<'a> {
-            Repeat(&'a [bool]),
-            Sym(Option<bool>),
-        }
-        assert_eq!(std::mem::size_of::<Segment<'_>>(), 16);
-    }
-    */
 
     #[test]
     fn basic_bouncer() {
