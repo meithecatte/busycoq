@@ -8,7 +8,7 @@ use std::collections::VecDeque;
 use std::fmt;
 
 const SPACE_LIMIT: usize = 1024;
-const TIME_LIMIT: u32 = 100000;
+const TIME_LIMIT: u32 = 250000;
 
 #[derive(Clone, Debug)]
 pub struct Cert {
@@ -534,6 +534,8 @@ fn find_progressions(records: &[Record]) -> Vec<[&Record; 3]> {
                     .map(|(a, b)| b - a);
                 let Some(diff) = diffs.next() else { break };
                 let length = diffs.take_while(|&d| d == diff).count();
+                // The index that would be included if we wanted to extend
+                // the progression.
                 let next_index = i + (length + 4) * k;
 
                 if length > 0 && next_index >= records.len() {
@@ -543,8 +545,9 @@ fn find_progressions(records: &[Record]) -> Vec<[&Record; 3]> {
                     progressions.push(records);
                 }
 
-                // length = 1 => 4 elements
-                i += length + 1;
+                // We allow for an overlap of two elements, since that is the
+                // maximum two different quadratic progressions can overlap by.
+                i += k * (length + 1);
             }
         }
     }
