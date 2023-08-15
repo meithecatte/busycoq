@@ -221,7 +221,7 @@ impl Decide {
                 }
             });
 
-            let certs = indices.par_iter().map(|&index| {
+            let certs = indices.par_iter().with_max_len(1).map(|&index| {
                 let tm = db.get(index);
                 let cert = cyclers.decide(&tm)
                     .or_else(|| tcyclers.decide(&tm))
