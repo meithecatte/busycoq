@@ -509,9 +509,8 @@ impl fmt::Display for SymbolicTM<'_> {
 ///  - the step counts are in a quadratic progression
 ///  - the pattern extends until the end of the list of records
 fn find_progressions(records: &[Record]) -> impl Iterator<Item=[&Record; 3]> {
-    (1..=(records.len() / 3)).flat_map(move |k| {
-        (0..k).flat_map(move |i0| {
-            let mut i = i0;
+    (1..=records.len() / 3).flat_map(move |k| {
+        (0..k).flat_map(move |mut i| {
             iter::from_fn(move || {
                 if i >= records.len() {
                     return None;
