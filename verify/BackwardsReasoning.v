@@ -45,6 +45,8 @@ Definition matches (t : Q * tape) (t' : stencil) : Prop :=
     q = q' /\ s = s' /\ side_matches l l' /\ side_matches r r'
   end.
 
+Local Hint Unfold matches : core.
+
 Definition find_transitions (tm : TM) (f : option (Sym * dir * Q) -> bool)
     : list (Q * Sym) :=
   filter (fun a => f (tm a)) all_qs.
@@ -80,17 +82,17 @@ Proof.
     rewrite H. reflexivity. }
   eapply in_map in Hfound.
   rewrite Exists_exists.
-  eexists. split.
-  - eassumption.
-  - repeat split; auto.
+  eauto 7.
 Qed.
 
+(* Check if we could've had [s'] on the tape before moving
+   in the direction [d]. *)
 Definition symbol_ok (t : ctape) (s' : Sym) (d : dir) :=
   match d, t with
   | L, _ {{_}} []       => true
-  | L, _ {{_}} (s :: _) => eqb_sym s s'
+  | L, _ {{_}} (s :: _) => if eqb_sym s s' then true else false
   | R,       [] {{_}} _ => true
-  | R, (s :: _) {{_}} _ => eqb_sym s s'
+  | R, (s :: _) {{_}} _ => if eqb_sym s s' then true else false
   end.
 
 (* If we took the [(q, s)] transition and ended up at [st], how did the
@@ -100,14 +102,17 @@ Definition rewind (tm : TM) (st : stencil) (q : Q) (s : Sym) : option stencil :=
   match tm (q, s) with
   | None => None
   | Some (s', d, q') =>
-    if eqb_q qfin q' && symbol_ok tfin s' d then
-      let '(l, _, r) :=
-        match d with
-        | L => right tfin
-        | R => left tfin
-        end
-      in
-      Some (q;; l {{s}} r)
+    if eqb_q qfin q' then
+      if symbol_ok tfin s' d then
+        let '(l, _, r) :=
+          match d with
+          | L => right tfin
+          | R => left tfin
+          end
+        in
+        Some (q;; l {{s}} r)
+      else
+        None
     else
       None
   end.
@@ -123,13 +128,16 @@ Proof.
   destruct Hmatch as [Eq [Es [Hl Hr]]]. subst q'' s''.
   inverts Hstep as Htm;
     unfold rewind;
-    rewrite Htm, eqb_q_refl;
+    rewrite Htm; destruct (eqb_q q' q'); try congruence;
     lazymatch goal with
     | H: side_matches (?side << ?s) ?st |- _ =>
       destruct st; [clear H | inverts H]
     end; simpl;
-    eexists; try rewrite eqb_sym_refl;
-    repeat split; auto.
+    lazymatch goal with
+    | |- context [eqb_sym ?s ?s] => destruct (eqb_sym s1 s1); try congruence
+    | _ => idtac
+    end;
+    eexists; repeat split; auto.
 Qed.
 
 Fixpoint has_contra (tm : TM) (n : nat) (st : stencil) :=
@@ -165,18 +173,17 @@ Proof.
 Qed.
 
 Definition verify_backwards (tm : TM) (n : nat) : bool :=
-  match cmultistep tm n starting with
-  | Some _ => forallb (has_contra tm n) (haltings tm)
-  | None => false
-  end.
+  if cmultistep tm n starting then
+    forallb (has_contra tm n) (haltings tm)
+  else
+    false.
 
 Theorem verify_backwards_correct : forall tm n,
   verify_backwards tm n = true ->
   ~ halts tm c0.
 Proof.
   introv H Hhalts. unfold verify_backwards in H.
-  destruct (cmultistep tm n starting) eqn:E; try discriminate.
-  apply cmultistep_some in E.
+  destruct (cmultistep tm n starting) as [[c' Hexec] |]; try discriminate.
   destruct Hhalts as [m Hhalts].
   assert (Hle : n <= m)
     by eauto using within_halt.

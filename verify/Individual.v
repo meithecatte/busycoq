@@ -1,7 +1,7 @@
 (** * Utilities for proving individual machines *)
 
 From Coq Require Export Lists.Streams.
-From BusyCoq Require Export Extraction. Export ETranslatedCyclers.
+From BusyCoq Require Export Extraction. Export ECyclers.
 Set Default Goal Selector "!".
 
 Notation "0" := S0.
@@ -23,8 +23,8 @@ Ltac apply_assumption :=
   | H: _ |- _ => apply H
   end.
 
-Ltac prove_step_left := apply step_left; reflexivity.
-Ltac prove_step_right := apply step_right; reflexivity.
+Ltac prove_step_left := apply @step_left; reflexivity.
+Ltac prove_step_right := apply @step_right; reflexivity.
 Ltac prove_step := prove_step_left || prove_step_right.
 Ltac simpl_tape :=
   try rewrite move_left_const;

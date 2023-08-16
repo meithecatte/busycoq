@@ -5,6 +5,7 @@ From Coq Require Import Arith.Arith.
 From Coq Require Import Lia.
 From Coq Require Import Lists.List. Import ListNotations.
 From Coq Require Import Lists.Streams.
+From Coq Require Import Program.Tactics.
 From BusyCoq Require Export Cyclers.
 Set Default Goal Selector "!".
 
@@ -22,6 +23,13 @@ Fixpoint EqTake (n : nat) (xs ys : side): Prop :=
     end
   end.
 
+Arguments EqTake !n !xs !ys.
+Arguments firstn [A] !n !l.
+
+Lemma EqTake_0 : forall xs ys, EqTake 0 xs ys.
+Proof. constructor. Qed.
+Local Hint Immediate EqTake_0 : core.
+
 Lemma EqTake_refl : forall n xs, EqTake n xs xs.
 Proof.
   induction n; introv.
@@ -29,6 +37,7 @@ Proof.
   - destruct xs as [x xs].
     simpl. auto.
 Qed.
+Local Hint Immediate EqTake_refl : core.
 
 Lemma EqTake_sym : forall n xs ys,
   EqTake n xs ys -> EqTake n ys xs.
@@ -67,44 +76,30 @@ Proof.
     eapply IHn, H.
 Qed.
 
-Definition eqb_take (n : nat) (xs ys : list Sym) : bool :=
-  eqb_side (firstn n xs) (firstn n ys).
+Local Hint Immediate EqTake_less : core.
 
-Lemma eqb_take_cons : forall n x y xs xs',
-  eqb_take (S n) (x :: xs) (y :: xs') = eqb_sym x y && eqb_take n xs xs'.
-Proof.
-  reflexivity.
+Lemma EqTake_firstn : forall n xs ys,
+  EqTake n (lift_side xs) (lift_side ys) <->
+    lift_side (firstn n xs) = lift_side (firstn n ys).
+Proof with intuition; congruence.
+  induction n.
+  - introv. split; auto.
+  - introv. destruct xs; destruct ys; simpl.
+    + split; auto.
+    + rewrite const_unfold. simpl.
+      rewrite (IHn []), firstn_nil. simpl...
+    + rewrite const_unfold. simpl.
+      rewrite (IHn _ []), firstn_nil. simpl...
+    + rewrite IHn...
 Qed.
 
-Lemma empty_side_firstn : forall n xs,
-  reflect (EqTake n (lift_side xs) (const s0)) (empty_side (firstn n xs)).
-Proof.
-  induction n; introv.
-  - repeat constructor.
-  - destruct xs as [| x xs].
-    + rewrite firstn_nil. apply ReflectT, EqTake_refl.
-    + simpl. apply reflect_andb.
-      * apply eqb_sym_spec.
-      * apply IHn.
-Qed.
+Local Hint Resolve -> EqTake_firstn : core.
+Local Hint Resolve <- EqTake_firstn : core.
 
-Lemma eqb_take_spec : forall n xs ys,
-  reflect (EqTake n (lift_side xs) (lift_side ys)) (eqb_take n xs ys).
-Proof.
-  induction n; introv.
-  - apply ReflectT. exact I.
-  - destruct xs as [| x xs].
-    + unfold eqb_take. rewrite firstn_nil. apply iff_reflect.
-      rewrite EqTake_sym_iff. apply reflect_iff.
-      apply empty_side_firstn.
-    + destruct ys as [| y ys].
-      * unfold eqb_take. rewrite firstn_nil. apply empty_side_firstn.
-      * rewrite eqb_take_cons.
-        specialize (IHn xs ys). simpl.
-        apply reflect_andb.
-        ** apply eqb_sym_spec.
-        ** apply IHn.
-Qed.
+Program Definition eqb_take (n : nat) (xs ys : list Sym)
+    : {EqTake n (lift_side xs) (lift_side ys)}
+      + {~ EqTake n (lift_side xs) (lift_side ys)} :=
+  Reduce (eqb_side (firstn n xs) (firstn n ys)).
 
 (** [EqLimit] checks that the tapes match if you don't look more
     than [n] steps left. *)
@@ -113,6 +108,8 @@ Definition EqLimit (n : nat) (t t' : tape): Prop :=
   | l {{s}} r, l' {{s'}} r' =>
     EqTake n l l' /\ s = s' /\ r = r'
   end.
+
+Local Hint Unfold EqLimit : core.
 
 Lemma EqLimit_move_left : forall n t t',
   EqLimit (S n) t t' ->
@@ -138,12 +135,14 @@ Proof.
   repeat split; try assumption; congruence.
 Qed.
 
+Local Hint Resolve EqLimit_move_left EqLimit_move_right : core.
+
 Lemma EqLimit_refl : forall n t, EqLimit n t t.
 Proof.
-  intros n [[l s] r].
-  repeat split.
-  apply EqTake_refl.
+  intros n [[l s] r]. auto.
 Qed.
+
+Local Hint Immediate EqLimit_refl : core.
 
 Lemma EqLimit_trans : forall n t1 t2 t3,
   EqLimit n t1 t2 -> EqLimit n t2 t3 -> EqLimit n t1 t3.
@@ -160,28 +159,20 @@ Lemma EqLimit_less : forall n k t t',
 Proof.
   intros n k [[l s] r] [[l' s'] r'] H.
   simpl in H. destruct H.
-  split; try assumption.
-  eapply EqTake_less; eassumption.
+  eauto.
 Qed.
 
-Definition eqb_limit (n : nat) (t t' : ctape) : bool :=
+Local Hint Immediate EqLimit_less : core.
+
+Local Obligation Tactic := program_simplify; intuition.
+
+Program Definition eqb_limit (n : nat) (t t' : ctape)
+    : {EqLimit n (lift_tape t) (lift_tape t')}
+      + {~ EqLimit n (lift_tape t) (lift_tape t')} :=
   match t, t' with
   | l {{s}} r, l' {{s'}} r' =>
-    eqb_take n l l' && eqb_sym s s' && eqb_side r r'
+    eqb_take n l l' && (eqb_sym s s' && Reduce (eqb_side r r'))
   end.
-
-Lemma eqb_limit_spec : forall n t t',
-  reflect (EqLimit n (lift_tape t) (lift_tape t')) (eqb_limit n t t').
-Proof.
-  introv.
-  destruct t as [[l s] r].
-  destruct t' as [[l' s'] r'].
-  simpl. rewrite <- andb_assoc.
-  repeat apply reflect_andb.
-  - apply eqb_take_spec.
-  - apply eqb_sym_spec.
-  - apply eqb_side_spec.
-Qed.
 
 (** We define a refinement of the Turing machine step relation,
     that makes sure we don't go further left than a specified point
@@ -198,18 +189,22 @@ Inductive lstep (tm : TM) : nat * (Q * tape) -> nat * (Q * tape) -> Prop :=
 
   where "c =[ tm ]=> c'" := (lstep tm c c').
 
+Local Hint Constructors lstep : core.
+
 (** And the indexed multistep relation: *)
-Reserved Notation "c =[ tm ]=>* n / c'" (at level 40, n at next level).
+Reserved Notation "c =[ tm ]=>> n / c'" (at level 40, n at next level).
 
 Inductive lmultistep (tm : TM)
     : nat -> nat * (Q * tape) -> nat * (Q * tape) -> Prop :=
-  | lmultistep_0 c : c =[ tm ]=>* 0 / c
+  | lmultistep_0 c : c =[ tm ]=>> 0 / c
   | lmultistep_S n c c' c'' :
     c  =[ tm ]=>  c' ->
-    c' =[ tm ]=>* n / c'' ->
-    c  =[ tm ]=>* S n / c''
+    c' =[ tm ]=>> n / c'' ->
+    c  =[ tm ]=>> S n / c''
 
-  where "c =[ tm ]=>* n / c'" := (lmultistep tm n c c').
+  where "c =[ tm ]=>> n / c'" := (lmultistep tm n c c').
+
+Local Hint Constructors lmultistep : core.
 
 Local Arguments move_left : simpl never.
 Local Arguments move_right : simpl never.
@@ -225,31 +220,23 @@ Proof.
   destruct Heq as [Heq [Es Er]].
   subst s2 r2. rename s1 into s, r1 into r.
   inverts Hstep as Htm.
-  - exists (move_left (l2 {{s'}} r)). split.
-    + apply EqLimit_move_left. repeat split. assumption.
-    + apply lstep_left. assumption.
-  - exists (move_right (l2 {{s'}} r)). split.
-    + apply EqLimit_move_right. repeat split. assumption.
-    + apply lstep_right. assumption.
+  - exists (move_left (l2 {{s'}} r)). auto 6.
+  - exists (move_right (l2 {{s'}} r)). auto 6.
 Qed.
 
 Lemma lmultistep_EqLimit : forall tm n k q t1 t2 k' q' t1',
+  (k, q;; t1) =[ tm ]=>> n / (k', q';; t1') ->
   EqLimit k t1 t2 ->
-  (k, q;; t1) =[ tm ]=>* n / (k', q';; t1') ->
-  exists t2', EqLimit k' t1' t2' /\ (k, q;; t2) =[ tm ]=>* n / (k', q';; t2').
+  exists t2', EqLimit k' t1' t2' /\ (k, q;; t2) =[ tm ]=>> n / (k', q';; t2').
 Proof.
-  induction n; introv Heq Hexec; inverts Hexec as Hstep Hrest.
-  - exists t2. split.
-    + assumption.
-    + constructor.
+  induction n; introv Hexec Heq; inverts Hexec as Hstep Hrest.
+  - exists t2. auto.
   - destruct c' as [kk [qq tt1]].
     eapply lstep_EqLimit in Hstep; try exact Heq.
     destruct Hstep as [tt2 [Heqq Hstep]].
     eapply IHn in Hrest; try exact Heqq.
     destruct Hrest as [t2' [Heq' Hrest]].
-    exists t2'. split.
-    + assumption.
-    + eapply lmultistep_S; eassumption.
+    eauto.
 Qed.
 
 Lemma lstep_step : forall tm k c k' c',
@@ -259,156 +246,86 @@ Proof.
   introv H. inverts H as Htm; constructor; assumption.
 Qed.
 
+Local Hint Immediate lstep_step : core.
+
 Lemma lmultistep_multistep : forall tm n k c k' c',
-  (k, c) =[ tm ]=>* n / (k', c') ->
+  (k, c) =[ tm ]=>> n / (k', c') ->
   c -[ tm ]->> n / c'.
 Proof.
   induction n; introv H; inverts H as Hstep Hrest.
-  - apply multistep_0.
+  - auto.
   - destruct c'0 as [kk cc].
-    apply lstep_step in Hstep.
-    apply IHn in Hrest.
-    eapply multistep_S; eassumption.
+    eauto.
 Qed.
+
+Local Hint Resolve lmultistep_multistep : core.
 
 (** This allows us to describe the behavior of a translated cycler: *)
-Lemma tcycle_chain : forall tm n k k' q t t' i,
-  (k, q;; t) =[ tm ]=>* n / (k + k', q;; t') ->
-  EqLimit k t t' ->
-  exists t'', EqLimit k t t'' /\ q;; t -[ tm ]->> (i * n) / q;; t''.
-Proof.
-  introv Hexec Heq.
-  induction i.
-  - exists t. split.
-    + apply EqLimit_refl.
-    + apply multistep_0.
-  - destruct IHi as [t1 [Heq1 Hexec1]].
-    apply lmultistep_EqLimit with (t2 := t1) in Hexec; try exact Heq1.
-    destruct Hexec as [t2 [Heq2 Hexec2]].
-    eexists t2. split.
-    + apply EqLimit_less in Heq2.
-      eauto using EqLimit_trans.
-    + apply lmultistep_multistep in Hexec2.
-      simpl. rewrite Nat.add_comm.
-      eauto using multistep_trans.
-Qed.
-
 Theorem tcycle_nonhalting : forall tm n k k' q t t',
-  (k, q;; t) =[ tm ]=>* n / (k + k', q;; t') ->
+  (k, q;; t) =[ tm ]=>> S n / (k', q;; t') ->
+  k <= k' ->
   EqLimit k t t' ->
-  n > 0 ->
   ~ halts tm (q;; t).
 Proof.
-  introv Hrun Heq Hgt0 Hhalt.
-  destruct Hhalt as [h Hhalt].
-  apply (eventually_exceeds n h) in Hgt0.
-  destruct Hgt0 as [i Hexceeds].
-  eapply tcycle_chain in Hrun; try assumption.
-  destruct Hrun as [t'' [_ Hrun]].
-  eapply exceeds_halt; eassumption.
+  introv Hrun Hle Heq.
+  replace k' with (k + (k' - k)) in * by lia. clear Hle.
+  apply progress_nonhalt with (P := fun '(q0, t0) => q = q0 /\ EqLimit k t t0).
+  - intros [q0 t0] [Hq Ht]. subst q0.
+    eapply lmultistep_EqLimit in Hrun; try exact Ht.
+    destruct Hrun as [t2 []].
+    exists (q, t2). repeat split.
+    + apply EqLimit_trans with t'; eauto.
+    + eauto.
+  - auto.
 Qed.
 
-Definition clstep (tm : TM) (c : nat * (Q * ctape))
-    : option (nat * (Q * ctape)) :=
+Local Obligation Tactic := program_simplify; autorewrite with core;
+  try (apply lstep_left || apply lstep_right); auto.
+
+Program Definition clstep (tm : TM) (k : nat) (c : Q * ctape)
+    : { '(k', c') | (k, lift c) =[ tm ]=> (k', lift c') } + {True} :=
   match c with
-  | (k, q;; l {{s}} r) =>
+  | q;; l {{s}} r =>
     match tm (q, s) with
-    | None => None
+    | None => !!
     | Some (s', L, q') =>
       match k with
-      | 0 => None
-      | S k => Some (k, q';; left (l {{s'}} r))
+      | 0 => !!
+      | S k => [|| (k, q';; left (l {{s'}} r)) ||]
       end
-    | Some (s', R, q') => Some (S k, q';; right (l {{s'}} r))
+    | Some (s', R, q') => [|| (S k, q';; right (l {{s'}} r)) ||]
     end
   end.
 
-Lemma clstep_lstep : forall tm k c k' c',
-  clstep tm (k, c) = Some (k', c') ->
-  (k, lift c) =[ tm ]=> (k', lift c').
-Proof.
-  introv H.
-  destruct c as [q [[l s] r]].
-  simpl. simpl in H.
-  destruct (tm (q;; s)) as [[[s' []] q1] |] eqn:E; try discriminate.
-  - destruct k as [| k]; try discriminate.
-    inverts H as; simpl.
-    rewrite lift_left. apply lstep_left. assumption.
-  - inverts H as; simpl.
-    rewrite lift_right. apply lstep_right. assumption.
-Qed.
+Local Obligation Tactic := program_simplify; eauto.
 
-Arguments clstep : simpl never.
-
-Fixpoint clmultistep (tm : TM) (n : nat) (c : nat * (Q * ctape))
-    : option (nat * (Q * ctape)) :=
+Program Fixpoint clmultistep (tm : TM) (n : nat) (k : nat) (c : Q * ctape)
+    : { '(k', c') | (k, lift c) =[ tm ]=>> n / (k', lift c') } + {True} :=
   match n with
-  | 0 => Some c
+  | 0 => [|| (k, c) ||]
   | S n' =>
-    match clstep tm c with
-    | Some c' => clmultistep tm n' c'
-    | None => None
-    end
+    bind (k', c') <-- clstep tm k c;
+    bind kc <-- clmultistep tm n' k' c';
+    [|| kc ||]
   end.
 
-Lemma clmultistep_some : forall tm n k c k' c',
-  clmultistep tm n (k, c) = Some (k', c') ->
-  (k, lift c) =[ tm ]=>* n / (k', lift c').
-Proof.
-  induction n; introv H; simpl in H.
-  - inverts H. apply lmultistep_0.
-  - destruct (clstep tm (k;; c)) as [[kk cc] |] eqn:E; try discriminate.
-    apply IHn in H. apply clstep_lstep in E.
-    eauto using lmultistep_S.
-Qed.
+Local Obligation Tactic := program_simplify;
+  eauto 3 using skip_halts, tcycle_nonhalting.
 
-Definition verify_tcycler_r (tm : TM) (n0 n1 k : nat) :=
-  match cmultistep tm n0 starting with
-  | Some c1 =>
-    match clmultistep tm n1 (k, c1) with
-    | Some (k', c1') =>
-      match c1, c1' with
-      | q;; t, q';; t' =>
-        (0 <? n1) && (k <=? k') && eqb_q q q' && eqb_limit k t t'
-      end
-    | None => false
-    end
-  | None => false
+Program Definition verify_tcycler_r (tm : TM) (n0 n1 k : nat)
+    : {~ halts tm c0} + {True} :=
+  bind q;; t <- cmultistep tm n0 starting;
+  bind (k', q';; t') <- clmultistep tm n1 k (q;; t);
+  match n1 with
+  | 0 => No
+  | S n1 => le_dec k k' && (eqb_q q q' && Reduce (eqb_limit k t t'))
   end.
 
-Theorem verify_tcycler_r_correct : forall tm n0 n1 k,
-  verify_tcycler_r tm n0 n1 k = true -> ~ halts tm c0.
-Proof.
-  introv H. unfold verify_tcycler_r in H.
-  destruct (cmultistep tm n0 starting) as [c1 |] eqn:E0; try discriminate.
-  destruct (clmultistep tm n1 (k, c1)) as [[k' c1'] |] eqn:E1; try discriminate.
-  destruct c1 as [q t]. destruct c1' as [q' t'].
-  destruct (Nat.ltb_spec 0 n1); try discriminate.
-  destruct (Nat.leb_spec k k'); try discriminate.
-  destruct (eqb_q_spec q q'); try discriminate. subst q'.
-  destruct (eqb_limit_spec k t t'); try discriminate.
-
-  apply cmultistep_some in E0.
-  apply clmultistep_some in E1.
-  eapply skip_halts; try exact E0.
-  replace k' with (k + (k' - k)) in E1 by lia.
-  eapply tcycle_nonhalting; eassumption.
-Qed.
-
-Definition verify_tcycler (tm : TM) (d : dir) (n0 n1 k : nat) :=
+Program Definition verify_tcycler (tm : TM) (d : dir) (n0 n1 k : nat)
+    : {~ halts tm c0} + {True} :=
   match d with
-  | L => verify_tcycler_r (flip tm) n0 n1 k
+  | L => Reduce (verify_tcycler_r (flip tm) n0 n1 k)
   | R => verify_tcycler_r tm n0 n1 k
   end.
-
-Definition verify_tcycler_correct : forall tm d n0 n1 k,
-  verify_tcycler tm d n0 n1 k = true -> ~ halts tm c0.
-Proof.
-  introv H. unfold verify_tcycler in H.
-  destruct d; apply verify_tcycler_r_correct in H.
-  - replace c0 with (flip_conf c0) in H by reflexivity.
-    rewrite <- flip_halts_iff in H. assumption.
-  - assumption.
-Qed.
 
 End TranslatedCyclers.

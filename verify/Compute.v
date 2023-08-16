@@ -8,6 +8,7 @@
     that corresponds to the abstract one. *)
 
 From Coq Require Import Bool.
+From Coq Require Import Program.Tactics.
 From Coq Require Import Lists.List. Import ListNotations.
 From Coq Require Import Lists.Streams.
 From Coq Require Import Lia.
@@ -34,85 +35,42 @@ Definition lift_tape (t : ctape) : tape :=
 Definition lift (c : Q * ctape) : Q * tape :=
   match c with (q, t) => (q, lift_tape t) end.
 
+Local Obligation Tactic := intros; subst;
+  simpl; rewrite const_unfold; congruence.
+
 (** Deciding whether two [ctape]s correspond to the same [tape]. *)
-Fixpoint empty_side (xs : list Sym) : bool :=
+Program Fixpoint empty_side (xs : list Sym)
+    : {lift_side xs = const s0} + {lift_side xs <> const s0} :=
   match xs with
-  | x :: xs => eqb_sym x s0 && empty_side xs
-  | [] => true
+  | x :: xs => eqb_sym x s0 && Reduce (empty_side xs)
+  | [] => Yes
   end.
 
-Lemma empty_side_spec : forall xs,
-  reflect (lift_side xs = const s0) (empty_side xs).
-Proof.
-  induction xs.
-  - apply ReflectT. reflexivity.
-  - simpl.
-    destruct (eqb_sym_spec a s0) as [E | Hneq].
-    + subst a.
-      inverts IHxs as Elift Eempty.
-      * apply ReflectT. rewrite Elift, <- const_unfold. reflexivity.
-      * apply ReflectF. rewrite const_unfold. congruence.
-    + apply ReflectF. rewrite const_unfold. congruence.
-Qed.
+Local Obligation Tactic := intros; subst; simpl in *; try congruence.
 
-Fixpoint eqb_side (xs ys : list Sym) : bool :=
+Program Fixpoint eqb_side (xs ys : list Sym)
+    : {lift_side xs = lift_side ys} + {lift_side xs <> lift_side ys} :=
   match xs with
   | x :: xs' =>
     match ys with
-    | y :: ys' => eqb_sym x y && eqb_side xs' ys'
-    | [] => empty_side xs
+    | y :: ys' => eqb_sym x y && Reduce (eqb_side xs' ys')
+    | [] => Reduce (empty_side xs)
     end
-  | [] => empty_side ys
+  | [] => Reduce (empty_side ys)
   end.
 
-Lemma eqb_side_spec : forall xs ys,
-  reflect (lift_side xs = lift_side ys) (eqb_side xs ys).
-Proof.
-  induction xs; intros ys.
-  - simpl. apply reflect_sym, empty_side_spec.
-  - destruct ys as [| y ys].
-    + apply empty_side_spec.
-    + simpl.
-      destruct (eqb_sym_spec a y) as [E | Hneq].
-      * subst a. simpl.
-        destruct (IHxs ys) as [E | Hneq]; constructor; congruence.
-      * apply ReflectF. congruence.
-Qed.
-
-Definition eqb_tape (t t' : ctape) : bool :=
+Program Definition eqb_tape (t t' : ctape)
+    : {lift_tape t = lift_tape t'} + {lift_tape t <> lift_tape t'} :=
   match t, t' with
   | (l, s, r), (l', s', r') =>
-    eqb_side l l' && eqb_sym s s' && eqb_side r r'
+    eqb_side l l' && (eqb_sym s s' && Reduce (eqb_side r r'))
   end.
 
-Lemma eqb_tape_spec : forall t t',
-  reflect (lift_tape t = lift_tape t') (eqb_tape t t').
-Proof.
-  intros [[l s] r] [[l' s'] r']. simpl.
-  apply iff_reflect.
-  repeat rewrite andb_true_iff.
-  rewrite <- (reflect_iff _ _ (eqb_side_spec l l')).
-  rewrite <- (reflect_iff _ _ (eqb_sym_spec  s s')).
-  rewrite <- (reflect_iff _ _ (eqb_side_spec r r')).
-  repeat split; try (inverts H; auto).
-  intros [[H1 H2] H3]. congruence.
-Qed.
-
-Definition eqb (c c' : Q * ctape) : bool :=
+Program Definition eqb (c c' : Q * ctape)
+    : {lift c = lift c'} + {lift c <> lift c'} :=
   match c, c' with
-  | q;; t, q';; t' => eqb_q q q' && eqb_tape t t'
+  | q;; t, q';; t' => eqb_q q q' && Reduce (eqb_tape t t')
   end.
-
-Lemma eqb_spec : forall c c',
-  reflect (lift c = lift c') (eqb c c').
-Proof.
-  intros [q t] [q' t']. simpl.
-  apply iff_reflect. rewrite andb_true_iff.
-  rewrite <- (reflect_iff _ _ (eqb_q_spec q q')).
-  rewrite <- (reflect_iff _ _ (eqb_tape_spec t t')).
-  repeat split; try (inverts H; auto).
-  intros [H1 H2]. congruence.
-Qed.
 
 (** Movement on [ctape]s. *)
 Definition left (t : ctape) : ctape :=
@@ -140,89 +98,31 @@ Proof.
   intros [[l s] [| s' r]]; reflexivity.
 Qed.
 
+#[export] Hint Rewrite lift_left lift_right : core.
+
+Local Obligation Tactic := program_simplify; autorewrite with core; try (apply step_left || apply step_right); eauto.
+
 (** Computable semantics of Turing machines. *)
-Definition cstep (tm : TM) (c : Q * ctape) : option (Q * ctape) :=
+Program Definition cstep (tm : TM) (c : Q * ctape)
+    : {c' | lift c -[ tm ]-> lift c'} + {halting tm (lift c)} :=
   match c with
   | q;; l {{s}} r =>
     match tm (q, s) with
-    | None => None
-    | Some (s', L, q') => Some (q';; left  (l {{s'}} r))
-    | Some (s', R, q') => Some (q';; right (l {{s'}} r))
+    | None => inright _
+    | Some (s', L, q') => [|| q';; left  (l {{s'}} r) ||]
+    | Some (s', R, q') => [|| q';; right (l {{s'}} r) ||]
     end
   end.
 
-Lemma cstep_halting : forall tm c,
-  cstep tm c = None -> halting tm (lift c).
-Proof.
-  introv H. destruct c as [q [[l s] r]]. unfold halting.
-  simpl. simpl in H.
-  destruct (tm (q;; s)) as [[[s' []] q'] |]; try discriminate.
-  reflexivity.
-Qed.
-
-Lemma cstep_some : forall tm c c',
-  cstep tm c = Some c' ->
-  lift c -[ tm ]-> lift c'.
-Proof.
-  introv H. destruct c as [q [[l s] r]].
-  simpl. simpl in H.
-  destruct (tm (q;; s)) as [[[s' []] q1] |] eqn:E; inverts H as; simpl.
-  - rewrite lift_left. apply step_left. assumption.
-  - rewrite lift_right. apply step_right. assumption.
-Qed.
-
-Fixpoint cmultistep (tm : TM) (n : nat) (c : Q * ctape) : option (Q * ctape) :=
+Program Fixpoint cmultistep (tm : TM) (n : nat) (c : Q * ctape)
+    : {c' | lift c -[ tm ]->> n / lift c'} + {halts tm (lift c)} :=
   match n with
-  | 0 => Some c
+  | 0 => [|| c ||]
   | S n' =>
-    match cstep tm c with
-    | Some c' => cmultistep tm n' c'
-    | None => None
-    end
+    bind c' <-- cstep tm c;
+    bind c'' <-- cmultistep tm n' c';
+    [|| c'' ||]
   end.
-
-Lemma cmultistep_some : forall tm n c c',
-  cmultistep tm n c = Some c' ->
-  lift c -[ tm ]->> n / lift c'.
-Proof.
-  induction n; introv H; simpl in H.
-  - inverts H. apply multistep_0.
-  - destruct (cstep tm c) as [c1 |] eqn:E.
-    + apply IHn in H. apply cstep_some in E.
-      eapply multistep_S; eassumption.
-    + discriminate.
-Qed.
-
-Lemma cmultistep_halts_in : forall tm n c,
-  cmultistep tm n c = None ->
-  exists n', n' < n /\ halts_in tm (lift c) n'.
-Proof.
-  induction n; introv H.
-  - discriminate.
-  - simpl in H. destruct (cstep tm c) as [c1 |] eqn:E.
-    + apply IHn in H. apply cstep_some in E.
-      destruct H as [n' [Hlt [ch [Hrun Hhalting]]]].
-      exists (S n'). split.
-      * lia.
-      * exists ch. split.
-        ** eapply multistep_S; eassumption.
-        ** assumption.
-    + apply cstep_halting in E. exists 0. split.
-      * lia.
-      * exists (lift c). split.
-        ** apply multistep_0.
-        ** assumption.
-Qed.
-
-Corollary cmultistep_halts : forall tm n c,
-  cmultistep tm n c = None ->
-  halts tm (lift c).
-Proof.
-  introv H.
-  apply cmultistep_halts_in in H.
-  destruct H as [n' [_ H]].
-  exists n'. exact H.
-Qed.
 
 (** The starting configuration. *)
 Definition starting : Q * ctape := q0;; [] {{s0}} [].

@@ -111,7 +111,10 @@ Proof.
     exact H.
 Qed.
 
-Lemma flip_c0 : flip_conf c0 = c0.
-Proof. reflexivity. Qed.
+Lemma flip_halts_c0 : forall tm,
+  ~ halts (flip tm) c0 -> ~ halts tm c0.
+Proof. introv H. rewrite flip_halts_iff. exact H. Qed.
+
+#[export] Hint Immediate flip_halts_c0 : core.
 
 End Flip.

@@ -1,5 +1,6 @@
 (** * TM: Definition of Turing Machines *)
 
+From Coq Require Import Bool.Sumbool.
 From Coq Require Import Lists.List. Import ListNotations.
 From Coq Require Import Lists.Streams.
 From Coq Require Import PeanoNat.
@@ -22,10 +23,8 @@ Module Type Ctx.
   Parameter s0 : Sym.
 
   (** Moreover we want decidable equality for [Q] and [Sym]. *)
-  Parameter eqb_q : Q -> Q -> bool.
-  Parameter eqb_q_spec : forall a b, reflect (a = b) (eqb_q a b).
-  Parameter eqb_sym : Sym -> Sym -> bool.
-  Parameter eqb_sym_spec : forall a b, reflect (a = b) (eqb_sym a b).
+  Parameter eqb_q : forall (a b : Q), {a = b} + {a <> b}.
+  Parameter eqb_sym : forall (a b : Sym), {a = b} + {a <> b}.
 
   (** It is also useful, in some situations, to be able to enumerate
       all the symbols and states. *)
@@ -37,12 +36,6 @@ End Ctx.
 
 Module TM (Ctx : Ctx).
   Export Ctx.
-
-Lemma eqb_q_refl : forall q, eqb_q q q = true.
-Proof. introv. destruct (eqb_q_spec q q); congruence. Qed.
-
-Lemma eqb_sym_refl : forall s, eqb_sym s s = true.
-Proof. introv. destruct (eqb_sym_spec s s); congruence. Qed.
 
 #[export] Hint Resolve all_qs_spec all_syms_spec : core.
 
@@ -104,6 +97,9 @@ Inductive step (tm : TM) : Q * tape -> Q * tape -> Prop :=
     q;; l {{s}} r -[ tm ]-> q';; (move_right (l {{s'}} r))
 
   where "c -[ tm ]-> c'" := (step tm c c').
+
+Arguments step_left {tm q q' s s' l r}.
+Arguments step_right {tm q q' s s' l r}.
 
 #[export] Hint Constructors step : core.
 
@@ -291,6 +287,38 @@ Proof.
   introv H1 H2. induction H1; eauto.
 Qed.
 
+Lemma halts_in_S :
+  forall tm c c' n,
+  halts_in tm c' n ->
+  c -[ tm ]-> c' ->
+  halts_in tm c (S n).
+Proof.
+  introv Hhalts Hstep.
+  destruct Hhalts as [ch [Hrun Hhalting]].
+  eauto.
+Qed.
+
+#[export] Hint Resolve halts_in_S : core.
+
+Lemma halts_step :
+  forall tm c c',
+  halts tm c' ->
+  c -[ tm ]-> c' ->
+  halts tm c.
+Proof.
+  introv H Hstep. destruct H. eauto.
+Qed.
+
+#[export] Hint Resolve halts_step : core.
+
+Lemma halting_halts :
+  forall tm c,
+  halting tm c ->
+  halts tm c.
+Proof. eauto 6. Qed.
+
+#[export] Hint Immediate halting_halts : core.
+
 Lemma progress_trans :
   forall tm c c' c'',
   c  -[ tm ]->+ c'  ->
@@ -308,7 +336,7 @@ Proof.
   induction n; introv H; inverts H; eauto.
 Qed.
 
-#[export] Hint Immediate multistep_progress : core.
+#[export] Hint Resolve multistep_progress : core.
 
 Lemma progress_multistep :
   forall tm c c',

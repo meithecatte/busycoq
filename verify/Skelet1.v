@@ -8,6 +8,7 @@ From Coq Require Import List. Import ListNotations.
 From Coq Require Import Lia.
 From Coq Require Import PArith.BinPos PArith.Pnat.
 From Coq Require Import NArith.BinNat NArith.Nnat.
+From Coq Require Import Program.Tactics.
 From BusyCoq Require Import Individual.
 Set Default Goal Selector "!".
 
@@ -284,61 +285,22 @@ Definition K : rtape :=
 Definition uni_P : positive := 53946.
 Definition uni_T : positive := 4 * uni_P - 5.
 
-Definition eqb_l (a b : lsym) : bool :=
-  match a, b with
-  | l_xs n, l_xs m => (n =? m)%positive
-  | l_D, l_D => true
-  | l_P, l_P => true
-  | l_C0, l_C0 => true
-  | l_C1, l_C1 => true
-  | l_C2, l_C2 => true
-  | l_C3, l_C3 => true
-  | l_F0, l_F0 => true
-  | l_F1, l_F1 => true
-  | l_F2, l_F2 => true
-  | l_F3, l_F3 => true
-  | l_G0, l_G0 => true
-  | l_G1, l_G1 => true
-  | l_G2, l_G2 => true
-  | l_Fs n, l_Fs m => (n =? m)%positive
-  | l_Gs n, l_Gs m => (n =? m)%positive
-  | l_Hs n, l_Hs m => (n =? m)%positive
-  | _, _ => false
-  end.
+Definition eqb_l (a b : lsym) : {a = b} + {a <> b}.
+  decide equality; apply Pos.eq_dec.
+Defined.
 
-Definition eqb_r (a b : rsym) : bool :=
-  match a, b with
-  | r_xs n, r_xs m => (n =? m)%positive
-  | r_D, r_D => true
-  | r_C, r_C => true
-  | r_P, r_P => true
-  | r_Gs n, r_Gs m => (n =? m)%positive
-  | _, _ => false
-  end.
+Definition eqb_r (a b : rsym) : {a = b} + {a <> b}.
+  decide equality; apply Pos.eq_dec.
+Defined.
 
-Lemma eqb_l_spec : forall a b,
-  reflect (a = b) (eqb_l a b).
-Proof.
-  destruct a; destruct b; try (apply ReflectF; discriminate);
-    try (apply ReflectT; reflexivity); simpl;
-    destruct (Pos.eqb_spec n n0);
-    try (apply ReflectT; congruence);
-    (apply ReflectF; congruence).
-Qed.
+Definition eqb_rtape (xs ys : rtape) : {xs = ys} + {xs <> ys}.
+  decide equality; apply eqb_r.
+Defined.
 
-Lemma eqb_r_spec : forall a b,
-  reflect (a = b) (eqb_r a b).
-Proof.
-  destruct a; destruct b; try (apply ReflectF; discriminate);
-    try (apply ReflectT; reflexivity); simpl;
-    destruct (Pos.eqb_spec n n0);
-    try (apply ReflectT; congruence);
-    (apply ReflectF; congruence).
-Qed.
+Notation left := TM.L.
+Notation right := TM.R.
 
-Inductive direction := left | right.
-
-Notation conf := (direction * ltape * rtape)%type.
+Notation conf := (dir * ltape * rtape)%type.
 
 Fixpoint lift_right (t : rtape) : side :=
   match t with
@@ -1419,29 +1381,21 @@ Proof.
     finish.
 Qed.
 
-Fixpoint strip_prefix (xs ys : ltape) :=
+Program Fixpoint strip_prefix (xs ys : ltape) : {zs | ys = xs ++ zs} + {True} :=
   match xs, ys with
-  | [], ys => Some ys
-  | _, [] => None
+  | [], ys => [|| ys ||]
+  | _, [] => !!
   | x :: xs, y :: ys =>
     if eqb_l x y then
-      strip_prefix xs ys
+      match strip_prefix xs ys with
+      | [|| zs ||] => [|| zs ||]
+      | !! => !!
+      end
     else
-      None
+      !!
   end.
 
 Arguments strip_prefix !xs !ys.
-
-Lemma strip_prefix_spec : forall xs ys zs,
-  strip_prefix xs ys = Some zs ->
-  ys = xs ++ zs.
-Proof.
-  induction xs as [| x xs IH]; introv H; simpl in H.
-  - inverts H. reflexivity.
-  - destruct ys as [| y ys]; try discriminate; simpl in H.
-    destruct (eqb_l_spec x y) as [E | E]; try discriminate.
-    apply IH in H. subst. reflexivity.
-Qed.
 
 Definition uni_cycle_count (xs : positive) (r : rtape) : N :=
   let xs_limit := (N.pred (N.pos xs) / N.pos uni_P)%N in
@@ -1469,7 +1423,7 @@ Definition try_uni_cycle (c : conf) : option conf :=
   match c with
   | (right, l_D :: l_C1 :: l_xs xs :: l, r) =>
     match strip_prefix J l with
-    | Some l =>
+    | [|| l ||] =>
       match uni_cycle_count xs r with
       | N0 => None
       | Npos n =>
@@ -1480,7 +1434,7 @@ Definition try_uni_cycle (c : conf) : option conf :=
         | None => None
         end
       end
-    | None => None
+    | !! => None
     end
   | _ => None
   end.
@@ -1494,8 +1448,8 @@ Proof.
   destruct l as [| [] l]; try discriminate.
   destruct l as [| [] l]; try discriminate.
   destruct l as [| [] l]; try discriminate. rename n into xs.
-  destruct (strip_prefix J l) as [l' |] eqn:El'; try discriminate.
-  apply strip_prefix_spec in El'. subst l. rename l' into l.
+  destruct (strip_prefix J l) as [[l' El'] |]; try discriminate.
+  subst l. rename l' into l.
   destruct (uni_cycle_count xs r) as [| n] eqn:Ecount; try discriminate.
   destruct (stride 0 (n * uni_T) r) as [r' |] eqn:Estride; inverts H.
 
@@ -1532,27 +1486,6 @@ Definition initial: conf := (right, [l_C1], [r_P]).
 
 Lemma init' : c0 -->* lift initial.
 Proof. exact init. Qed.
-
-Fixpoint eqb_rtape (xs ys : rtape) : bool :=
-  match xs, ys with
-  | x :: xs, y :: ys => eqb_r x y && eqb_rtape xs ys
-  | [], [] => true
-  | _, _ => false
-  end.
-
-Lemma eqb_rtape_spec : forall xs ys,
-  reflect (xs = ys) (eqb_rtape xs ys).
-Proof.
-  induction xs as [| x xs IH]; destruct ys as [| y ys];
-    try (apply ReflectF; discriminate);
-    try (apply ReflectT; reflexivity).
-  simpl.
-  destruct (eqb_r_spec x y); try (apply ReflectF; congruence).
-  simpl.
-  destruct (IH ys).
-  - apply ReflectT; congruence.
-  - apply ReflectF; congruence.
-Qed.
 
 Fixpoint steps (n : nat) (c : conf) : option conf :=
   match n with
@@ -1602,24 +1535,17 @@ Proof.
     repeat eexists. apply infinite_cycle.
   - eauto.
 Qed.
+
+Local Hint Immediate cycle_nonhalt : core.
+
+Obligation Tactic := intros; subst; auto; discriminate.
     
-Definition is_cycling (c : conf) : bool :=
+Program Definition is_cycling (c : conf) : {~ halts tm (lift c)} + {True} :=
   match c with
   | (right, l_C0 :: l, r) =>
-    eqb_rtape K r
-  | _ => false
+    Reduce (eqb_rtape K r)
+  | _ => No
   end.
-
-Theorem is_cycling_spec : forall c,
-  is_cycling c = true ->
-  ~ halts tm (lift c).
-Proof.
-  introv H.
-  destruct c as [[[] [| [] l]] r]; try discriminate.
-  unfold is_cycling in H.
-  destruct (eqb_rtape_spec K r) as [E |]; inverts H. subst r.
-  apply cycle_nonhalt.
-Qed.
 
 From Coq Require Extraction.
 Require Import ExtrOcamlBasic.

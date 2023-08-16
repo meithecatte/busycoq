@@ -9,6 +9,23 @@ From Coq Require Import NArith.BinNat NArith.Nnat.
 From BusyCoq Require Export LibTactics.
 Set Default Goal Selector "!".
 
+(* sig *)
+Notation "[: x :]" := (exist _ x _).
+
+(* sumbool *)
+Notation Yes := (left _ _).
+Notation No := (right _ _).
+Notation Reduce x := (if x then Yes else No).
+Notation "a && b" := (if a then b else No).
+
+(* sumor *)
+Notation "!!" := (inright _).
+Notation "[|| x ||]" := (inleft [: x :]).
+Notation "'bind' x <- a ; b" := (match a with | [|| x ||] => b | !! => No end)
+  (right associativity, at level 60, x pattern).
+Notation "'bind' x <-- a ; b" := (match a with | [|| x ||] => b | !! => !! end)
+  (right associativity, at level 60, x pattern).
+
 Lemma Cons_unfold : forall A (xs : Stream A),
   xs = Cons (hd xs) (tl xs).
 Proof.

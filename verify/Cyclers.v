@@ -4,60 +4,34 @@ From Coq Require Import Bool.Bool.
 From Coq Require Import Arith.Arith.
 From Coq Require Import Lia.
 From Coq Require Import Lists.List. Import ListNotations.
+From Coq Require Import Program.Tactics.
 From BusyCoq Require Export Flip.
 Set Default Goal Selector "!".
 
 Module Cyclers (Ctx : Ctx).
   Module Flip := Flip Ctx. Export Flip.
 
-Definition verify_cycler (tm : TM) (n k : nat) : bool :=
-  match cmultistep tm n starting with
-  | Some c =>
-    match cmultistep tm k c with
-    | Some c' => (0 <? k) && eqb c c'
-    | None => false
-    end
-  | None => false
-  end.
-
-Lemma cycle_chain :
-  forall (tm : TM) c n k,
-  c -[ tm ]->> k / c ->
-  c -[ tm ]->> (n * k) / c.
-Proof.
-  introv H.
-  induction n.
-  - apply multistep_0.
-  - simpl. eapply multistep_trans; eassumption.
-Qed.
-
 Lemma cycle_nonhalting :
-  forall (tm : TM) c k,
-  k > 0 ->
-  c -[ tm ]->> k / c ->
+  forall {tm : TM} {c c' k},
+  c = c' ->
+  c -[ tm ]->> S k / c' ->
   ~ halts tm c.
 Proof.
-  introv Hgt0 Hk [h Hhalts_in].
-  destruct (eventually_exceeds k h Hgt0) as [r Hr].
-  eapply cycle_chain in Hk.
-  eapply exceeds_halt; eassumption.
+  introv E Hgt0. subst c'.
+  apply progress_nonhalt with (P := fun c' => c = c');
+    intros; subst; eauto.
 Qed.
 
-Theorem verify_cycler_correct : forall tm n k,
-  verify_cycler tm n k = true -> ~ halts tm c0.
-Proof.
-  introv H. unfold verify_cycler in H.
-  destruct (cmultistep tm n starting) as [c |] eqn:E; try discriminate.
-  destruct (cmultistep tm k c) as [c' |] eqn:E'; try discriminate.
-  destruct (Nat.ltb_spec 0 k) as [Hgt0 |]; try discriminate.
-  destruct (eqb_spec c c') as [Elift |]; try discriminate.
+Local Obligation Tactic := simpl; intros; subst;
+  eauto 3 using cycle_nonhalting, skip_halts.
 
-  apply cmultistep_some in E, E'.
-  rewrite lift_starting in E.
-  rewrite <- Elift in E'.
-  eapply skip_halts.
-  - eassumption.
-  - eapply cycle_nonhalting; eassumption.
-Qed.
+Program Definition verify_cycler (tm : TM) (n k : nat) :
+  {~ halts tm c0} + {True} :=
+  bind c <- cmultistep tm n starting;
+  bind c' <- cmultistep tm k c;
+  match k with
+  | 0 => No
+  | S k => Reduce (eqb c c')
+  end.
 
 End Cyclers.

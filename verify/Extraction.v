@@ -15,32 +15,13 @@ Module Ctx <: Ctx.
   Definition q0 := A.
   Definition s0 := S0.
 
-  Definition eqb_q (a b : Q) :=
-    match a, b with
-    | A, A => true
-    | B, B => true
-    | C, C => true
-    | D, D => true
-    | E, E => true
-    | _, _ => false
-    end.
+  Definition eqb_q (a b : Q): {a = b} + {a <> b}.
+    decide equality.
+  Defined.
 
-  Lemma eqb_q_spec : forall a b, reflect (a = b) (eqb_q a b).
-  Proof.
-    intros [] []; constructor; (reflexivity || discriminate).
-  Qed.
-
-  Definition eqb_sym (a b : Sym) :=
-    match a, b with
-    | S0, S0 => true
-    | S1, S1 => true
-    | _, _ => false
-    end.
-
-  Lemma eqb_sym_spec : forall a b, reflect (a = b) (eqb_sym a b).
-  Proof.
-    intros [] []; constructor; (reflexivity || discriminate).
-  Qed.
+  Definition eqb_sym (a b : Sym): {a = b} + {a <> b}.
+    decide equality.
+  Defined.
 
   Definition all_qs := [A; B; C; D; E].
 
