@@ -13,10 +13,37 @@ use binrw::binrw;
 const SPACE_LIMIT: usize = 1024;
 const TIME_LIMIT: u32 = 250000;
 
-#[derive(Clone, Debug)]
 #[binrw]
+#[derive(Clone, Debug)]
 pub struct Cert {
+    /// Steps taken before reaching `C(1)`
     run_steps: u32,
+    /// Direction in which the head is pointing at `C(n)`
+    dir: Dir,
+    /// Number of macro-steps taken to complete the cycle
+    cycle_steps: u32,
+
+    #[br(temp)]
+    #[bw(calc = tape_split.len().try_into().unwrap())]
+    tape_split_len: u16,
+    /// Tuples of `(wall length, repeater length)`.
+    /// Remainder gets turned into a wall.
+    #[br(count = tape_split_len)]
+    tape_split: Vec<(u16, u16)>,
+
+    #[br(temp)]
+    #[bw(calc = shift_rules.len().try_into().unwrap())]
+    shift_rules_len: u16,
+    /// List of shift rules applied during the cycle, in order.
+    #[br(count = shift_rules_len)]
+    shift_rules: Vec<ShiftRule>,
+}
+
+#[binrw]
+#[derive(Clone, Debug)]
+struct ShiftRule {
+    tail_len: u16,
+    steps_taken: u32,
 }
 
 pub fn decide_bouncer(tm: &TM) -> Result<Cert, FailReason> {
@@ -37,30 +64,59 @@ pub fn decide_bouncer(tm: &TM) -> Result<Cert, FailReason> {
         let state = progression[1].state;
         let dir = progression[1].dir;
         if let Some(symbolic) = split_tapes(progression) {
-            let Some(cert) = SymbolicTM::with(tm, &symbolic, state, dir, |mut tm|
-            {
+            let cert = SymbolicTM::with(tm, &symbolic, state, dir, |mut tm| {
                 // `initial` is like `symbolic`, but aligned
                 let initial = tm.tape.clone();
+                let mut cycle_steps = 0;
 
                 while let Ok(()) = tm.step(&mut shift_buf) {
+                    cycle_steps += 1;
+
                     if tm.state == state &&
                         tm.is_on_edge(dir) &&
                         tm.is_special_case_of(initial.iter().copied())
                     {
                         return Some(Cert {
                             run_steps: progression[1].steps_taken,
+                            dir,
+                            cycle_steps,
+                            tape_split: describe_split(initial.iter().copied()),
+                            shift_rules: tm.shift_rules,
                         });
                     }
                 }
 
                 None
-            }) else { continue };
+            });
 
-            return Ok(cert);
+            if let Some(cert) = cert {
+                return Ok(cert);
+            }
         }
     }
 
     Err(reason)
+}
+
+fn describe_split<'a>(
+    tape: impl Iterator<Item = Segment<'a>>,
+) -> Vec<(u16, u16)> {
+    let mut split = vec![];
+    let mut wall = 0;
+
+    for segment in tape {
+        match segment {
+            Segment::Sym(_) => wall += 1,
+            Segment::Repeat(seg) => {
+                split.push((wall, seg.len() as u16));
+                wall = 0;
+            }
+        }
+    }
+
+    // anything leftover in wall is implicit
+
+    split
 }
 
 // Check whether `tape` is a special-case of `stencil`, assuming both
@@ -149,7 +205,10 @@ struct SymbolicTM<'a> {
     state: u8,
     dir: Dir,
     pos: usize,
+    /// Number of base steps taken
     steps_taken: u32,
+    /// Description of shift rules applied, in order
+    shift_rules: Vec<ShiftRule>,
 }
 
 impl<'bump> SymbolicTM<'bump> {
@@ -174,6 +233,7 @@ impl<'bump> SymbolicTM<'bump> {
             dir,
             pos,
             steps_taken: 0,
+            shift_rules: vec![],
         };
 
         tm.align();
@@ -322,11 +382,11 @@ impl<'bump> SymbolicTM<'bump> {
     }
 
     fn step(&mut self, shift_buf: &mut Vec<bool>) -> Result<(), ()> {
-        self.take_step()?;
         let seg = self.head_segment();
 
         match seg {
             Segment::Sym(sym) => {
+                self.take_step()?;
                 match self.tm.code[self.state as usize][sym as usize] {
                     Command::Halt => return Err(()),
                     Command::Step { write, dir, next } => {
@@ -343,7 +403,9 @@ impl<'bump> SymbolicTM<'bump> {
                 let initial_pos = config.pos;
                 let mut leftmost = config.pos as isize;
                 let mut rightmost = config.pos as isize;
+                let mut steps_taken = 0;
                 while let Ok(true) = config.step(self.tm) {
+                    steps_taken += 1;
                     leftmost = leftmost.min(config.pos as isize);
                     rightmost = rightmost.max(config.pos as isize);
                     self.take_step()?;
@@ -356,7 +418,7 @@ impl<'bump> SymbolicTM<'bump> {
                 let leftmost = leftmost as usize;
                 let rightmost = rightmost as usize;
 
-                match self.dir {
+                let tail_len = match self.dir {
                     Dir::L => {
                         if config.pos != usize::MAX {
                             return Err(());
@@ -379,6 +441,7 @@ impl<'bump> SymbolicTM<'bump> {
                         let seg = self.bump.alloc_slice_copy(seg);
                         self.tape[self.pos + tail_len] = Segment::Repeat(seg);
                         self.align_segment_right(self.pos + tail_len);
+                        tail_len
                     }
                     Dir::R => {
                         if config.pos != config.tape.len() {
@@ -403,8 +466,14 @@ impl<'bump> SymbolicTM<'bump> {
                         let seg = self.bump.alloc_slice_copy(seg);
                         self.tape[self.pos - tail_len - 1] = Segment::Repeat(seg);
                         self.align_segment_left(self.pos - tail_len - 1);
+                        tail_len
                     }
-                }
+                };
+
+                self.shift_rules.push(ShiftRule {
+                    tail_len: tail_len as u16,
+                    steps_taken,
+                });
             }
         }
 
