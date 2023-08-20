@@ -9,6 +9,7 @@ From Coq Require Import Lia.
 From Coq Require Import PArith.BinPos PArith.Pnat.
 From Coq Require Import NArith.BinNat NArith.Nnat.
 From Coq Require Import Program.Tactics.
+From Coq Require Import ZifyBool.
 From BusyCoq Require Import Individual.
 Set Default Goal Selector "!".
 
@@ -1207,27 +1208,18 @@ Lemma decr_rearrange : forall xs k,
   N.pos (xs :+ Pos.pred k) = decr (xs :+ k).
 Proof.
   introv H.
-  destruct xs; unfold decr, het_add; lia.
+  destruct xs; unfold decr; lia.
 Qed.
 
 Lemma le_het_add : forall a b c,
   (a <=? N.pos c)%N = true ->
   true = (a <=? N.pos (b :+ c))%N.
-Proof.
-  introv H. rewrite pos_het_add.
-  destruct (N.leb_spec a (N.pos c)); try discriminate.
-  destruct (N.leb_spec a (b + N.pos c)%N); try reflexivity.
-  lia.
-Qed.
+Proof. lia. Qed.
 
 Lemma het_add_sub : forall b c d,
   (d <? c)%positive = true ->
   N.pos (b :+ (c - d)) = (0 + N.pos (b :+ c) - N.pos d)%N.
-Proof.
-  introv H.
-  destruct (Pos.ltb_spec d c); inverts H.
-  repeat rewrite pos_het_add. lia.
-Qed.
+Proof. lia. Qed.
 
 Ltac apply_stride_at H N R R' l r r' Hr :=
   lazymatch r' with
@@ -1236,7 +1228,7 @@ Ltac apply_stride_at H N R R' l r r' Hr :=
     lazymatch cond' with
     | (?a <=? N.pos (?b :+ ?c))%N =>
       replace cond with true in Hr
-        by (exact (le_het_add a b c eq_refl));
+        by exact (le_het_add a b c eq_refl);
       let then' := eval hnf in THEN in
       change (stride' 0 1 r id = then') in Hr;
       apply_stride_at H N R R' l r then' Hr
@@ -1247,7 +1239,7 @@ Ltac apply_stride_at H N R R' l r r' Hr :=
       let a := eval vm_compute in (c - d')%positive in
       replace (0 + N.pos (b :+ c) - d)%N
         with (N.pos (b :+ a)) in Hr
-        by (exact (het_add_sub b c d' eq_refl));
+        by exact (het_add_sub b c d' eq_refl);
       let r' := context G [ N.pos (b :+ a) ] in
       apply_stride_at H N R R' l r r' Hr
     end
@@ -1345,15 +1337,6 @@ Qed.
 
 Opaque J.
 
-Lemma het_add_assoc : forall a b c,
-  (a + N.pos b) :+ c = a :+ (b + c).
-Proof.
-  introv.
-  enough (N.pos ((a + N.pos b) :+ c) = N.pos (a :+ (b + c))).
-  { inverts H as H. reflexivity. }
-  repeat rewrite pos_het_add. lia.
-Qed.
-
 Corollary uni_cycles : forall n l r r' xs,
   stride 0 (n * uni_T) r = Some r' ->
   lift (right, l_D :: l_C1 :: l_xs (xs :+ (n * uni_P + 1)) :: J ++ l, r) -->*
@@ -1364,14 +1347,14 @@ Proof.
   - apply uni_cycle', H.
   - replace (xs :+ (Pos.succ n * uni_P + 1))
       with ((xs + N.pos uni_P) :+ (n * uni_P + 1))
-      by (rewrite het_add_assoc; f_equal; lia).
+      by lia.
     replace (Pos.succ n * uni_T)%positive
       with (n * uni_T + uni_T)%positive in H by lia.
     apply stride_add in H. destruct H as [t1 [H1 H2]].
     follow IHn.
     replace ((xs + N.pos uni_P) :+ 1)
       with (xs :+ (uni_P + 1))
-      by (rewrite het_add_assoc; reflexivity).
+      by lia.
     eapply stride_Grs in H2.
     eapply uni_cycle' in H2.
     follow H2.
@@ -1457,9 +1440,9 @@ Proof.
   { rewrite <- Ecount. apply uni_cycle_count_spec. }
   pose (N.pred (N.pos xs - N.pos (n * uni_P))) as u.
   replace (l_xs xs) with (l_xs (u :+ (n * uni_P + 1)))
-    by (f_equal; unfold het_add; destruct u eqn:Eu; lia).
+    by (f_equal; lia).
   replace (xs - n * uni_P)%positive with (u :+ 1)
-    by (unfold het_add; destruct u eqn:Eu; lia).
+    by lia.
   apply uni_cycles, Estride.
 Qed.
 

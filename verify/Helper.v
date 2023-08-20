@@ -4,8 +4,10 @@ From Coq Require Import Bool.
 From Coq Require Import Lists.List. Import ListNotations.
 From Coq Require Import Lists.Streams.
 From Coq Require Import Lia.
+From Coq Require Import ZifyClasses.
 From Coq Require Import PArith.BinPos PArith.Pnat.
 From Coq Require Import NArith.BinNat NArith.Nnat.
+From Coq Require Import ZArith.
 From BusyCoq Require Export LibTactics.
 Set Default Goal Selector "!".
 
@@ -74,17 +76,6 @@ Proof.
   introv H1 H2. destruct H1, H2; constructor; intuition.
 Qed.
 
-Lemma eventually_exceeds :
-  forall d h, d > 0 ->
-  exists k, k * d > h.
-Proof.
-  introv H.
-  induction h.
-  - exists 1. lia.
-  - destruct IHh as [k IH].
-    exists (S k). lia.
-Qed.
-
 Fixpoint Str_app {A} (xs : list A) (ys : Stream A) : Stream A :=
   match xs with
   | [] => ys
@@ -130,20 +121,17 @@ Definition het_add (a : N) (b : positive) : positive :=
 
 Notation "a :+ b" := (het_add a b)  (at level 50, left associativity).
 
-Lemma het_add_succ : forall a b, N.succ a :+ b = a :+ Pos.succ b.
-Proof.
-  introv. destruct a; unfold ":+", N.succ; lia.
-Qed.
-
-Lemma het_add_succ_l : forall a b, N.succ a :+ b = Pos.succ (a :+ b).
-Proof.
-  introv. destruct a; unfold ":+", N.succ; lia.
-Qed.
-
-Lemma pos_het_add : forall a b, (N.pos (a :+ b) = a + N.pos b)%N.
+Lemma het_add_Z : forall a b, Z.pos (a :+ b) = (Z.of_N a + Z.pos b)%Z.
 Proof.
   introv. destruct a; unfold ":+"; lia.
 Qed.
+
+#[global] Instance Op_het_add : BinOp het_add :=
+  { TBOp := Z.add; TBOpInj := het_add_Z }.
+Add Zify BinOp Op_het_add.
+
+Lemma het_add_succ_l : forall a b, N.succ a :+ b = Pos.succ (a :+ b).
+Proof. lia. Qed.
 
 Fixpoint pow2' (k : nat) : positive :=
   match k with
@@ -161,3 +149,6 @@ Proof. introv. unfold pow2. simpl. lia. Qed.
 
 Lemma pow2_gt0 : forall k, (pow2 k > 0)%N.
 Proof. unfold pow2. lia. Qed.
+
+Ltac Zify.zify_pre_hook ::=
+  unfold pow2 in *; simpl pow2' in *.

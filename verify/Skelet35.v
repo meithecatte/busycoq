@@ -79,16 +79,12 @@ Corollary D_run : forall u n m,
   (u <= b m)%N ->
   D n m -->* D (u + n) (u :+ m).
 Proof.
-  apply (N.induction (fun u =>
-    forall n m, (u <= b m)%N -> D n m -->* D (u + n) (u :+ m))).
-  - (* morphism bullshit *) intuition.
-  - (* u = 0 *) introv H. finish.
-  - intros u IH n m H.
-    follow D_inc. { apply bn0_has0. lia. }
+  induction u using N.peano_ind; introv H.
+  - finish.
+  - follow D_inc. { apply bn0_has0. lia. }
     replace (N.succ u + n)%N with (u + N.succ n)%N by lia.
-    replace (N.succ u :+ m)%N with (u :+ P m)%N
-      by (rewrite het_add_succ; reflexivity).
-    apply IH. rewrite b_succ; lia.
+    replace (N.succ u :+ m)%N with (u :+ P m)%N by lia.
+    apply IHu. rewrite b_succ; lia.
 Qed.
 
 Corollary D_finish : forall n m,
@@ -201,8 +197,7 @@ Proof.
   - finish.
   - follow LaR_inc. { apply bn0_has0. lia. }
     follow IHbin_plus. { rewrite b_succ; lia. }
-    replace (u :+ P m)%N with (N.succ u :+ m)%N
-      by (rewrite het_add_succ; reflexivity).
+    replace (u :+ P m)%N with (N.succ u :+ m)%N by lia.
     finish.
 Qed.
 
@@ -271,9 +266,7 @@ Proof.
   - destruct IHn as [k [n' [EIH IH]]].
     exists (S k), n'. split.
     + simpl. simpl in EIH. rewrite EIH. reflexivity.
-    + unfold pow2, pow2'. fold pow2'.
-      unfold pow2, pow2' in IH. fold pow2' in IH.
-      lia.
+    + lia.
   - exists O, N0. repeat split.
     simpl. rewrite const_unfold at 1. reflexivity.
 Qed.
@@ -294,7 +287,7 @@ Proof.
   - lia.
   - rewrite pow4_shift. simpl b.
     rewrite IHk.
-    rewrite <- plus_n_Sm. simpl pow2'.
+    rewrite <- plus_n_Sm.
     lia.
 Qed.
 
@@ -311,20 +304,19 @@ Proof.
   - unfold E. rewrite EK.
     follow drop_KI. { lia. }
     finish.
-  - rewrite En'. unfold pow2. nia.
+  - rewrite En'. nia.
   - destruct (f_lt m a k) as [x [E Hx]].
     rewrite b_pow4, E.
     replace (4 * (pow2 k - 1 :+ m) + x)%positive
       with (N.pos x :+ 4 * (pow2 k - 1 :+ m))
-      by (unfold ":+" at 1; lia).
+      by lia.
     rewrite b_add by (simpl; lia).
     replace (b (4 * (pow2 k - 1 :+ m)))
       with (N.succ_double (N.succ_double (b (pow2 k - 1 :+ m))))
       by reflexivity.
     transitivity (b (pow2 k - 1 :+ m)).
-    + rewrite b_add by lia.
-      unfold pow2 in *. nia.
-    + unfold pow2. nia.
+    + rewrite b_add by lia. nia.
+    + nia.
 Qed.
 
 Corollary do_reset : forall n m a,
@@ -350,7 +342,7 @@ Proof.
   introv.
   assert (H: exists m', E (N.succ (b m)) 1 (P (b m :+ m)) -->* E 0 0 m').
   { apply do_reset; try lia.
-    rewrite b0_succ, pos_het_add.
+    rewrite b0_succ.
     - lia.
     - apply b_add_self. }
   destruct H as [m' H]. exists m'.
