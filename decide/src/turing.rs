@@ -1,14 +1,16 @@
 use std::array;
 use std::fmt;
 use std::str::FromStr;
+use binrw::binrw;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct OutOfSpace;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[binrw]
 pub enum Dir {
-    L,
-    R,
+    #[brw(magic = 1u8)] L,
+    #[brw(magic = 0u8)] R,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

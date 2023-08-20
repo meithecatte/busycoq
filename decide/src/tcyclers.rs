@@ -1,13 +1,13 @@
 use crate::{Certificate, Decider, running_min, running_max};
 use crate::turing::{Configuration, Dir, Limit, OutOfSpace, TM};
-use byteorder::{BE, WriteBytesExt};
 use enum_map::Enum;
-use std::io::Cursor;
+use binrw::binrw;
 
 const SPACE_LIMIT: usize = 4096;
 const TIME_LIMIT: u32 = 20000;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[binrw]
 pub struct Cert {
     /// The side of the tape the record is on.
     dir: Dir,
@@ -173,17 +173,6 @@ fn decide_tcyclers(tm: &TM) -> Result<Cert, FailReason> {
                 k: k as u32,
             });
         }
-    }
-}
-
-impl Cert {
-    pub fn to_bytes(self) -> [u8; 13] {
-        let mut cursor = Cursor::new([0; 13]);
-        cursor.write_u8(self.dir.into()).unwrap();
-        cursor.write_u32::<BE>(self.n0).unwrap();
-        cursor.write_u32::<BE>(self.n1).unwrap();
-        cursor.write_u32::<BE>(self.k).unwrap();
-        cursor.into_inner()
     }
 }
 

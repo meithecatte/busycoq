@@ -1,8 +1,9 @@
-use std::io::prelude::*;
-use std::io::Result;
 use std::io::BufWriter;
 use std::fs::File;
 use std::path::Path;
+use anyhow::Result;
+use binrw::{BinWrite, binrw};
+use binrw::io::NoSeek;
 use byteorder::{BE, WriteBytesExt};
 use crate::cyclers;
 use crate::tcyclers;
@@ -10,11 +11,13 @@ use crate::backwards;
 use crate::bouncers;
 
 #[derive(Clone, Debug)]
+#[binrw]
+#[brw(big)]
 pub enum Certificate {
-    Cyclers(cyclers::Cert),
-    TCyclers(tcyclers::Cert),
-    Backwards(backwards::Cert),
-    Bouncers(bouncers::Cert),
+    #[brw(magic = 0u8)] Cyclers(cyclers::Cert),
+    #[brw(magic = 1u8)] TCyclers(tcyclers::Cert),
+    #[brw(magic = 2u8)] Backwards(backwards::Cert),
+    #[brw(magic = 3u8)] Bouncers(bouncers::Cert),
 }
 
 pub struct CertList {
@@ -30,26 +33,7 @@ impl CertList {
 
     pub fn write_entry(&mut self, index: u32, cert: &Certificate) -> Result<()> {
         self.writer.write_u32::<BE>(index)?;
-        use Certificate::*;
-        match cert {
-            Cyclers(cert) => {
-                self.writer.write_u8(0)?;
-                self.writer.write_all(&cert.to_bytes())?;
-            }
-            TCyclers(cert) => {
-                self.writer.write_u8(1)?;
-                self.writer.write_all(&cert.to_bytes())?;
-            }
-            Backwards(cert) => {
-                self.writer.write_u8(2)?;
-                self.writer.write_all(&cert.to_bytes())?;
-            }
-            Bouncers(cert) => {
-                self.writer.write_u8(3)?;
-                self.writer.write_all(&cert.to_bytes())?;
-            }
-        }
-
+        cert.write(&mut NoSeek::new(&mut self.writer))?;
         Ok(())
     }
 }

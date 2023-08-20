@@ -1,11 +1,13 @@
 use crate::{Certificate, Decider};
 use crate::turing::{Configuration, Limit, TM, OutOfSpace};
 use enum_map::Enum;
+use binrw::binrw;
 
 const SPACE_LIMIT: usize = 2048;
 const TIME_LIMIT: u32 = 1024;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[binrw]
 pub struct Cert {
     n: u32,
 }
@@ -55,12 +57,6 @@ fn decide_cyclers(tm: &TM) -> Result<Cert, FailReason> {
     }
 
     Err(FailReason::OutOfTime)
-}
-
-impl Cert {
-    pub fn to_bytes(self) -> [u8; 4] {
-        self.n.to_be_bytes()
-    }
 }
 
 pub struct Cyclers;

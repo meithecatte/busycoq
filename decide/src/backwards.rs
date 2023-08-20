@@ -3,6 +3,7 @@ use crate::turing::{Command, Dir, TM};
 use crate::undo::UndoArray;
 use enum_map::Enum;
 use std::cell::Cell;
+use binrw::binrw;
 
 // These are very small parameters, but nevertheless the decider is maximally
 // effective
@@ -12,6 +13,7 @@ const SPACE_LIMIT: usize = 64;
 type Tape = UndoArray<bool, SPACE_LIMIT>;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[binrw]
 pub struct Cert {
     depth: u32,
 }
@@ -123,12 +125,6 @@ fn decide_backwards(tm: &TM) -> Result<Cert, FailReason> {
     }
 
     Ok(Cert { depth: max_depth })
-}
-
-impl Cert {
-    pub fn to_bytes(self) -> [u8; 4] {
-        self.depth.to_be_bytes()
-    }
 }
 
 pub struct BackwardsReasoning;

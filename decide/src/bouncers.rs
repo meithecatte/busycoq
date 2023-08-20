@@ -8,11 +8,13 @@ use std::collections::VecDeque;
 use std::fmt;
 use std::num::NonZeroU32;
 use std::iter;
+use binrw::binrw;
 
 const SPACE_LIMIT: usize = 1024;
 const TIME_LIMIT: u32 = 250000;
 
 #[derive(Clone, Debug)]
+#[binrw]
 pub struct Cert {
     run_steps: u32,
 }
@@ -744,12 +746,6 @@ impl<'a> RecordDetect<'a> {
         }
 
         Err(FailReason::OutOfTime)
-    }
-}
-
-impl Cert {
-    pub fn to_bytes(&self) -> [u8; 4] {
-        self.run_steps.to_be_bytes()
     }
 }
 
