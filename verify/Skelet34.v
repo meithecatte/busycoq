@@ -80,10 +80,9 @@ Corollary D_run : forall u n m,
 Proof.
   induction u using N.peano_ind; introv H.
   - finish.
-  - follow D_inc. { apply bn0_has0. lia. }
-    replace (N.succ u + n)%N with (u + N.succ n)%N by lia.
-    replace (N.succ u :+ m)%N with (u :+ P m)%N by lia.
-    apply IHu. rewrite b_succ; lia.
+  - follow D_inc.
+    follow IHu. { rewrite b_succ; lia. }
+    finish.
 Qed.
 
 Corollary D_finish : forall n m,
@@ -194,9 +193,8 @@ Proof.
   introv H.
   generalize dependent m. induction H; introv Hr.
   - finish.
-  - follow LaR_inc. { apply bn0_has0. lia. }
+  - follow LaR_inc.
     follow IHbin_plus. { rewrite b_succ; lia. }
-    replace (u :+ P m)%N with (N.succ u :+ m)%N by lia.
     finish.
 Qed.
 
@@ -346,7 +344,7 @@ Proof.
     - apply b_add_self. }
   destruct H as [m' H]. exists m'.
   eapply evstep_progress_trans. { apply D_finish. }
-  eapply progress_evstep_trans. { apply start_reset', b0_all1, b_add_self. }
+  eapply progress_evstep_trans. { apply start_reset'. auto. }
   rewrite N.add_0_r.
   follow H. finish.
 Qed.

@@ -31,20 +31,23 @@ Inductive all1 : positive -> Prop :=
 
 Lemma b0_all1 : forall n, b n = N0 -> all1 n.
 Proof.
-  induction n; introv H.
-  - apply all1_1, IHn.
-    simpl in H. lia.
-  - simpl in H. lia.
+  induction n; introv H; simpl in H.
+  - apply all1_1, IHn. lia.
+  - lia.
   - apply all1_H.
 Qed.
 
-Lemma bn0_has0 : forall n, (b n > 0)%N -> has0 n.
+#[export] Hint Resolve b0_all1 : core.
+
+Lemma bgt0_has0 : forall n, (b n > 0)%N -> has0 n.
 Proof.
-  induction n; introv H; simpl; simpl in H.
+  induction n; introv H; simpl in *.
   - apply has0_1, IHn. lia.
   - apply has0_0.
-  - lia.
+  - inverts H.
 Qed.
+
+#[export] Hint Extern 1 (has0 _) => apply bgt0_has0; lia : core.
 
 Lemma b_succ : forall n, (b n > 0)%N -> b (Pos.succ n) = N.pred (b n).
 Proof. induction n; simpl; lia. Qed.
@@ -64,6 +67,8 @@ Corollary b_add_self : forall n,
 Proof.
   introv. rewrite b_add; lia.
 Qed.
+
+#[export] Hint Immediate b_add_self : core.
 
 Lemma b0_succ : forall n, b n = 0%N -> b (Pos.succ n) = (Npos n).
 Proof.

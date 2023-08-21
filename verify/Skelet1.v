@@ -1028,9 +1028,7 @@ Proof.
     simpl in H. eapply IH in H.
     simpl. follow rule_xn_right.
     rewrite <- repeat_add.
-    replace (Pos.to_nat xs' + N.to_nat xs)
-      with (N.to_nat (xs + N.pos xs')) by lia.
-    apply H. }
+    follow H. finish. }
 
   assert (case_D : forall t t' xs l,
     (forall t' xs l, stride xs 1 t = Some t' ->
@@ -1117,7 +1115,6 @@ Proof.
   follow rule_C_left.
   follow rule_xn_left.
   repeat simp.
-  replace (N.to_nat (xs - 1)) with u by lia.
   finish.
 Qed.
 
@@ -1288,6 +1285,8 @@ Ltac apply_simple :=
     end
   end.
 
+(** Avoid running [reflexivity] on [lift c = lift c'] directly, as that will
+    unfold all the compression. *)
 Ltac maybe_finish :=
   lazymatch goal with
   | |- lift ?c -->* lift ?c' =>
@@ -1311,33 +1310,36 @@ Proof.
   repeat (maybe_finish || apply_simple).
 Time Qed.
 
+Lemma lift_eq : forall d l l' r r',
+  lift_left l = lift_left l' ->
+  lift_right r = lift_right r' ->
+  lift (d, l, r) = lift (d, l', r').
+Proof.
+  introv H1 H2. unfold lift. rewrite H1, H2. reflexivity.
+Qed.
+
+Lemma lift_left_cons : forall a xs ys,
+  lift_left xs = lift_left ys ->
+  lift_left (a :: xs) = lift_left (a :: ys).
+Proof. introv H. simpl. rewrite H. reflexivity. Qed.
+
 Corollary uni_cycle' : forall l r r' xs,
   stride 0 uni_T r = Some r' ->
   lift (right, l_D :: l_C1 :: l_xs (xs :+ (uni_P + 1)) :: J ++ l, r) -->*
     lift (right, l_D :: l_C1 :: l_xs (xs :+ 1) :: J ++ Fls 1 l, Grs 1 r').
 Proof.
   introv H.
-  replace (lift (_, _, Grs 1 r'))
-    with (lift (right, l_D :: l_C1 :: l_xs (xs :+ 1) :: J ++ F ++ l, G ++ r')).
-  - apply uni_cycle, H.
-  - unfold lift.
-    replace (lift_right (G ++ r')) with (lift_right (Grs 1 r')).
-    + replace (lift_left (l_D :: l_C1 :: l_xs (xs :+ 1) :: J ++ F ++ l))
-      with (lift_left (l_D :: l_C1 :: l_xs (xs :+ 1) :: J ++ Fls 1 l)).
-      { reflexivity. }
-      unfold J. cbn[lift_left app].
-      replace (lift_left (F ++ l)) with (lift_left (Fls 1 l)).
-      { reflexivity. }
-      rewrite lift_Fls. simpl repeat.
-      reflexivity.
-    + rewrite lift_Grs. simpl repeat.
-      unfold G. cbn [lift_right app].
-      reflexivity.
+  follow uni_cycle.
+  finish.
+  apply lift_eq.
+  - repeat apply lift_left_cons.
+    rewrite lift_Fls. reflexivity.
+  - rewrite lift_Grs. reflexivity.
 Qed.
 
 Opaque J.
 
-Corollary uni_cycles : forall n l r r' xs,
+Corollary uni_cycles : forall n xs l r r',
   stride 0 (n * uni_T) r = Some r' ->
   lift (right, l_D :: l_C1 :: l_xs (xs :+ (n * uni_P + 1)) :: J ++ l, r) -->*
     lift (right, l_D :: l_C1 :: l_xs (xs :+ 1) :: J ++ Fls (N.pos n) l,
@@ -1351,16 +1353,13 @@ Proof.
     replace (Pos.succ n * uni_T)%positive
       with (n * uni_T + uni_T)%positive in H by lia.
     apply stride_add in H. destruct H as [t1 [H1 H2]].
-    follow IHn.
+    follow IHn. clear H1.
     replace ((xs + N.pos uni_P) :+ 1)
       with (xs :+ (uni_P + 1))
       by lia.
-    eapply stride_Grs in H2.
-    eapply uni_cycle' in H2.
-    follow H2.
+    follow uni_cycle'. { apply stride_Grs. eassumption. }
     unfold rxs. rewrite Grs_Grs.
     rewrite Fls_Fls.
-    replace (1 + N.pos n)%N with (N.pos (Pos.succ n)) by lia.
     finish.
 Qed.
 
@@ -1439,11 +1438,7 @@ Proof.
   assert (H: (N.pos n * N.pos uni_P < N.pos xs)%N).
   { rewrite <- Ecount. apply uni_cycle_count_spec. }
   pose (N.pred (N.pos xs - N.pos (n * uni_P))) as u.
-  replace (l_xs xs) with (l_xs (u :+ (n * uni_P + 1)))
-    by (f_equal; lia).
-  replace (xs - n * uni_P)%positive with (u :+ 1)
-    by lia.
-  apply uni_cycles, Estride.
+  follow (uni_cycles n u l r r'). finish.
 Qed.
 
 Definition fullstep (c : conf) : option conf :=
