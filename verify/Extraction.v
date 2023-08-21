@@ -4,7 +4,7 @@ From Coq Require Extraction.
 From Coq Require Import Lists.List. Import ListNotations.
 Require Import ExtrOcamlBasic.
 Require Import ExtrOcamlIntConv.
-From BusyCoq Require Export BackwardsReasoning.
+From BusyCoq Require Export Cyclers TranslatedCyclers BackwardsReasoning.
 
 Inductive state := A | B | C | D | E.
 Inductive sym := S0 | S1.
@@ -38,6 +38,7 @@ Module Ctx <: Ctx.
   Qed.
 End Ctx.
 
+Module EFlip := Flip Ctx.
 Module ECyclers := Cyclers Ctx.
 Module ETranslatedCyclers := TranslatedCyclers Ctx.
 Module EBackwardsReasoning := BackwardsReasoning Ctx.

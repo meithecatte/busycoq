@@ -6,11 +6,11 @@ From Coq Require Import Lia.
 From Coq Require Import Lists.List. Import ListNotations.
 From Coq Require Import Lists.Streams.
 From Coq Require Import Program.Tactics.
-From BusyCoq Require Export Cyclers.
+From BusyCoq Require Export Flip.
 Set Default Goal Selector "!".
 
 Module TranslatedCyclers (Ctx : Ctx).
-  Module Cyclers := Cyclers Ctx. Export Cyclers.
+  Module Flip := Flip Ctx. Export Flip.
 
 (** [EqTake] holds if the first [n] symbols on a particular side of the
     tape match. *)

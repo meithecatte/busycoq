@@ -5,11 +5,11 @@ From Coq Require Import Arith.Arith.
 From Coq Require Import Lia.
 From Coq Require Import Lists.Streams.
 From Coq Require Import Lists.List. Import ListNotations.
-From BusyCoq Require Export TranslatedCyclers.
+From BusyCoq Require Export Flip.
 Set Default Goal Selector "!".
 
 Module BackwardsReasoning (Ctx : Ctx).
-  Module TranslatedCyclers := TranslatedCyclers Ctx. Export TranslatedCyclers.
+  Module Flip := Flip Ctx. Export Flip.
 
 Definition all_qs := list_prod all_qs all_syms.
 

@@ -2,7 +2,7 @@
 
 From Coq Require Export Lists.Streams.
 From Coq Require Import Lia.
-From BusyCoq Require Export Extraction. Export ECyclers.
+From BusyCoq Require Export Extraction. Export EFlip.
 Set Default Goal Selector "!".
 
 Notation "0" := S0.
