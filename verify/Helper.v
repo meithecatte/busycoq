@@ -152,3 +152,24 @@ Proof. unfold pow2. lia. Qed.
 
 Ltac Zify.zify_pre_hook ::=
   unfold pow2 in *; simpl pow2' in *.
+
+Section StripPrefix.
+  Variable A : Type.
+  Variable eqb : forall (a b : A), {a = b} + {a <> b}.
+
+Program Fixpoint strip_prefix (xs ys : list A) : {zs | ys = xs ++ zs} + {True} :=
+  match xs, ys with
+  | [], ys => [|| ys ||]
+  | _, [] => !!
+  | x :: xs, y :: ys =>
+    if eqb x y then
+      match strip_prefix xs ys with
+      | [|| zs ||] => [|| zs ||]
+      | !! => !!
+      end
+    else
+      !!
+  end.
+End StripPrefix.
+
+Arguments strip_prefix {A} eqb !xs !ys.

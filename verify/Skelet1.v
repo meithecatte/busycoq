@@ -1363,22 +1363,6 @@ Proof.
     finish.
 Qed.
 
-Program Fixpoint strip_prefix (xs ys : ltape) : {zs | ys = xs ++ zs} + {True} :=
-  match xs, ys with
-  | [], ys => [|| ys ||]
-  | _, [] => !!
-  | x :: xs, y :: ys =>
-    if eqb_l x y then
-      match strip_prefix xs ys with
-      | [|| zs ||] => [|| zs ||]
-      | !! => !!
-      end
-    else
-      !!
-  end.
-
-Arguments strip_prefix !xs !ys.
-
 Definition uni_cycle_count (xs : positive) (r : rtape) : N :=
   let xs_limit := (N.pred (N.pos xs) / N.pos uni_P)%N in
   match xs_limit with
@@ -1404,7 +1388,7 @@ Qed.
 Definition try_uni_cycle (c : conf) : option conf :=
   match c with
   | (right, l_D :: l_C1 :: l_xs xs :: l, r) =>
-    match strip_prefix J l with
+    match strip_prefix eqb_l J l with
     | [|| l ||] =>
       match uni_cycle_count xs r with
       | N0 => None
@@ -1430,7 +1414,7 @@ Proof.
   destruct l as [| [] l]; try discriminate.
   destruct l as [| [] l]; try discriminate.
   destruct l as [| [] l]; try discriminate. rename n into xs.
-  destruct (strip_prefix J l) as [[l' El'] |]; try discriminate.
+  destruct (strip_prefix eqb_l J l) as [[l' El'] |]; try discriminate.
   subst l. rename l' into l.
   destruct (uni_cycle_count xs r) as [| n] eqn:Ecount; try discriminate.
   destruct (stride 0 (n * uni_T) r) as [r' |] eqn:Estride; inverts H.
