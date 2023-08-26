@@ -42,6 +42,28 @@ Proof.
   reflexivity.
 Qed.
 
+Lemma app_cons_r : forall {A} xs (x : A) ys,
+  xs ++ x :: ys = (xs ++ [x]) ++ ys.
+Proof.
+  induction xs.
+  - reflexivity.
+  - introv. simpl.
+    rewrite <- IHxs. reflexivity.
+Qed.
+
+Lemma skipn_add : forall {A} n m (xs : list A),
+  skipn (n + m) xs = skipn m (skipn n xs).
+Proof.
+  induction n.
+  - reflexivity.
+  - destruct xs.
+    + repeat rewrite skipn_nil. reflexivity.
+    + apply IHn.
+Qed.
+
+#[export] Hint Rewrite firstn_nil skipn_nil skipn_all firstn_all
+  firstn_app_2 : list.
+
 (** We define our own [reflect] in [Prop] instead of [Set],
     as we don't want it to occur in the extracted programs. *)
 
