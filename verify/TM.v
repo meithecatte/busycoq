@@ -59,7 +59,7 @@ Notation tape := (side * Sym * side)%type.
 (** We define a notation for tapes, evocative of a turing machine's head
     hovering over a particular symbol. **)
 Notation "l {{ s }} r" := (l, s, r)
-  (at level 30, only parsing).
+  (at level 30, s at next level, only parsing).
 
 (** Moreover the streams could use some more natural notation, to have
     the element at the start of the stream be on the right side, as necessary. *)
@@ -84,6 +84,10 @@ Definition move_right (t : tape) : tape :=
     of the head within the tape is implicit, since the tape is centered
     at the head. *)
 Notation "q ;; t" := (q, t) (at level 35, only parsing).
+
+(** For the directed head formulation, we use the following: *)
+Notation "l <{{ q }} r" := (q;; tl l {{hd l}} r)  (at level 30, q at next level).
+Notation "l {{ q }}> r" := (q;; l {{hd r}} tl r)  (at level 30, q at next level).
 
 (** The small-step semantics of Turing machines: *)
 Reserved Notation "c -[ tm ]-> c'" (at level 40).
@@ -277,6 +281,11 @@ Proof.
   - apply IHn in H2. destruct H2 as [cmid [H2 H3]].
     eauto.
 Qed.
+
+Lemma evstep_one : forall {tm c c'},
+  c -[ tm ]->  c' ->
+  c -[ tm ]->* c'.
+Proof. eauto. Qed.
 
 Lemma evstep_trans :
   forall tm c c' c'',

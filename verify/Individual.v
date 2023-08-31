@@ -87,6 +87,3 @@ Tactic Notation "follow" constr(H) := follow_hyp H.
 
 (** For trivial [-->*] goals, provable by stepping and applying assumptions. *)
 Ltac triv := intros; repeat (try solve [finish]; (step || follow)).
-
-Notation "l <{{ q }} r" := (q;; tl l {{hd l}} r)  (at level 30, q at next level).
-Notation "l {{ q }}> r" := (q;; l {{hd r}} tl r)  (at level 30, q at next level).

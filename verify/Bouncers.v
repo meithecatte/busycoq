@@ -7,11 +7,11 @@ From Coq Require Import Lists.List. Import ListNotations.
 From Coq Require Lists.Streams.
 From Coq Require Import Program.Tactics.
 From Coq Require Import Program.Wf.
-From BusyCoq Require Export Flip.
+From BusyCoq Require Export Subtape.
 Set Default Goal Selector "!".
 
-Module Cyclers (Ctx : Ctx).
-  Module Flip := Flip Ctx. Export Flip.
+Module Bouncers (Ctx : Ctx).
+  Module Subtape := Subtape Ctx. Export Subtape.
 
 Inductive segment :=
   | Repeat (xs : list Sym)
@@ -20,7 +20,7 @@ Inductive segment :=
 Reserved Notation "s ~ t" (at level 70).
 
 Inductive matches : list segment -> list Sym -> Prop :=
-  | match_nil : [] ~ []
+  | match_zeros n : [] ~ repeat s0 n
   | match_sym x s t : s ~ t -> Symbol x :: s ~ x :: t
   | match_skip xs s t : s ~ t -> Repeat xs :: s ~ t
   | match_repeat xs s t : Repeat xs :: s ~ t -> Repeat xs :: s ~ xs ++ t
@@ -28,6 +28,11 @@ Inductive matches : list segment -> list Sym -> Prop :=
   where "s ~ t" := (matches s t).
 
 Local Hint Constructors matches : core.
+
+Lemma match_nil : [] ~ [].
+Proof. exact (match_zeros 0). Qed.
+
+Local Hint Immediate match_nil : core.
 
 (** XXX: perhaps unnecessary *)
 Lemma match_repeatn : forall n xs s t,
@@ -52,6 +57,8 @@ Local Obligation Tactic := program_simplify; auto; simpl;
   autorewrite with list; intuition;
   try (lia || congruence).
 
+(** Check whether a symbolic tape [s] matches a concrete tape [t].
+    Assumes that [s] is aligned, which allows using a greedy algorithm. *)
 Program Fixpoint check_match (s : list segment) (t : list Sym)
     {measure (length s + length t)} : {s ~ t} + {True} :=
   match s, t with
@@ -70,6 +77,15 @@ Program Fixpoint check_match (s : list segment) (t : list Sym)
   | _, _ => No
   end.
 
+
+(** ** Splitting the initial concrete tape into a symbolic tape: *)
+Lemma match_map_app : forall xs s t,
+  s ~ t ->
+  map Symbol xs ++ s ~ xs ++ t.
+Proof. induction xs; simpl; auto. Qed.
+
+Local Hint Resolve match_map_app : core.
+
 Lemma match_map : forall t, map Symbol t ~ t.
 Proof. induction t; simpl; auto. Qed.
 
@@ -81,6 +97,26 @@ Proof.
   - auto.
   - destruct t; simpl; auto.
 Qed.
+
+Lemma match_map_destruct : forall xs s t,
+  map Symbol xs ++ s ~ t ->
+  exists t', t = xs ++ t' /\ s ~ t'.
+Proof.
+  induction xs; introv H; simpl in *.
+  - eauto.
+  - inverts H as H. apply IHxs in H. destruct H as [t' [E H]].
+    subst. eauto.
+Qed.
+
+Ltac match_map_destruct H :=
+  lazymatch type of H with
+  | map Symbol ?xs ++ ?s ~ ?t =>
+    let E := fresh in
+    let t' := fresh in
+    apply match_map_destruct in H;
+    destruct H as [t' [E H]];
+    subst t; rename t' into t
+  end.
 
 Lemma match_repeat_firstn : forall n s' t,
   s' ~ skipn n t ->
@@ -310,3 +346,227 @@ Proof.
   rewrite cyc_get_cycle.
   assumption.
 Qed.
+
+Obligation Tactic := program_simpl.
+
+(** We now have to relate the configuration expressed using symbolic tapes
+    to the concrete configurations the machine can be in. *)
+Notation stape := (dir * list segment * list segment)%type.
+
+Definition stape_matches (sc : stape) (c : dtape) : Prop :=
+  let '(d, l, r) := sc in
+  let '(d', l', r') := c in
+  d = d' /\ l ~ l' /\ r ~ r'.
+
+Notation "sc ~~ c" := (stape_matches sc c) (at level 70).
+
+Local Hint Unfold stape_matches : core.
+
+Definition simple_step (tm : TM) (q : Q) (s : Sym) (l r : list segment)
+    : option (Q * stape) :=
+  match tm (q, s) with
+  | Some (s', L, q') => Some (q', (L, l, Symbol s' :: r))
+  | Some (s', R, q') => Some (q', (R, Symbol s' :: l, r))
+  | None => None
+  end.
+
+Lemma match_s0 : forall s, s ~ [] -> s ~ [s0].
+Proof.
+  introv H.
+  remember [] as t eqn:Et.
+  induction H.
+  - (* match_zeros *)
+    inverts Et as E. rewrite E.
+    apply (match_zeros 1).
+  - (* match_sym *) inverts Et.
+  - (* match_skip *) auto.
+  - (* match_repeat *)
+    apply app_eq_nil in Et. destruct Et. subst.
+    auto.
+Qed.
+
+Local Hint Resolve match_s0 : core.
+
+Lemma simple_step_some : forall tm q s l r q' st' lt rt,
+  simple_step tm q s l r = Some (q', st') ->
+  l ~ lt ->
+  r ~ rt ->
+  exists t', st' ~~ t' /\
+    lift (q;; lt {{s}} rt) -[ tm ]->* lift (q';; undir t').
+Proof.
+  introv Hstep Hl Hr.
+  unfold simple_step in Hstep.
+  destruct (tm (q, s)) as [[[s' []] q0] |] eqn:Etm;
+    inverts Hstep; unfold "~~".
+  - (* L *)
+    destruct lt as [| ls lt]; eexists (_, _, _);
+      intuition eauto; exact (evstep_one (step_left Etm)).
+  - (* R *)
+    destruct rt as [| rs rt]; eexists (_, _, _);
+      intuition eauto; exact (evstep_one (step_right Etm)).
+Qed.
+
+Program Fixpoint grab_tail (s : list segment) (k : nat)
+    : { '(tail, rest) | map Symbol tail ++ rest = s } + {True} :=
+  match k with
+  | 0 => [|| ([], s) ||]
+  | S k =>
+    match s with
+    | Symbol x :: s =>
+      bind (tail', rest) <-- grab_tail s k;
+      [|| (x :: tail', rest) ||]
+    | _ => !!
+    end
+  end.
+
+(** To prove the shift rule lemma, we need to strengthen the hypothesis,
+    by allowing for some occurences of [s'] on the right-hand side. *)
+Lemma shiftrule_left' : forall tm q l s tail rest n s' t,
+  submultistep tm n (q, (L, s, tail)) = Some (q, (L, [], tail ++ s')) ->
+  (L, Repeat s :: l, map Symbol tail ++ Repeat s' :: rest) ~~ t ->
+  exists t', (L, l, map Symbol tail ++ Repeat s' :: rest) ~~ t' /\
+    lift (q;; undir t) -[ tm ]->* lift (q;; undir t').
+Proof.
+  introv Hstep Hmatch.
+  destruct t as [[d lt ] rt]. destruct Hmatch as [Hd [Hl Hr]]. subst d.
+  remember (Repeat s :: l) as l' eqn:El'.
+  generalize dependent rt.
+  induction Hl as [| | tail' l' lt Hl IH | tail' l' lt Hl IH];
+    inverts El'; introv Hr;
+    match_map_destruct Hr.
+  - (* match_skip *)
+    exists (L, lt, tail ++ rt).
+    auto 7.
+  - (* match_repeat *)
+    specialize (IH eq_refl (tail ++ s' ++ rt) ltac:(solve [auto])).
+    destruct IH as [t [Hmatch IH]]. exists t.
+    split; [exact Hmatch|].
+    eapply submultistep_some in Hstep. simpl sublift in Hstep.
+    eapply evstep_trans. { apply Hstep. }
+    rewrite <- app_assoc. apply IH.
+Qed.
+
+Lemma shiftrule_left : forall tm q l s tail rest n s' t,
+  submultistep tm n (q, (L, s, tail)) = Some (q, (L, [], tail ++ s')) ->
+  (L, Repeat s :: l, map Symbol tail ++ rest) ~~ t ->
+  exists t', (L, l, map Symbol tail ++ Repeat s' :: rest) ~~ t' /\
+    lift (q;; undir t) -[ tm ]->* lift (q;; undir t').
+Proof.
+  introv Hstep Hmatch.
+  destruct t as [[d lt] rt]. destruct Hmatch as [E [Hl Hr]]. subst d.
+  match_map_destruct Hr.
+  eapply shiftrule_left'; eauto 6.
+Qed.
+
+(** Try applying a shift rule that has a tail of length [k] and
+    takes [n] base steps to prove. *)
+Definition try_shift_rule (tm : TM) (q : Q) (s : list Sym) (l r : list segment)
+    (n k : nat) : option (list segment) :=
+  match grab_tail r k with
+  | [|| (tail, rest) ||] =>
+    match submultistep tm n (q, (L, s, tail)) with
+    | Some (q', (L, [], r')) =>
+      if eqb_q q q' then
+        match strip_prefix eqb_sym tail r' with
+        | [|| s' ||] => Some (map Symbol tail ++ Repeat s' :: rest)
+        | !! => None
+        end
+      else
+        None
+    | _ => None
+    end
+  | !! => None
+  end.
+
+Lemma try_shift_rule_some : forall tm q s l r r' n k t,
+  try_shift_rule tm q s l r n k = Some r' ->
+  (L, Repeat s :: l, r) ~~ t ->
+  exists t', (L, l, r') ~~ t' /\
+    lift (q;; undir t) -[ tm ]->* lift (q;; undir t').
+Proof.
+  introv H Hmatch. unfold try_shift_rule in H.
+  destruct (grab_tail r k) as [[[tail rest] Hgrab] |]; try discriminate.
+  simpl in Hgrab. subst r.
+
+  destruct (submultistep tm n (q, (L, s, tail)))
+    as [[q'' [[[] []] r'']] |] eqn:Hstep; try discriminate.
+  destruct (eqb_q q q'') as [E |]; try discriminate. subst q''.
+  destruct (strip_prefix eqb_sym tail r'') as [[s' E] |]; try discriminate.
+  subst r''. inverts H.
+
+  eapply shiftrule_left; eassumption.
+Qed.
+
+Definition step (tm : TM) (q : Q) (st : stape) (shifts : list (nat * nat))
+    : option (Q * stape) * list (nat * nat) :=
+  match st with
+  | (L, Repeat s :: l, r) =>
+    match shifts with
+    | (n, k) :: shifts =>
+      match try_shift_rule tm q s l r n k with
+      | Some r => (Some (q, (L, l, r)), shifts)
+      | None => (None, shifts)
+      end
+    | [] => (None, [])
+    end
+  | (L, Symbol s :: l, r) => (simple_step tm q s l r, shifts)
+  | (L, [], r) => (simple_step tm q s0 [] r, shifts)
+  | (R, l, Repeat s :: r) =>
+    match shifts with
+    | (n, k) :: shifts =>
+      match try_shift_rule (flip tm) q s r l n k with
+      | Some l => (Some (q, (R, l, r)), shifts)
+      | None => (None, shifts)
+      end
+    | [] => (None, [])
+    end
+  | (R, l, Symbol s :: r) => (simple_step tm q s l r, shifts)
+  | (R, l, []) => (simple_step tm q s0 l [], shifts)
+  end.
+
+Lemma undir_left_s0 : forall n r,
+  undir (L, repeat s0 n, r) = (repeat s0 (pred n), s0, r).
+Proof. introv. destruct n; reflexivity. Qed.
+
+Lemma undir_right_s0 : forall n l,
+  undir (R, l, repeat s0 n) = (l, s0, repeat s0 (pred n)).
+Proof. introv. destruct n; reflexivity. Qed.
+
+Lemma step_some : forall tm q q' st st' shifts shifts' t,
+  step tm q st shifts = (Some (q', st'), shifts') ->
+  st ~~ t ->
+  exists t', st' ~~ t' /\
+    lift (q;; undir t) -[ tm ]->* lift (q';; undir t').
+Proof.
+  introv H Hmatch.
+  destruct st as [[[] l] r]; simpl in H.
+  - (* L *)
+    destruct l as [| [s | s] l].
+    + (* [] *)
+      destruct t as [[d lt] rt]; destruct Hmatch as [E [Hl Hr]]; subst d.
+      inverts H as H. inverts Hl.
+      rewrite undir_left_s0.
+      eapply simple_step_some in H; eauto.
+    + (* Repeat s *)
+      destruct shifts as [| [n k] shifts]; try discriminate.
+      destruct (try_shift_rule tm q s l r n k) as [r' |] eqn:E; inverts H.
+      eapply try_shift_rule_some in E; try eassumption.
+    + (* Symbol s *)
+      destruct t as [[d lt] rt]; destruct Hmatch as [E [Hl Hr]]; subst d.
+      inverts H as H. inverts Hl as Hl.
+      eapply simple_step_some in H; eauto.
+  - (* R *)
+    destruct r as [| [s | s] r].
+    + (* [] *)
+      destruct t as [[d lt] rt]; destruct Hmatch as [E [Hl Hr]]; subst d.
+      inverts H as H. inverts Hr.
+      rewrite undir_right_s0.
+      eapply simple_step_some in H; eauto.
+    + (* Repeat s *)
+      destruct shifts as [| [n k] shifts]; try discriminate.
+      admit.
+    + (* Symbol s *)
+      destruct t as [[d lt] rt]; destruct Hmatch as [E [Hl Hr]]; subst d.
+      inverts H as H. inverts Hr as Hr.
+      eapply simple_step_some in H; eauto.
+Admitted.
