@@ -24,4 +24,21 @@ Definition undir (d : dtape) : ctape :=
     end
   end.
 
+Lemma flip_undir : forall q d l r,
+  flip_conf (lift (q, undir (d, l, r))) = lift (q, undir (flip_dir d, r, l)).
+Proof.
+  introv.
+  destruct d.
+  - destruct l; reflexivity.
+  - destruct r; reflexivity.
+Qed.
+
+Lemma undir_left_s0 : forall n r,
+  undir (L, repeat s0 n, r) = (repeat s0 (pred n), s0, r).
+Proof. introv. destruct n; reflexivity. Qed.
+
+Lemma undir_right_s0 : forall n l,
+  undir (R, l, repeat s0 n) = (l, s0, repeat s0 (pred n)).
+Proof. introv. destruct n; reflexivity. Qed.
+
 End Directed.

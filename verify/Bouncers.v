@@ -524,14 +524,6 @@ Definition step (tm : TM) (q : Q) (st : stape) (shifts : list (nat * nat))
   | (R, l, []) => (simple_step tm q s0 l [], shifts)
   end.
 
-Lemma undir_left_s0 : forall n r,
-  undir (L, repeat s0 n, r) = (repeat s0 (pred n), s0, r).
-Proof. introv. destruct n; reflexivity. Qed.
-
-Lemma undir_right_s0 : forall n l,
-  undir (R, l, repeat s0 n) = (l, s0, repeat s0 (pred n)).
-Proof. introv. destruct n; reflexivity. Qed.
-
 Lemma step_some : forall tm q q' st st' shifts shifts' t,
   step tm q st shifts = (Some (q', st'), shifts') ->
   st ~~ t ->
@@ -550,23 +542,58 @@ Proof.
     + (* Repeat s *)
       destruct shifts as [| [n k] shifts]; try discriminate.
       destruct (try_shift_rule tm q s l r n k) as [r' |] eqn:E; inverts H.
-      eapply try_shift_rule_some in E; try eassumption.
+      eapply try_shift_rule_some in E; eassumption.
     + (* Symbol s *)
       destruct t as [[d lt] rt]; destruct Hmatch as [E [Hl Hr]]; subst d.
       inverts H as H. inverts Hl as Hl.
       eapply simple_step_some in H; eauto.
   - (* R *)
-    destruct r as [| [s | s] r].
+    destruct r as [| [s | s] r]; destruct t as [[d lt] rt].
     + (* [] *)
-      destruct t as [[d lt] rt]; destruct Hmatch as [E [Hl Hr]]; subst d.
+      destruct Hmatch as [E [Hl Hr]]; subst d.
       inverts H as H. inverts Hr.
       rewrite undir_right_s0.
       eapply simple_step_some in H; eauto.
     + (* Repeat s *)
       destruct shifts as [| [n k] shifts]; try discriminate.
-      admit.
+      destruct (try_shift_rule (flip tm) q s r l n k) eqn:E; inverts H.
+      destruct Hmatch as [Hmatch [Hl Hr]]. subst d.
+      eapply try_shift_rule_some with (t := (L, rt, lt)) in E; auto.
+      destruct E as [[[d rt'] lt'] [[Ed [Hr' Hl']] Hrun]]. subst d.
+      apply unflip_evstep in Hrun.
+      repeat rewrite flip_undir in Hrun. simpl flip_dir in Hrun.
+      exists (R, lt', rt'). auto.
     + (* Symbol s *)
-      destruct t as [[d lt] rt]; destruct Hmatch as [E [Hl Hr]]; subst d.
+      destruct Hmatch as [E [Hl Hr]]; subst d.
       inverts H as H. inverts Hr as Hr.
       eapply simple_step_some in H; eauto.
-Admitted.
+Qed.
+
+Fixpoint steps (tm : TM) (n : nat) (q : Q) (t : stape)
+    (shifts : list (nat * nat)) : option (Q * stape) :=
+  match n with
+  | 0 => Some (q, t)
+  | S n =>
+    match step tm q t shifts with
+    | (Some (q, t), shifts) => steps tm n q t shifts
+    | (None, _) => None
+    end
+  end.
+
+Lemma steps_some : forall tm n q q' st st' t shifts,
+  steps tm n q st shifts = Some (q', st') ->
+  st ~~ t ->
+  exists t', st' ~~ t' /\
+    lift (q;; undir t) -[ tm ]->* lift (q';; undir t').
+Proof.
+  induction n; introv E Hmatch.
+  - inverts E. eauto.
+  - simpl in E.
+    destruct (step tm q st shifts) as [[[qq tt] |] shifts'] eqn:E1;
+      try discriminate.
+    eapply step_some in E1; try eassumption.
+    destruct E1 as [t' [Htt Hstep]].
+    eapply IHn in E; try eassumption.
+    destruct E as [t'' [Hst' Hsteps]].
+    eauto using evstep_trans.
+Qed.
