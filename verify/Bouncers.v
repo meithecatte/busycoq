@@ -347,6 +347,8 @@ Proof.
   assumption.
 Qed.
 
+Local Hint Resolve align_correct : core.
+
 Obligation Tactic := program_simpl.
 
 (** We now have to relate the configuration expressed using symbolic tapes
@@ -468,7 +470,7 @@ Definition try_shift_rule (tm : TM) (q : Q) (s : list Sym) (l r : list segment)
     | Some (q', (L, [], r')) =>
       if eqb_q q q' then
         match strip_prefix eqb_sym tail r' with
-        | [|| s' ||] => Some (map Symbol tail ++ Repeat s' :: rest)
+        | [|| s' ||] => Some (map Symbol tail ++ align s' rest)
         | !! => None
         end
       else
@@ -494,7 +496,10 @@ Proof.
   destruct (strip_prefix eqb_sym tail r'') as [[s' E] |]; try discriminate.
   subst r''. inverts H.
 
-  eapply shiftrule_left; eassumption.
+  eapply shiftrule_left in Hstep; try eassumption.
+  destruct Hstep as [[[d l'] r'] [[E [Hl Hr]] Hrun]]. subst d.
+  match_map_destruct Hr.
+  exists (L, l', tail ++ r'). eauto 7.
 Qed.
 
 Definition step (tm : TM) (q : Q) (st : stape) (shifts : list (nat * nat))
