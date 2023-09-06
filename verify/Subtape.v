@@ -103,8 +103,8 @@ Fixpoint submultistep (tm : TM) (n : nat) (c : subconf) : option subconf :=
 
 Lemma submultistep_some : forall tm n q q' t t' ll rr,
   submultistep tm n (q, t) = Some (q', t') ->
-  lift (q;; undir (sublift t ll rr)) -[ tm ]->*
-    lift (q';; undir (sublift t' ll rr)).
+  lift (q;; undir (sublift t ll rr)) -[ tm ]->>
+    n / lift (q';; undir (sublift t' ll rr)).
 Proof.
   induction n; introv H.
   - inverts H. auto.

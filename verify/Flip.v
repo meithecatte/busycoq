@@ -87,6 +87,19 @@ Proof.
   rewrite flip_involutive in H. exact H.
 Qed.
 
+Lemma flip_progress : forall tm c c',
+  c -[ tm ]->+ c' ->
+  flip_conf c -[ flip tm ]->+ flip_conf c'.
+Proof. introv H. induction H; eauto. Qed.
+
+Lemma unflip_progress : forall tm c c',
+  c -[ flip tm ]->+ c' ->
+  flip_conf c -[ tm ]->+ flip_conf c'.
+Proof.
+  introv H. apply flip_progress in H.
+  rewrite flip_involutive in H. exact H.
+Qed.
+
 Lemma flip_halting : forall tm c,
   halting tm c -> halting (flip tm) (flip_conf c).
 Proof.

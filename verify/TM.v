@@ -172,6 +172,9 @@ Inductive progress (tm : TM) : Q * tape -> Q * tape -> Prop :=
 
   where "c -[ tm ]->+ c'" := (progress tm c c').
 
+Arguments progress_base {tm c c'}.
+Arguments progress_step {tm c c' c''}.
+
 #[export] Hint Constructors progress : core.
 
 (** A halting configuration is one for which [tm (q, s)] returns [None]. *)
