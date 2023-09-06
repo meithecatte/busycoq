@@ -34,50 +34,6 @@ Proof. exact (match_zeros 0). Qed.
 
 Local Hint Immediate match_nil : core.
 
-(** XXX: perhaps unnecessary *)
-Lemma match_repeatn : forall n xs s t,
-  s ~ t -> Repeat xs :: s ~ concat (repeat xs n) ++ t.
-Proof.
-  induction n; introv H.
-  - auto.
-  - simpl. rewrite <- app_assoc. auto.
-Qed.
-
-Lemma length_gt0_if_not_nil : forall A (xs : list A),
-  [] <> xs -> length xs <> 0.
-Proof. introv H Hlen. apply length_zero_iff_nil in Hlen. auto. Qed.
-
-Local Ltac Zify.zify_pre_hook ::=
-  try lazymatch goal with
-  | H: [] <> _ |- _ => apply length_gt0_if_not_nil in H
-  | H: [] = _ -> False |- _ => apply length_gt0_if_not_nil in H
-  end.
-
-Local Obligation Tactic := program_simplify; auto; simpl;
-  autorewrite with list; intuition;
-  try (lia || congruence).
-
-(** Check whether a symbolic tape [s] matches a concrete tape [t].
-    Assumes that [s] is aligned, which allows using a greedy algorithm. *)
-Program Fixpoint check_match (s : list segment) (t : list Sym)
-    {measure (length s + length t)} : {s ~ t} + {True} :=
-  match s, t with
-  | Symbol x :: s', x' :: t' =>
-    eqb_sym x x' && Reduce (check_match s' t')
-  | Repeat xs :: s', t =>
-    match xs with
-    | [] => Reduce (check_match s' t)
-    | _ =>
-      match (strip_prefix eqb_sym xs t) with
-      | [|| t' ||] => Reduce (check_match (Repeat xs :: s') t')
-      | !! => Reduce (check_match s' t)
-      end
-    end
-  | [], [] => Yes
-  | _, _ => No
-  end.
-
-
 (** ** Splitting the initial concrete tape into a symbolic tape: *)
 Lemma match_map_app : forall xs s t,
   s ~ t ->
@@ -108,7 +64,7 @@ Proof.
     subst. eauto.
 Qed.
 
-Ltac match_map_destruct H :=
+Local Ltac match_map_destruct H :=
   lazymatch type of H with
   | map Symbol ?xs ++ ?s ~ ?t =>
     let E := fresh in
@@ -117,6 +73,11 @@ Ltac match_map_destruct H :=
     destruct H as [t' [E H]];
     subst t; rename t' into t
   end.
+
+Local Hint Extern 1 =>
+  lazymatch goal with
+  | H: map Symbol _ ++ _ ~ _ |- _ => match_map_destruct H
+  end : core.
 
 Lemma match_repeat_firstn : forall n s' t,
   s' ~ skipn n t ->
@@ -441,8 +402,7 @@ Proof.
     auto 7.
   - (* match_repeat *)
     specialize (IH eq_refl (tail ++ s' ++ rt) ltac:(solve [auto])).
-    destruct IH as [t [Hmatch IH]]. exists t.
-    split; [exact Hmatch|].
+    destruct IH as [t [Hmatch IH]]. exists t. intuition.
     eapply submultistep_some in Hstep. simpl sublift in Hstep.
     eapply evstep_trans. { apply Hstep. }
     rewrite <- app_assoc. apply IH.
@@ -602,3 +562,75 @@ Proof.
     destruct E as [t'' [Hst' Hsteps]].
     eauto using evstep_trans.
 Qed.
+
+Program Fixpoint strip_sym_prefix (s : list Sym) (u : list segment)
+    : {u' | u = map Symbol s ++ u'} + {True} :=
+  match s with
+  | [] => [|| u ||]
+  | x :: s =>
+    match u with
+    | Symbol x' :: u =>
+      if eqb_sym x x' then
+        bind u' <-- strip_sym_prefix s u;
+        [|| u' ||]
+      else
+        !!
+    | _ => !!
+    end
+  end.
+
+Lemma transfer_repeat : forall s t u xs,
+  (forall xs', t ~ xs' -> u ~ xs') ->
+  Repeat s :: t ~ xs ->
+  Repeat s :: u ~ xs.
+Proof.
+  introv Htu Hr.
+  remember (Repeat s :: t) as t' eqn:Et'.
+  induction Hr; inverts Et'; auto.
+Qed.
+
+Lemma transfer_symbol : forall x t u xs,
+  (forall xs', t ~ xs' -> u ~ xs') ->
+  Symbol x :: t ~ xs ->
+  Symbol x :: u ~ xs.
+Proof.
+  introv Htu Hx. inverts Hx. auto.
+Qed.
+
+Local Hint Immediate transfer_repeat transfer_symbol : core.
+
+Lemma length_gt0_if_not_nil : forall A (xs : list A),
+  [] <> xs -> length xs <> 0.
+Proof. introv H Hlen. apply length_zero_iff_nil in Hlen. auto. Qed.
+
+Local Ltac Zify.zify_pre_hook ::=
+  try lazymatch goal with
+  | H: [] <> _ |- _ => apply length_gt0_if_not_nil in H
+  | H: [] = _ -> False |- _ => apply length_gt0_if_not_nil in H
+  end.
+
+Local Obligation Tactic := program_simplify; eauto; simpl;
+  autorewrite with list; intuition;
+  try (congruence || lia).
+
+(** Check whether [t] is a special case of [u]. Assumes that both tapes
+    are aligned, which allows using a greedy algorithm. *)
+Program Fixpoint subsumes (t : list segment) (u : list segment)
+    {measure (length t + length u)} : {forall xs, t ~ xs -> u ~ xs} + {True} :=
+  match t, u with
+  | [], [] => Yes
+  | [], Repeat s :: u => Reduce (subsumes [] u)
+  | [], Symbol x :: u => No
+  | Repeat s :: t, Repeat s' :: u =>
+    list_eq_dec eqb_sym s s' && Reduce (subsumes t u)
+  | _, Repeat s :: u =>
+    match s with
+    | [] => Reduce (subsumes t u)
+    | _ =>
+      bind t' <- strip_sym_prefix s t;
+      Reduce (subsumes t' (Repeat s :: u))
+    end
+  | Symbol x :: t, Symbol x' :: u =>
+    eqb_sym x x' && Reduce (subsumes t u)
+  | _, _ => No
+  end.
