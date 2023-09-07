@@ -172,8 +172,17 @@ Proof. introv. unfold pow2. simpl. lia. Qed.
 Lemma pow2_gt0 : forall k, (pow2 k > 0)%N.
 Proof. unfold pow2. lia. Qed.
 
+Lemma length_gt0_if_not_nil : forall A (xs : list A),
+  [] <> xs -> length xs <> 0.
+Proof. introv H Hlen. apply length_zero_iff_nil in Hlen. auto. Qed.
+
 Ltac Zify.zify_pre_hook ::=
-  unfold pow2 in *; simpl pow2' in *.
+  unfold pow2 in *; simpl pow2' in *;
+  lazymatch goal with
+  | H: [] <> _ |- _ => apply length_gt0_if_not_nil in H
+  | H: [] = _ -> False |- _ => apply length_gt0_if_not_nil in H
+  | _ => idtac
+  end.
 
 Section StripPrefix.
   Variable A : Type.

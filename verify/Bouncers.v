@@ -625,17 +625,6 @@ Qed.
 
 Local Hint Immediate transfer_repeat transfer_symbol : core.
 
-Lemma length_gt0_if_not_nil : forall A (xs : list A),
-  [] <> xs -> length xs <> 0.
-Proof. introv H Hlen. apply length_zero_iff_nil in Hlen. auto. Qed.
-
-Local Ltac Zify.zify_pre_hook ::=
-  lazymatch goal with
-  | H: [] <> _ |- _ => apply length_gt0_if_not_nil in H
-  | H: [] = _ -> False |- _ => apply length_gt0_if_not_nil in H
-  | _ => idtac
-  end.
-
 Local Obligation Tactic := program_simplify; eauto; simpl;
   autorewrite with list; intuition; (lia || congruence).
 
