@@ -134,8 +134,20 @@ Proof.
   auto.
 Qed.
 
+Lemma repeat_empty : forall s t,
+  s ~ t -> Repeat [] :: s ~ t.
+Proof. apply (match_repeat 0 []). Qed.
+
 Local Hint Resolve match_map match_map_firstn match_repeat_firstn
-  match_repeat_more : core.
+  match_repeat_more repeat_empty : core.
+
+Lemma repeat_empty_destruct : forall s t,
+  Repeat [] :: s ~ t -> s ~ t.
+Proof.
+  introv H. inverts H. rewrite repeated_nil. auto.
+Qed.
+
+Local Hint Immediate repeat_empty_destruct : core.
 
 Program Fixpoint split_tape (xs : list (nat * nat)) (t : list Sym)
     : {s | s ~ t} :=
@@ -306,20 +318,6 @@ Fixpoint align' (cyc : Cycle) (s : list segment) :=
       Repeat (cyc_get cyc) :: s
   | _ => Repeat (cyc_get cyc) :: s
   end.
-
-Lemma repeat_empty : forall s t,
-  s ~ t -> Repeat [] :: s ~ t.
-Proof. apply (match_repeat 0 []). Qed.
-
-Local Hint Resolve repeat_empty : core.
-
-Lemma repeat_empty_destruct : forall s t,
-  Repeat [] :: s ~ t -> s ~ t.
-Proof.
-  introv H. inverts H. rewrite repeated_nil. auto.
-Qed.
-
-Local Hint Immediate repeat_empty_destruct : core.
 
 Lemma repeat_cyc_next : forall cyc s t,
   Repeat (cyc_get cyc) :: Symbol (cyc_hd cyc) :: s ~ t ->
@@ -639,8 +637,7 @@ Local Ltac Zify.zify_pre_hook ::=
   end.
 
 Local Obligation Tactic := program_simplify; eauto; simpl;
-  autorewrite with list; intuition;
-  try congruence.
+  autorewrite with list; intuition; (lia || congruence).
 
 (** Check whether [t] is a special case of [u]. Assumes that both tapes
     are aligned, which allows using a greedy algorithm. *)
