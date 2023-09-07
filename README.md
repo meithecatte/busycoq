@@ -68,6 +68,15 @@ Backwards Reasoning:
    2035576 Decided
     979028 OutOfSpace
     559598 OutOfTime
+Bouncers:
+   1406024 Decided
+     23438 OutOfSpace
+    109164 OutOfTime
+         0 Halted
+
+real	12m12.126s
+user	143m12.813s
+sys	0m8.300s
 ```
 
 With high limits for the Translated Cyclers decider:
