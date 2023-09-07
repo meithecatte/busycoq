@@ -4,7 +4,7 @@ From Coq Require Extraction.
 From Coq Require Import Lists.List. Import ListNotations.
 Require Import ExtrOcamlBasic.
 Require Import ExtrOcamlIntConv.
-From BusyCoq Require Export Cyclers TranslatedCyclers BackwardsReasoning.
+From BusyCoq Require Export Cyclers TranslatedCyclers BackwardsReasoning Bouncers.
 
 Inductive state := A | B | C | D | E.
 Inductive sym := S0 | S1.
@@ -42,9 +42,11 @@ Module EFlip := Flip Ctx.
 Module ECyclers := Cyclers Ctx.
 Module ETranslatedCyclers := TranslatedCyclers Ctx.
 Module EBackwardsReasoning := BackwardsReasoning Ctx.
+Module EBouncers := Bouncers Ctx.
 
 Extraction Language OCaml.
 Extraction "extraction.ml" nat_of_int
   ECyclers.verify_cycler
   ETranslatedCyclers.verify_tcycler
-  EBackwardsReasoning.verify_backwards.
+  EBackwardsReasoning.verify_backwards
+  EBouncers.verify_bouncer.

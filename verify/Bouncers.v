@@ -632,14 +632,15 @@ Lemma length_gt0_if_not_nil : forall A (xs : list A),
 Proof. introv H Hlen. apply length_zero_iff_nil in Hlen. auto. Qed.
 
 Local Ltac Zify.zify_pre_hook ::=
-  try lazymatch goal with
+  lazymatch goal with
   | H: [] <> _ |- _ => apply length_gt0_if_not_nil in H
   | H: [] = _ -> False |- _ => apply length_gt0_if_not_nil in H
+  | _ => idtac
   end.
 
 Local Obligation Tactic := program_simplify; eauto; simpl;
   autorewrite with list; intuition;
-  try (congruence || lia).
+  try congruence.
 
 (** Check whether [t] is a special case of [u]. Assumes that both tapes
     are aligned, which allows using a greedy algorithm. *)
@@ -726,3 +727,5 @@ Proof.
   introv H.
   destruct d; apply verify_bouncer_l_correct in H; auto.
 Qed.
+
+End Bouncers.
