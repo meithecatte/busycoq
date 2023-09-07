@@ -248,3 +248,24 @@ impl FromStr for TM {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn bb5_record() {
+        // NOTE: instead of the 1RZ transition, which counts as a step, we use ---,
+        // which doesn't count as a step. Thus the machine takes one step less than
+        // if we count using the usual convention.
+        let tm: TM = "1RB1LC_1RC1RB_1RD0LE_1LA1LD_---0LA".parse().unwrap();
+        let mut tape = [false; 32768];
+        let mut conf = Configuration::new(&mut tape);
+
+        for _ in 0..47_176_869 {
+            assert_eq!(conf.step(&tm), Ok(true));
+        }
+
+        assert_eq!(conf.step(&tm), Ok(false));
+    }
+}
