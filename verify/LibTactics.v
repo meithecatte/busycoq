@@ -3704,7 +3704,7 @@ Ltac auto_tilde := auto_tilde_default.
 
 Ltac auto_star_default := try solve [ auto | eauto | intuition eauto ].
   (* --todo: should be jauto *)
-Ltac auto_star := try solve [ jauto ]. (* SPECIAL VERSION FOR SF *)
+Ltac auto_star := auto_star_default.
 
 (** [autos~] is a notation for tactic [auto_tilde]. It may be followed
     by lemmas (or proofs terms) which auto will be able to use
@@ -4848,36 +4848,8 @@ Tactic Notation "clears_last" constr(N) :=
 (* ================================================================= *)
 (** ** Skipping Subgoals *)
 
-(** SF DOES NOT NEED an alternative implementation of the [skip] tactic. *)
-
-(** The [skip] tactic can be used at any time to admit the current
-    goal. Unlike [admit], it does not require ending the proof with
-    [Admitted] instead of [Qed]. It thus saves the pain of renaming [Qed]
-    into [Admitted] and vice-versa all the time.
-
-    The implementation of [skip] relies on an axiom [False].
-    To obtain a safe development, it suffices to replace [False] with [True]
-    in the statement of that axiom.
-
-    Note that it is still necessary to instantiate all the existential
-    variables introduced by other tactics in order for [Qed] to be accepted.
-*)
-
-(** To obtain a safe development, change to [skip_axiom : True] *)
-Axiom skip_axiom : True.
-
-Ltac skip_with_axiom :=
-  exfalso; apply skip_axiom.
-
-Tactic Notation "skip" :=
-  skip_with_axiom.
-
-(** To use traditional [admit] instead of [skip] in the tactics defined below,
-    uncomment the following definition, to bind [skip] to [admit]. *)
-(*
 Tactic Notation "skip" :=
   admit.
-*)
 
 (** [demo] is like [admit] but it documents the fact that admit is intended *)
 
