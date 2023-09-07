@@ -3,6 +3,8 @@ open Extraction
 type command = ((sym * dir) * state) option
 type tm = state * sym -> command
 
+let nats_of_ints (a, b) = (nat_of_int a, nat_of_int b)
+
 let verify_cycler tm n =
     let n = nat_of_int n in
     ECyclers.verify_cycler tm n n
@@ -17,12 +19,27 @@ let verify_backwards tm n =
     let n = nat_of_int n in
     EBackwardsReasoning.verify_backwards tm n
 
+let verify_bouncer tm dir n0 n1 split shifts =
+    let n0 = nat_of_int n0
+    and n1 = nat_of_int n1
+    and split = List.map nats_of_ints split
+    and shifts = List.map nats_of_ints shifts in
+    EBouncers.verify_bouncer tm dir n0 n1 split shifts
+
 let seed_file = open_in_bin "../seed.dat"
 let cert_file = open_in_bin "../certs.dat"
 let index_file = open_out_bin "../decided.dat"
 
 let read_u8 (ch: in_channel): int =
     Char.code (input_char ch)
+
+let read_u16 (ch: in_channel): int =
+    let buf = Bytes.create 2 in
+    really_input ch buf 0 2;
+    let b i = Char.code (Bytes.get buf i) in
+    let x0 = Int.shift_left (b 0) 8
+    and x1 = Int.shift_left (b 1) 0 in
+    Int.logor x0 x1
 
 let read_u32 (ch: in_channel): int =
     let buf = Bytes.create 4 in
@@ -40,6 +57,16 @@ let write_u32 (ch: out_channel) (v: int) =
     output_char ch (b 16);
     output_char ch (b 8);
     output_char ch (b 0)
+
+let read_tuple (f: in_channel -> 'a) (g: in_channel -> 'b)
+        (ch: in_channel): 'a * 'b =
+    let a = f ch
+    and b = g ch in
+    (a, b)
+
+let read_list (f: in_channel -> 'a) (ch: in_channel): 'a list =
+    let count = read_u32 ch in
+    List.init count (fun _ -> f ch)
 
 let parse_symbol (c: char): sym =
     match Char.code c with
@@ -95,19 +122,33 @@ type cert =
     | CertCyclers of int
     | CertTCyclers of dir * int * int * int
     | CertBackwards of int
+    | CertBouncers of dir * int * int * (int * int) list * (int * int) list
+
+let show_dir: dir -> string = function
+    | L -> "L"
+    | R -> "R"
 
 exception BadCert of int * cert
+
+let rec show_list (f: 'a -> string) (xs: 'a list) : string =
+    match xs with
+    | [] -> ""
+    | [x] -> f x
+    | x :: xs -> f x ^ "; " ^ show_list f xs
 
 let show_cert (cert: cert): string =
     match cert with
     | CertCyclers n ->
         Printf.sprintf "CertCyclers %d" n
-    | CertTCyclers (L, n0, n1, k) ->
-        Printf.sprintf "CertTCyclers (L, %d, %d, %d)" n0 n1 k
-    | CertTCyclers (R, n0, n1, k) ->
-        Printf.sprintf "CertTCyclers (R, %d, %d, %d)" n0 n1 k
+    | CertTCyclers (d, n0, n1, k) ->
+        Printf.sprintf "CertTCyclers (%s, %d, %d, %d)" (show_dir d) n0 n1 k
     | CertBackwards n ->
         Printf.sprintf "CertBackwards %d" n
+    | CertBouncers (d, n0, n1, split, shifts) ->
+        let show_pair (a, b) = Printf.sprintf "(%d, %d)" a b in
+        Printf.sprintf "CertBouncers (%s, %d, %d, [%s], [%s])"
+            (show_dir d) n0 n1 (show_list show_pair split)
+            (show_list show_pair shifts)
 
 let show_exn (e: exn): string option =
     match e with
@@ -128,6 +169,13 @@ let read_cert (): int * cert =
         and k = read_u32 cert_file in
         CertTCyclers (dir, n0, n1, k)
     | 2 -> CertBackwards (read_u32 cert_file)
+    | 3 ->
+        let dir = parse_dir (input_char cert_file)
+        and n0 = read_u32 cert_file
+        and n1 = read_u32 cert_file
+        and split = read_list (read_tuple read_u16 read_u16) cert_file
+        and shifts = read_list (read_tuple read_u16 read_u32) cert_file in
+        CertBouncers (dir, n0, n1, split, shifts)
     | _ -> failwith "unknown certificate type"
     in (index, cert)
 
@@ -137,6 +185,8 @@ let verify_cert (index: int) (cert: cert): unit =
     | CertCyclers n -> verify_cycler tm n
     | CertTCyclers (dir, n0, n1, k) -> verify_tcycler tm dir n0 n1 k
     | CertBackwards n -> verify_backwards tm n
+    | CertBouncers (dir, n0, n1, split, shifts) ->
+        verify_bouncer tm dir n0 n1 split shifts
     in
     if ok then
         write_u32 index_file index

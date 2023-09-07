@@ -17,6 +17,7 @@ is split into two parts:
  - Cyclers
  - Translated Cyclers
  - Backwards Reasoning
+ - Bouncers
 
 ## Individual machines
 
@@ -36,7 +37,8 @@ Make sure you have Rust, Coq and OCaml installed. Then,
 
 ```bash
 cd decide
-cargo run --release
+cargo build --release
+time target/release/beaver decide ../seed.dat ../certs.dat
 cd ../verify
 make
 ./verify

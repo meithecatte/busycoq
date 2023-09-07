@@ -448,7 +448,7 @@ Qed.
 (** Try applying a shift rule that has a tail of length [k] and
     takes [n] base steps to prove. *)
 Definition try_shift_rule (tm : TM) (q : Q) (s : list Sym) (l r : list segment)
-    (n k : nat) : option (list segment) :=
+    (k n : nat) : option (list segment) :=
   match grab_tail r k with
   | [|| (tail, rest) ||] =>
     match submultistep tm n (q, (L, s, tail)) with
@@ -469,8 +469,8 @@ Definition try_shift_rule (tm : TM) (q : Q) (s : list Sym) (l r : list segment)
   | !! => None
   end.
 
-Lemma try_shift_rule_some : forall tm q s l r r' n k t,
-  try_shift_rule tm q s l r n k = Some r' ->
+Lemma try_shift_rule_some : forall tm q s l r r' k n t,
+  try_shift_rule tm q s l r k n = Some r' ->
   (L, Repeat s :: l, r) ~~ t ->
   exists t', (L, l, r') ~~ t' /\
     lift (q;; undir t) -[ tm ]->+ lift (q;; undir t').
@@ -496,8 +496,8 @@ Definition step (tm : TM) (q : Q) (st : stape) (shifts : list (nat * nat))
   match st with
   | (L, Repeat s :: l, r) =>
     match shifts with
-    | (n, k) :: shifts =>
-      match try_shift_rule tm q s l r n k with
+    | (k, n) :: shifts =>
+      match try_shift_rule tm q s l r k n with
       | Some r => (Some (q, (L, l, r)), shifts)
       | None => (None, shifts)
       end
@@ -507,8 +507,8 @@ Definition step (tm : TM) (q : Q) (st : stape) (shifts : list (nat * nat))
   | (L, [], r) => (simple_step tm q s0 [] r, shifts)
   | (R, l, Repeat s :: r) =>
     match shifts with
-    | (n, k) :: shifts =>
-      match try_shift_rule (flip tm) q s r l n k with
+    | (k, n) :: shifts =>
+      match try_shift_rule (flip tm) q s r l k n with
       | Some l => (Some (q, (R, l, r)), shifts)
       | None => (None, shifts)
       end
@@ -533,8 +533,8 @@ Proof.
       inverts H as H. inverts Hl.
       eapply simple_step_some in H; eauto.
     + (* Repeat s *)
-      destruct shifts as [| [n k] shifts]; try discriminate.
-      destruct (try_shift_rule tm q s l r n k) as [r' |] eqn:E; inverts H.
+      destruct shifts as [| [k n] shifts]; try discriminate.
+      destruct (try_shift_rule tm q s l r k n) as [r' |] eqn:E; inverts H.
       eapply try_shift_rule_some in E; eassumption.
     + (* Symbol s *)
       destruct t as [[d lt] rt]; destruct Hmatch as [E [Hl Hr]]; subst d.
@@ -547,8 +547,8 @@ Proof.
       inverts H as H. inverts Hr.
       eapply simple_step_some in H; eauto.
     + (* Repeat s *)
-      destruct shifts as [| [n k] shifts]; try discriminate.
-      destruct (try_shift_rule (flip tm) q s r l n k) eqn:E; inverts H.
+      destruct shifts as [| [k n] shifts]; try discriminate.
+      destruct (try_shift_rule (flip tm) q s r l k n) eqn:E; inverts H.
       destruct Hmatch as [Hmatch [Hl Hr]]. subst d.
       eapply try_shift_rule_some with (t := (L, rt, lt)) in E; auto.
       destruct E as [[[d rt'] lt'] [[Ed [Hr' Hl']] Hrun]]. subst d.

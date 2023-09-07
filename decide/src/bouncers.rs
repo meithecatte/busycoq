@@ -16,16 +16,16 @@ const TIME_LIMIT: u32 = 250000;
 #[binrw]
 #[derive(Clone, Debug)]
 pub struct Cert {
-    /// Steps taken before reaching `C(1)`
-    run_steps: u32,
     /// Direction in which the head is pointing at `C(n)`
     dir: Dir,
+    /// Steps taken before reaching `C(1)`
+    run_steps: u32,
     /// Number of macro-steps taken to complete the cycle
     cycle_steps: u32,
 
     #[br(temp)]
     #[bw(calc = tape_split.len().try_into().unwrap())]
-    tape_split_len: u16,
+    tape_split_len: u32,
     /// Tuples of `(wall length, repeater length)`.
     /// Remainder gets turned into a wall.
     #[br(count = tape_split_len)]
@@ -33,7 +33,7 @@ pub struct Cert {
 
     #[br(temp)]
     #[bw(calc = shift_rules.len().try_into().unwrap())]
-    shift_rules_len: u16,
+    shift_rules_len: u32,
     /// List of shift rules applied during the cycle, in order.
     #[br(count = shift_rules_len)]
     shift_rules: Vec<ShiftRule>,
@@ -76,11 +76,16 @@ pub fn decide_bouncer(tm: &TM) -> Result<Cert, FailReason> {
                         tm.is_on_edge(dir) &&
                         tm.is_special_case_of(initial.iter().copied())
                     {
+                        let tape_split = match dir {
+                            Dir::L => describe_split(initial.iter().copied()),
+                            Dir::R => describe_split(initial.iter().rev().copied()),
+                        };
+
                         return Some(Cert {
                             run_steps: progression[1].steps_taken,
                             dir,
                             cycle_steps,
-                            tape_split: describe_split(initial.iter().copied()),
+                            tape_split,
                             shift_rules: tm.shift_rules,
                         });
                     }
