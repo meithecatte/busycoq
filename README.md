@@ -41,7 +41,7 @@ cargo build --release
 time target/release/beaver decide ../seed.dat ../certs.dat
 cd ../verify
 make
-./verify
+time ./verify ../seed.dat ../certs.dat ../decided.dat
 ```
 
 A binary file listing the database indices of all successfully decided machines
@@ -79,7 +79,8 @@ user	143m12.813s
 sys	0m8.300s
 ```
 
-With high limits for the Translated Cyclers decider:
+Here are some results from an earlier run with higher limits (50M steps,
+64k tape cells) on the Translated Cyclers decider:
 
 ```
 chikara:~/dev/busycoq/decide$ \time target/release/decide

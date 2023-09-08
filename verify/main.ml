@@ -26,9 +26,16 @@ let verify_bouncer tm dir n0 n1 split shifts =
     and shifts = List.map nats_of_ints shifts in
     EBouncers.verify_bouncer tm dir n0 n1 split shifts
 
-let seed_file = open_in_bin "../seed.dat"
-let cert_file = open_in_bin "../certs.dat"
-let index_file = open_out_bin "../decided.dat"
+let _ =
+    if Array.length Sys.argv != 4 then begin
+        Printf.printf "Usage: %s <seed db> <certs file> <index file output>\n"
+            Sys.argv.(0);
+        exit 64
+    end
+
+let seed_file = open_in_bin Sys.argv.(1)
+let cert_file = open_in_bin Sys.argv.(2)
+let index_file = open_out_bin Sys.argv.(3)
 
 let read_u8 (ch: in_channel): int =
     Char.code (input_char ch)
