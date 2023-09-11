@@ -201,7 +201,7 @@ impl Decide {
         let backwards = DeciderStats::<BackwardsReasoning>::new(self.no_backwards);
         let bouncers = DeciderStats::<Bouncers>::new(self.no_bouncers);
 
-        thread::scope(|s| {
+        let undecided = thread::scope(|s| {
             let progress_thread = s.spawn(|| {
                 let style = ProgressStyle::with_template(
                     "[{elapsed_precise}] {bar:30.cyan} {pos:>8}/{len:8} {msg} ETA {eta}"
@@ -231,19 +231,24 @@ impl Decide {
                 (tm.index, cert)
             }).collect::<Vec<_>>();
 
+            let mut undecided = 0;
             for (index, cert) in certs {
                 if let Some(cert) = cert {
                     certfile.write_entry(index, &cert).unwrap();
+                } else {
+                    undecided += 1;
                 }
             }
 
             progress_thread.thread().unpark();
+            undecided
         });
 
         cyclers.print_stats();
         tcyclers.print_stats();
         backwards.print_stats();
         bouncers.print_stats();
+        println!("\n  {undecided:8} Undecided");
     }
 }
 
