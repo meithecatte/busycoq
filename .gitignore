@@ -17,6 +17,7 @@ Makefile.coq.conf
 *.cmo
 **/target
 *.dat
+*.zst
 *.log
 verify/verify
 verify/skelet1
