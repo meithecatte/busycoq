@@ -1,5 +1,5 @@
 use crate::{Certificate, Decider};
-use crate::turing::{Command, Configuration, Dir, TM, OutOfSpace};
+use crate::turing::{Command, Configuration, Dir, Sym, State, TM, OutOfSpace};
 use crate::memo::Memo;
 use enum_map::Enum;
 use itertools::Itertools;
@@ -47,7 +47,7 @@ struct ShiftRule {
 }
 
 pub fn decide_bouncer(tm: &TM) -> Result<Cert, FailReason> {
-    let mut buf = [false; SPACE_LIMIT];
+    let mut buf = [Sym::S0; SPACE_LIMIT];
     let mut detector = RecordDetect::new(Configuration::new(&mut buf));
 
     let mut records = vec![];
@@ -207,7 +207,7 @@ struct SymbolicTM<'a> {
     tm: &'a TM,
     bump: &'a Bump,
     tape: VecDeque<Segment<'a>>,
-    state: u8,
+    state: State,
     dir: Dir,
     pos: usize,
     /// Number of base steps taken
@@ -220,7 +220,7 @@ impl<'bump> SymbolicTM<'bump> {
     fn with<U>(
         tm: &TM,
         tape: &[Segment<'_>],
-        state: u8,
+        state: State,
         dir: Dir,
         f: impl for<'a> FnOnce(SymbolicTM<'a>) -> U,
     ) -> U {
@@ -337,7 +337,7 @@ impl<'bump> SymbolicTM<'bump> {
         match self.dir {
             Dir::L => {
                 if self.pos == 0 {
-                    self.tape.push_front(Segment::Sym(false));
+                    self.tape.push_front(Segment::Sym(Sym::S0));
                     self.pos = 1;
                 }
 
@@ -345,7 +345,7 @@ impl<'bump> SymbolicTM<'bump> {
             }
             Dir::R => {
                 if self.pos == self.tape.len() {
-                    self.tape.push_back(Segment::Sym(false));
+                    self.tape.push_back(Segment::Sym(Sym::S0));
                 }
 
                 self.tape[self.pos]
@@ -386,13 +386,13 @@ impl<'bump> SymbolicTM<'bump> {
         Ok(())
     }
 
-    fn step(&mut self, shift_buf: &mut Vec<bool>) -> Result<(), ()> {
+    fn step(&mut self, shift_buf: &mut Vec<Sym>) -> Result<(), ()> {
         let seg = self.head_segment();
 
         match seg {
             Segment::Sym(sym) => {
                 self.take_step()?;
-                match self.tm.code[self.state as usize][sym as usize] {
+                match self.tm.code[self.state][sym] {
                     Command::Halt => return Err(()),
                     Command::Step { write, dir, next } => {
                         self.write_head(Segment::Sym(write));
@@ -508,7 +508,7 @@ impl<'bump> SymbolicTM<'bump> {
         &mut self,
         l: usize,
         r: usize,
-        buf: &'buf mut Vec<bool>,
+        buf: &'buf mut Vec<Sym>,
     ) -> Configuration<'buf> {
         buf.clear();
         assert!((l..=r).contains(&self.pos));
@@ -616,22 +616,18 @@ fn find_progressions(records: &[Record]) -> impl Iterator<Item=[&Record; 3]> {
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 enum Segment<'a> {
-    Repeat(&'a [bool]),
-    Sym(bool),
+    Repeat(&'a [Sym]),
+    Sym(Sym),
 }
 
 impl fmt::Display for Segment<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
-            Segment::Sym(false) => f.write_str("0"),
-            Segment::Sym(true) => f.write_str("1"),
+            Segment::Sym(sym) => write!(f, "{sym}"),
             Segment::Repeat(seg) => {
                 f.write_str("(")?;
-                for s in seg {
-                    match s {
-                        false => f.write_str("0")?,
-                        true => f.write_str("1")?,
-                    }
+                for sym in seg {
+                    write!(f, "{sym}")?;
                 }
                 f.write_str(")")
             }
@@ -772,8 +768,8 @@ struct RecordDetect<'a> {
 struct Record {
     dir: Dir,
     steps_taken: u32,
-    state: u8,
-    tape: Vec<bool>,
+    state: State,
+    tape: Vec<Sym>,
 }
 
 impl<'a> RecordDetect<'a> {

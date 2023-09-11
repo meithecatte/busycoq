@@ -1,5 +1,5 @@
 use crate::{Certificate, Decider, running_min, running_max};
-use crate::turing::{Configuration, Dir, Limit, OutOfSpace, TM};
+use crate::turing::{Configuration, Dir, Limit, OutOfSpace, Sym, TM};
 use enum_map::Enum;
 use binrw::binrw;
 
@@ -145,9 +145,9 @@ fn decide_tcyclers(tm: &TM) -> Result<Cert, FailReason> {
         return Err(FailReason::NotApplicable);
     }
 
-    let mut tortoise = [false; SPACE_LIMIT];
+    let mut tortoise = [Sym::S0; SPACE_LIMIT];
     let mut tortoise = RecordDetect::new(Configuration::new(&mut tortoise));
-    let mut hare = [false; SPACE_LIMIT];
+    let mut hare = [Sym::S0; SPACE_LIMIT];
     let mut hare = RecordDetect::new(Configuration::new(&mut hare));
 
     // Records the range of cells that were visited between two consecutive

@@ -1,5 +1,5 @@
 use crate::{Certificate, Decider};
-use crate::turing::{Command, Dir, TM};
+use crate::turing::{Command, Dir, Sym, State, TM};
 use crate::undo::UndoArray;
 use enum_map::Enum;
 use std::cell::Cell;
@@ -10,7 +10,7 @@ use binrw::binrw;
 const EXPLORE_LIMIT: u32 = 100;
 const SPACE_LIMIT: usize = 64;
 
-type Tape = UndoArray<bool, SPACE_LIMIT>;
+type Tape = UndoArray<Sym, SPACE_LIMIT>;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[binrw]
@@ -44,7 +44,7 @@ impl Backwards<'_> {
         l: usize,
         r: usize,
         pos: usize,
-        state: u8,
+        state: State,
     ) -> Result<u32, FailReason> {
         self.configs_visited.set(self.configs_visited.get() + 1);
 
@@ -54,8 +54,8 @@ impl Backwards<'_> {
 
         let mut max_depth = 0;
 
-        for (prev_state, cmds) in self.tm.code.iter().enumerate() {
-            for (prev_symbol, &cmd) in cmds.iter().enumerate() {
+        for (prev_state, cmds) in self.tm.code.iter() {
+            for (prev_symbol, &cmd) in cmds.iter() {
                 let Command::Step { write, next, dir } = cmd else { continue };
 
                 if next != state { continue }
@@ -90,8 +90,8 @@ impl Backwards<'_> {
                 let l = l.min(pos);
                 let r = r.max(pos);
 
-                let depth = tape.with(pos, prev_symbol != 0, |tape| {
-                    self.visit(tape, l, r, pos, prev_state as u8)
+                let depth = tape.with(pos, prev_symbol, |tape| {
+                    self.visit(tape, l, r, pos, prev_state)
                 })?;
 
                 max_depth = max_depth.max(depth);
@@ -108,16 +108,16 @@ fn decide_backwards(tm: &TM) -> Result<Cert, FailReason> {
         configs_visited: Cell::new(0),
     };
 
-    let mut tape = UndoArray::new([false; SPACE_LIMIT]);
+    let mut tape = UndoArray::new([Sym::S0; SPACE_LIMIT]);
     let pos = SPACE_LIMIT / 2;
     let mut max_depth = 0;
 
-    for (state, cmds) in tm.code.iter().enumerate() {
-        for (symbol, &cmd) in cmds.iter().enumerate() {
+    for (state, cmds) in tm.code.iter() {
+        for (symbol, &cmd) in cmds.iter() {
             if cmd != Command::Halt { continue }
 
-            let depth = tape.with(pos, symbol != 0, |tape| {
-                backwards.visit(tape, pos, pos, pos, state as u8)
+            let depth = tape.with(pos, symbol, |tape| {
+                backwards.visit(tape, pos, pos, pos, state)
             })?;
 
             max_depth = max_depth.max(depth);
