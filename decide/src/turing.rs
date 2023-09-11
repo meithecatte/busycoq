@@ -20,6 +20,8 @@ pub enum Sym {
     S1,
 }
 
+pub const NUM_STATES: u8 = 5;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Enum)]
 pub enum State {
     A,

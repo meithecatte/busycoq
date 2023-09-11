@@ -18,6 +18,7 @@ pub enum Certificate {
     #[brw(magic = 1u8)] TCyclers(tcyclers::Cert),
     #[brw(magic = 2u8)] Backwards(backwards::Cert),
     #[brw(magic = 3u8)] Bouncers(bouncers::Cert),
+    #[brw(magic = 254u8)] ClosedSubset,
 }
 
 pub struct CertList {
