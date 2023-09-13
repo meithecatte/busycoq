@@ -2,6 +2,7 @@ mod api;
 mod certificate;
 mod database;
 mod decider;
+mod enumerate;
 mod index;
 mod memo;
 mod turing;
@@ -96,6 +97,7 @@ struct TopLevel {
 #[argh(subcommand)]
 enum SubCommand {
     Decide(Decide),
+    Enumerate(enumerate::Enumerate),
     Merge(index::Merge),
     Diff(index::Diff),
     Query(api::Query),
@@ -147,6 +149,7 @@ fn main() {
     let args: TopLevel = argh::from_env();
     match args.cmd {
         SubCommand::Decide(decide) => decide.run(),
+        SubCommand::Enumerate(enumerate) => enumerate.run(),
         SubCommand::Merge(merge) => merge.run(),
         SubCommand::Diff(diff) => diff.run(),
         SubCommand::Query(query) => query.run(),
