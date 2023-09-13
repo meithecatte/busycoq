@@ -3,24 +3,25 @@ use std::fmt;
 use std::str::FromStr;
 use binrw::binrw;
 use enum_map::{Enum, EnumMap};
+use strum::EnumIter;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct OutOfSpace;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, EnumIter)]
 #[binrw]
 pub enum Dir {
     #[brw(magic = 1u8)] L,
     #[brw(magic = 0u8)] R,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Enum)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Enum, EnumIter)]
 pub enum Sym {
     S0,
     S1,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Enum)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Enum, EnumIter)]
 pub enum State {
     A,
     B,
@@ -29,7 +30,7 @@ pub enum State {
     E,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Enum)]
 pub enum Limit {
     Time,
     Space,
