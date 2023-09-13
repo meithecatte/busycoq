@@ -576,7 +576,7 @@ fn find_progressions(records: &[Record]) -> impl Iterator<Item=[&Record; 3]> {
         (0..k).flat_map(move |mut i| {
             // Enumerate progressions starting at i mod k
             iter::from_fn(move || {
-                if i >= records.len() {
+                if i + 3 * k >= records.len() {
                     return None;
                 }
 
@@ -593,7 +593,10 @@ fn find_progressions(records: &[Record]) -> impl Iterator<Item=[&Record; 3]> {
                     .map(|(a, b)| b - a)
                     .tuple_windows()
                     .map(|(a, b)| b - a);
-                let diff = diffs.next()?;
+                let Some(diff) = diffs.next() else {
+                    i += k;
+                    return Some(None);
+                };
                 let length = diffs.take_while(|&d| d == diff).count();
                 // The index that would be included if we wanted to extend
                 // the progression.

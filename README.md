@@ -69,14 +69,16 @@ Backwards Reasoning:
     979028 OutOfSpace
     559598 OutOfTime
 Bouncers:
-   1406024 Decided
-     23438 OutOfSpace
-    109164 OutOfTime
+   1406032 Decided
+     23433 OutOfSpace
+    109161 OutOfTime
          0 Halted
 
-real	12m12.126s
-user	143m12.813s
-sys	0m8.300s
+    132594 Undecided
+
+real    34m38.321s
+user    391m10.605s
+sys     0m8.354s
 ```
 
 Here are some results from an earlier run with higher limits (50M steps,
