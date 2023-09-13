@@ -1,23 +1,17 @@
 mod api;
-mod backwards;
-mod bouncers;
 mod certificate;
-mod cyclers;
 mod database;
+mod decider;
 mod index;
 mod memo;
-mod tcyclers;
 mod turing;
 mod undo;
 
-use backwards::BackwardsReasoning;
-use bouncers::Bouncers;
 use certificate::{Certificate, CertList};
-use cyclers::Cyclers;
 use database::Database;
 use index::IndexReader;
-use tcyclers::TCyclers;
 use turing::TM;
+use decider::*;
 
 use argh::FromArgs;
 use bitvec::bitvec;
