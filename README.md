@@ -36,7 +36,7 @@ Place the [seed database][seed] at `seed.dat` in the root of the repository.
 Make sure you have Rust, Coq and OCaml installed. Then,
 
 ```bash
-cd decide
+cd beaver
 cargo build --release
 time target/release/beaver decide ../seed.dat ../certs.dat
 cd ../verify
@@ -83,7 +83,7 @@ Here are some results from an earlier run with higher limits (50M steps,
 64k tape cells) on the Translated Cyclers decider:
 
 ```
-chikara:~/dev/busycoq/decide$ \time target/release/decide
+chikara:~/dev/busycoq/beaver$ \time target/release/beaver decide
 Cyclers:
   11229238 Decided
          0 OutOfSpace
