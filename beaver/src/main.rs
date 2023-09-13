@@ -8,9 +8,8 @@ mod turing;
 mod undo;
 
 use certificate::{Certificate, CertList};
-use database::Database;
+use database::{Database, DatabaseEntry};
 use index::IndexReader;
-use turing::TM;
 use decider::*;
 
 use argh::FromArgs;
@@ -29,7 +28,7 @@ trait Decider {
     type Error: Clone + Copy + fmt::Debug + EnumArray<AtomicU32>;
     const NAME: &'static str;
 
-    fn decide(tm: &TM) -> Result<Certificate, Self::Error>;
+    fn decide(tm: &DatabaseEntry) -> Result<Certificate, Self::Error>;
 }
 
 struct DeciderStats<D: Decider> {
@@ -58,7 +57,7 @@ impl<D: Decider> DeciderStats<D> {
         }
     }
 
-    fn decide(&self, tm: &TM) -> Option<Certificate> {
+    fn decide(&self, tm: &DatabaseEntry) -> Option<Certificate> {
         if self.skip {
             return None;
         }

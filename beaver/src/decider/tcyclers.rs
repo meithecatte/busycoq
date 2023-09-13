@@ -1,4 +1,5 @@
 use crate::{Certificate, Decider, running_min, running_max};
+use crate::database::DatabaseEntry;
 use crate::turing::{Configuration, Dir, Limit, OutOfSpace, Sym, TM};
 use enum_map::Enum;
 use binrw::binrw;
@@ -141,10 +142,6 @@ fn compare_segment(
 }
 
 fn decide_tcyclers(tm: &TM) -> Result<Cert, FailReason> {
-    if tm.limit == Limit::Time {
-        return Err(FailReason::NotApplicable);
-    }
-
     let mut tortoise = [Sym::S0; SPACE_LIMIT];
     let mut tortoise = RecordDetect::new(Configuration::new(&mut tortoise));
     let mut hare = [Sym::S0; SPACE_LIMIT];
@@ -182,7 +179,11 @@ impl Decider for TCyclers {
     type Error = FailReason;
     const NAME: &'static str = "Translated Cyclers";
 
-    fn decide(tm: &TM) -> Result<Certificate, FailReason> {
-        decide_tcyclers(tm).map(From::from)
+    fn decide(tm: &DatabaseEntry) -> Result<Certificate, FailReason> {
+        if tm.limit == Limit::Time {
+            return Err(FailReason::NotApplicable);
+        }
+
+        decide_tcyclers(&tm.tm).map(From::from)
     }
 }

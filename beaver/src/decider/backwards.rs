@@ -1,4 +1,5 @@
 use crate::{Certificate, Decider};
+use crate::database::DatabaseEntry;
 use crate::turing::{Command, Dir, Sym, State, TM};
 use crate::undo::UndoArray;
 use enum_map::Enum;
@@ -133,7 +134,7 @@ impl Decider for BackwardsReasoning {
     type Error = FailReason;
     const NAME: &'static str = "Backwards Reasoning";
 
-    fn decide(tm: &TM) -> Result<Certificate, FailReason> {
-        decide_backwards(tm).map(From::from)
+    fn decide(tm: &DatabaseEntry) -> Result<Certificate, FailReason> {
+        decide_backwards(&tm.tm).map(From::from)
     }
 }

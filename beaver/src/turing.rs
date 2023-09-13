@@ -47,11 +47,6 @@ pub enum Command {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct TM {
-    /// Records the index of this Turing machine in the database.
-    pub index: u32,
-    /// Records which limit the machine triggered during the initial
-    /// evaluation.
-    pub limit: Limit,
     pub code: EnumMap<State, EnumMap<Sym, Command>>,
 }
 
@@ -63,10 +58,8 @@ pub struct Configuration<'a> {
 }
 
 impl TM {
-    pub fn from_bytes(index: u32, limit: Limit, data: &[u8; 30]) -> TM {
+    pub fn from_bytes(data: &[u8; 30]) -> TM {
         TM {
-            index,
-            limit,
             code: EnumMap::from_array(array::from_fn(|st| {
                 EnumMap::from_array(array::from_fn(|read| {
                     let offset = 6 * st + 3 * read;
@@ -258,7 +251,7 @@ impl fmt::Display for Command {
 
 impl fmt::Display for TM {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "#{} {}", self.index, self.compact())
+        write!(f, "{}", self.compact())
     }
 }
 
@@ -298,11 +291,7 @@ impl FromStr for TM {
             }).collect::<Vec<_>>().try_into().unwrap())
         }).collect::<Vec<_>>().try_into().unwrap());
 
-        Ok(TM { 
-            index: 0,
-            limit: Limit::Time,
-            code,
-        })
+        Ok(TM { code })
     }
 }
 

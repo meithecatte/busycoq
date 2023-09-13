@@ -1,4 +1,5 @@
 use crate::{Certificate, Decider};
+use crate::database::DatabaseEntry;
 use crate::turing::{Configuration, Sym, Limit, TM, OutOfSpace};
 use enum_map::Enum;
 use binrw::binrw;
@@ -29,17 +30,6 @@ fn check(s: Result<bool, OutOfSpace>) -> Result<(), FailReason> {
 }
 
 fn decide_cyclers(tm: &TM) -> Result<Cert, FailReason> {
-    // If the Turing machine ran out of the 12k cell space limit,
-    // then it must've done that before the first repeated configuration.
-    // Thus, we would need to run the machine for at least 12k steps, and
-    // we use a much lower count for that.
-    //
-    // Not to mention, we don't allocate 12k cells of space, so we would run
-    // out of that too.
-    if tm.limit == Limit::Space {
-        return Err(FailReason::NotApplicable);
-    }
-
     let mut tortoise = [Sym::S0; SPACE_LIMIT];
     let mut tortoise = Configuration::new(&mut tortoise);
 
@@ -65,7 +55,18 @@ impl Decider for Cyclers {
     type Error = FailReason;
     const NAME: &'static str = "Cyclers";
 
-    fn decide(tm: &TM) -> Result<Certificate, FailReason> {
-        decide_cyclers(tm).map(From::from)
+    fn decide(tm: &DatabaseEntry) -> Result<Certificate, FailReason> {
+        // If the Turing machine ran out of the 12k cell space limit,
+        // then it must've done that before the first repeated configuration.
+        // Thus, we would need to run the machine for at least 12k steps, and
+        // we use a much lower count for that.
+        //
+        // Not to mention, we don't allocate 12k cells of space, so we would run
+        // out of that too.
+        if tm.limit == Limit::Space {
+            return Err(FailReason::NotApplicable);
+        }
+
+        decide_cyclers(&tm.tm).map(From::from)
     }
 }

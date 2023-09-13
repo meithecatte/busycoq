@@ -17,6 +17,16 @@ pub struct Database {
     mmap: Mmap,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct DatabaseEntry {
+    /// Records the index of this Turing machine in the database.
+    pub index: u32,
+    /// Records which limit the machine triggered during the initial
+    /// evaluation.
+    pub limit: Limit,
+    pub tm: TM,
+}
+
 impl Database {
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
         let file = File::open(path)?;
@@ -43,7 +53,7 @@ impl Database {
         })
     }
 
-    pub fn get(&self, index: u32) -> TM {
+    pub fn get(&self, index: u32) -> DatabaseEntry {
         let limit = if index < self.num_timelimit {
             Limit::Time
         } else {
@@ -52,6 +62,10 @@ impl Database {
 
         let offset = HEADER_LEN + TM_SIZE * index as usize;
         let data = self.mmap[offset..offset+30].try_into().unwrap();
-        TM::from_bytes(index, limit, data)
+        DatabaseEntry {
+            index,
+            limit,
+            tm: TM::from_bytes(data),
+        }
     }
 }

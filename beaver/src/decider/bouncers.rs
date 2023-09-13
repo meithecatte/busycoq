@@ -1,4 +1,5 @@
 use crate::{Certificate, Decider};
+use crate::database::DatabaseEntry;
 use crate::turing::{Command, Configuration, Dir, Sym, State, TM, OutOfSpace};
 use crate::memo::Memo;
 use enum_map::Enum;
@@ -825,8 +826,8 @@ impl Decider for Bouncers {
     type Error = FailReason;
     const NAME: &'static str = "Bouncers";
 
-    fn decide(tm: &TM) -> Result<Certificate, FailReason> {
-        decide_bouncer(tm).map(From::from)
+    fn decide(tm: &DatabaseEntry) -> Result<Certificate, FailReason> {
+        decide_bouncer(&tm.tm).map(From::from)
     }
 }
 
