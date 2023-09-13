@@ -574,6 +574,7 @@ impl fmt::Display for SymbolicTM<'_> {
 fn find_progressions(records: &[Record]) -> impl Iterator<Item=[&Record; 3]> {
     (1..=records.len() / 3).flat_map(move |k| {
         (0..k).flat_map(move |mut i| {
+            // Enumerate progressions starting at i mod k
             iter::from_fn(move || {
                 if i >= records.len() {
                     return None;
@@ -610,7 +611,7 @@ fn find_progressions(records: &[Record]) -> impl Iterator<Item=[&Record; 3]> {
                 // maximum two different quadratic progressions can overlap by.
                 i += k * (length + 1);
                 Some(progression)
-            }).filter_map(|x| x)
+            }).flatten()
         })
     })
 }
