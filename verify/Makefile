@@ -1,7 +1,8 @@
 COQMFFLAGS := -Q . BusyCoq
 
-ALLVFILES := LibTactics.v Helper.v TM.v Compute.v Flip.v Directed.v Subtape.v Cyclers.v TranslatedCyclers.v BackwardsReasoning.v Bouncers.v Extraction.v \
-		Individual.v FixedBin.v ShiftOverflow.v Skelet34.v Skelet35.v Skelet1.v
+ALLVFILES := LibTactics.v Helper.v TM.v Compute.v Flip.v Directed.v Subtape.v Cyclers.v TranslatedCyclers.v BackwardsReasoning.v Bouncers.v Individual.v \
+	BB52.v Individual52.v FixedBin.v ShiftOverflow.v Skelet34.v Skelet35.v Skelet1.v Extraction.v \
+	BB33.v Individual33.v
 
 all: check verify skelet1
 

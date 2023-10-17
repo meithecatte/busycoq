@@ -3,6 +3,7 @@
 (** Following https://www.sligocki.com/2023/03/13/skelet-1-infinite.html *)
 
 Set Warnings "-abstract-large-number".
+From BusyCoq Require Import Individual52. Import Individual52.
 From Coq Require Import PeanoNat.
 From Coq Require Import List. Import ListNotations.
 From Coq Require Import Lia.
@@ -10,7 +11,6 @@ From Coq Require Import PArith.BinPos PArith.Pnat.
 From Coq Require Import NArith.BinNat NArith.Nnat.
 From Coq Require Import Program.Tactics.
 From Coq Require Import ZifyBool.
-From BusyCoq Require Import Individual.
 Set Default Goal Selector "!".
 
 Definition tm : TM := fun '(q, s) =>
@@ -21,32 +21,6 @@ Definition tm : TM := fun '(q, s) =>
   | D, 0 => Some (0, R, E)  | D, 1 => Some (0, L, B)
   | E, 0 => None            | E, 1 => Some (1, R, C)
   end.
-
-Fixpoint repeat {A} (n : nat) (f : A -> A) (a : A) : A :=
-  match n with
-  | O => a
-  | S n => f (repeat n f a)
-  end.
-
-Lemma repeat_shift : forall A n f (a : A),
-  f (repeat n f a) = repeat n f (f a).
-Proof.
-  induction n; introv.
-  - reflexivity.
-  - simpl. rewrite IHn. reflexivity.
-Qed.
-
-Lemma repeat_S : forall {A} n f (a : A),
-  repeat (S n) f a = f (repeat n f a).
-Proof. reflexivity. Qed.
-
-Lemma repeat_add : forall A n m f (a : A),
-  repeat (n + m) f a = repeat n f (repeat m f a).
-Proof.
-  introv. induction n.
-  - reflexivity.
-  - simpl. rewrite IHn. reflexivity.
-Qed.
 
 Notation "c --> c'" := (c -[ tm ]-> c')   (at level 40).
 Notation "c -->* c'" := (c -[ tm ]->* c') (at level 40).

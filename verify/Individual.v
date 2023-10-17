@@ -2,11 +2,40 @@
 
 From Coq Require Export Lists.Streams.
 From Coq Require Import Lia.
-From BusyCoq Require Export Extraction. Export EFlip.
+From BusyCoq Require Export Flip.
 Set Default Goal Selector "!".
 
-Notation "0" := S0.
-Notation "1" := S1.
+Fixpoint repeat {A} (n : nat) (f : A -> A) (a : A) : A :=
+  match n with
+  | O => a
+  | S n => f (repeat n f a)
+  end.
+
+Lemma repeat_shift : forall {A} f n (a : A),
+  f (repeat n f a) = repeat n f (f a).
+Proof.
+  induction n; introv.
+  - reflexivity.
+  - simpl. rewrite IHn. reflexivity.
+Qed.
+
+Lemma repeat_S : forall {A} n f (a : A),
+  repeat (S n) f a = f (repeat n f a).
+Proof. reflexivity. Qed.
+
+Lemma repeat_add : forall A n m f (a : A),
+  repeat (n + m) f a = repeat n f (repeat m f a).
+Proof.
+  introv. induction n.
+  - reflexivity.
+  - simpl. rewrite IHn. reflexivity.
+Qed.
+
+Notation "f :> t" := (f t)  (at level 25, right associativity, only parsing).
+Notation "t <: f" := (f t)  (at level 24, left associativity, only parsing).
+
+Module Individual (Ctx : Ctx).
+  Module Flip := Flip Ctx. Export Flip.
 
 (** Trivial lemmas, but [simpl] in these situations leaves a mess. *)
 Lemma move_left_const : forall s0 s r,
@@ -87,3 +116,5 @@ Tactic Notation "follow" constr(H) := follow_hyp H.
 
 (** For trivial [-->*] goals, provable by stepping and applying assumptions. *)
 Ltac triv := intros; repeat (try solve [finish]; (step || follow)).
+
+End Individual.
