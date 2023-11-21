@@ -3,7 +3,6 @@
 (** Following https://www.sligocki.com/2023/03/13/skelet-1-infinite.html *)
 
 Set Warnings "-abstract-large-number".
-From BusyCoq Require Import Individual52. Import Individual52.
 From Coq Require Import PeanoNat.
 From Coq Require Import List. Import ListNotations.
 From Coq Require Import Lia.
@@ -11,6 +10,7 @@ From Coq Require Import PArith.BinPos PArith.Pnat.
 From Coq Require Import NArith.BinNat NArith.Nnat.
 From Coq Require Import Program.Tactics.
 From Coq Require Import ZifyBool.
+From BusyCoq Require Import Individual52. Import Individual52.
 Set Default Goal Selector "!".
 
 Definition tm : TM := fun '(q, s) =>

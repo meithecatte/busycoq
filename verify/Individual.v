@@ -46,6 +46,9 @@ Lemma move_right_const : forall l s s0,
   move_right (l {{s}} const s0) = l << s {{s0}} const s0.
 Proof. reflexivity. Qed.
 
+Lemma tl_const : forall A (x : A), tl (const x) = const x.
+Proof. reflexivity. Qed.
+
 (** The direct formulation isn't as useful when the proof that the two
     configurations are the same is non-trivial. *)
 Lemma evstep_refl' : forall tm c c',
@@ -66,6 +69,7 @@ Ltac prove_step := prove_step_left || prove_step_right.
 (** Simplify a tape expression, removing [move_left] and [move_right] leftover
     after [prove_step], without needlessly expanding the [cofix] in [const s0]. *)
 Ltac simpl_tape :=
+  try rewrite tl_const;
   try rewrite move_left_const;
   try rewrite move_right_const;
   simpl;
@@ -73,6 +77,8 @@ Ltac simpl_tape :=
 
 (** Prove a goal of the form [c -->+ c'] that consists of a single TM step. *)
 Ltac finish_progress := apply progress_base; prove_step.
+
+Ltac start_progress := eapply progress_intro; [prove_step | simpl_tape].
 
 (** Prove a goal of the form [c -->* c'] that consists of zero TM steps. *)
 Ltac finish_evstep := apply evstep_refl'; try (reflexivity || lia_refl).
@@ -105,7 +111,13 @@ Ltac do_adjust H ty :=
 
 Ltac adjust H := let ty := type of H in do_adjust H ty.
 Ltac adjusted H := apply H || adjust H.
-Ltac follow_hyp H := eapply evstep_trans; [adjusted H; eauto |].
+Ltac follow_trans :=
+  lazymatch goal with
+  | |- _ -[ _ ]->* _ => eapply evstep_trans
+  | |- _ -[ _ ]->+ _ => eapply evstep_progress_trans
+  end.
+
+Ltac follow_hyp H := follow_trans; [adjusted H; eauto |].
 Ltac follow_assm :=
   match goal with
   | H: _ |- _ => follow_hyp H

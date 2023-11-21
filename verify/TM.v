@@ -177,6 +177,15 @@ Arguments progress_step {tm c c' c''}.
 
 #[export] Hint Constructors progress : core.
 
+(* alternative definition for [progress] *)
+Lemma progress_intro : forall tm c c' c'',
+  c  -[ tm ]->  c'  ->
+  c' -[ tm ]->* c'' ->
+  c  -[ tm ]->+ c''.
+Proof.
+  introv H1 H2. generalize dependent c. induction H2; eauto.
+Qed.
+
 (** A halting configuration is one for which [tm (q, s)] returns [None]. *)
 Definition halting (tm : TM) (c : Q * tape) : Prop :=
   match c with
