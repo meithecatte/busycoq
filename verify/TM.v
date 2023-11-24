@@ -380,7 +380,7 @@ Proof.
 Qed.
 
 Lemma with_counter :
-  forall tm c c',
+  forall {tm c c'},
   c -[ tm ]->* c' ->
   exists n, c -[ tm ]->> n / c'.
 Proof.
@@ -511,6 +511,16 @@ Proof.
   - eauto using preceeds_halt.
 Qed.
 
+Corollary multistep_nonhalt : forall tm c c',
+  c -[ tm ]->* c' ->
+  ~ halts tm c' ->
+  ~ halts tm c.
+Proof.
+  introv Hexec Hnonhalt.
+  destruct (with_counter Hexec) as [n Hexec'].
+  eauto using skip_halts.
+Qed.
+
 Lemma progress_nonhalt' : forall tm (P : Q * tape -> Prop),
   (forall c, P c -> exists c', P c' /\ c -[ tm ]->+ c') ->
   forall k c, P c -> ~ halts_in tm c k.
@@ -539,6 +549,16 @@ Proof.
   assert (Hnhalts : ~ halts_in tm c k)
     by eauto using progress_nonhalt'.
   contradiction.
+Qed.
+
+Corollary progress_nonhalt_simple : forall tm (A : Set) (C : A -> Q * tape) i0,
+  (forall i, exists i', C i -[ tm ]->+ C i') ->
+  ~ halts tm (C i0).
+Proof with eauto.
+  introv Hstep.
+  apply progress_nonhalt with (P := fun c => exists i, c = C i)...
+  - introv [i Hi]. subst c.
+    destruct (Hstep i) as [i' Hi']...
 Qed.
 
 End TM.

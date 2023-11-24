@@ -349,23 +349,9 @@ Proof.
   follow H. finish.
 Qed.
 
-Theorem D_nonhalt : forall m, ~ halts tm (D 0 m).
+Theorem nonhalt : ~ halts tm c0.
 Proof.
-  introv.
-  apply progress_nonhalt with (P := fun c => exists m, c = D 0 m).
-  - clear m. introv H. destruct H as [m H]. subst.
-    destruct (D_next m) as [m' Hrun].
-    exists (D 0 m'); eauto.
-  - eauto.
-Qed.
-
-Lemma enters_D : c0 -->* D 0 1441.
-Proof. execute. Qed.
-
-Corollary nonhalt : ~ halts tm c0.
-Proof.
-  destruct (with_counter _ _ _ enters_D) as [n H].
-  eapply skip_halts.
-  - eassumption.
-  - apply D_nonhalt.
+  apply multistep_nonhalt with (D 0 1441). { execute. }
+  apply progress_nonhalt_simple with (C := D 0). intro m.
+  destruct (D_next m) as [m' Hrun]. eauto.
 Qed.
