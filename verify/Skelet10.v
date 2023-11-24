@@ -28,6 +28,8 @@ Inductive dorf : Set :=
   | zO : dorf -> dorf
   | zIO : dorf -> dorf.
 
+(* Note: We don't actually need to define [val] for the proof to go
+   through. It's just useful to sanity-check the definition. *)
 Fixpoint val' (n : dorf) (prev cur : nat) : nat :=
   match n with
   | zend => 0
