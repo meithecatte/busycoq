@@ -77,3 +77,25 @@ Proof.
   - reflexivity.
   - simpl. rewrite IHall1. lia.
 Qed.
+
+Lemma all1_succ_pow2 : forall n,
+  all1 n ->
+  exists k, Pos.succ n = pow2' k.
+Proof.
+  introv H. induction H.
+  - exists 1. reflexivity.
+  - destruct IHall1 as [k IH].
+    exists (S k). lia.
+Qed.
+
+Corollary b_add_pow2 : forall n,
+  exists k, Pos.succ (b n :+ n) = pow2' k.
+Proof.
+  introv. apply all1_succ_pow2. auto.
+Qed.
+
+Lemma b_pow2 : forall k,
+  (b (pow2' k) = pow2 k - 1)%N.
+Proof.
+  induction k; simpl; lia.
+Qed.

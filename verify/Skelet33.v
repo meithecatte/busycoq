@@ -108,23 +108,20 @@ Definition K (n : N) : side :=
   end.
 
 Lemma L_as_K : forall n,
-  L n = K n << 0.
+  L' n = K' n << 0.
 Proof.
-  destruct n as [| n].
-  - apply const_unfold.
-  - simpl. induction n; simpl; try rewrite IHn; reflexivity.
+  induction n; simpl; try rewrite IHn; reflexivity.
 Qed.
 
 Definition E n m : Q * tape :=
-  K n <{{C}} 1 >> 0 >> 1 >> 0 >> R m.
+  K' n <{{C}} 1 >> 0 >> 1 >> 0 >> R m.
 
 Theorem start_reset : forall n m,
   all1 m ->
-  D n m -->+ E (N.succ n) (P m)~1.
+  D n m -->* E (N.succ_pos n) (P m)~1.
 Proof.
   introv H. unfold D.
-  follow L_inc. rewrite L_as_K.
-  apply evstep_progress; try discriminate.
+  follow L_inc. unfold L. rewrite <- N.succ_pos_spec, L_as_K.
   execute. follow R_inc_all1.
   execute.
 Qed.
@@ -241,12 +238,11 @@ Proof.
   - finish.
 Qed.
 
-Lemma prepare_K : forall (n : N), (n > 1)%N -> exists (k : nat) (n' : N),
-  K n = Lk (bin_min k) (K n' << 0 << 1 << 0 << 0)
-  /\ (n = pow2 k + pow2 (S k) * n')%N.
+Lemma prepare_K : forall (n : positive),
+  exists (k : nat) (n' : N),
+  K' n = Lk (bin_min k) (K n' << 0 << 1 << 0 << 0)
+  /\ n = pow2 (S k) * n' :+ pow2' k.
 Proof.
-  destruct n as [| n]. { lia. }
-  intros _.
   induction n.
   - exists O, (Npos n). auto.
   - destruct IHn as [k [n' [EIH IH]]].
@@ -286,197 +282,168 @@ Proof.
   - rewrite b_pow4. simpl b. lia.
 Qed.
 
-Lemma b_pow2 : forall k,
-  (b (pow2' k) = pow2 k - 1)%N.
-Proof.
-  unfold pow2.
-  induction k; introv; simpl pow2'.
-  - trivial.
-  - simpl b. rewrite IHk. lia.
-Qed.
-
-Lemma pow2_add : forall n m,
-  (pow2 (n + m) = pow2 n * pow2 m)%N.
-Proof.
-  introv. induction n.
-  - lia.
-  - simpl pow2. rewrite pow2_S, IHn. lia.
-Qed.
-
 (* n = 1, or n starts with 11 in binary *)
-Inductive leads : N -> Prop :=
-  | leads_1: leads 1
-  | leads_add1 n: leads n -> leads (2 * n + 1)
-  | leads_add0 n: leads n -> (n > 1)%N -> leads (2 * n).
+Inductive leads' : positive -> Prop :=
+  | leads_1 : leads' 1
+  | leads_xI n : leads' n -> leads' n~1
+  | leads_xO n : leads' n -> (n <> 1)%positive -> leads' n~0.
 
-Lemma not_leads_2 : ~ leads 2.
-Proof. intro H. inversion H; cases n; lia. Qed.
+Definition leads (n : N) : Prop :=
+  match n with
+  | 0%N => False
+  | N.pos n => leads' n
+  end.
+
+Hint Constructors leads' : core.
+
+Lemma not_leads_2 : ~ leads' 2.
+Proof. intro H. inverts H. auto. Qed.
 
 Lemma leads_add0_rev : forall n,
-  leads (2 * n) ->
-  leads n.
+  leads' n~0 ->
+  leads' n.
 Proof.
-  introv H. inversion H.
-  (* why is this proof so awkward? *)
-  - cases n; lia.
-  - cases n; cases n0; lia.
-  - cases n; cases n0; try lia. inversion H0. rewrite <- H4. assumption.
+  introv H. inverts H. assumption.
 Qed.
 
-Lemma leads_pow2_rev : forall k n,
-  leads (pow2 k * n) ->
-  leads n.
+Hint Resolve leads_add0_rev : core.
+
+Lemma leads_pow2_rev : forall n k,
+  leads' (pow2' k * n) ->
+  leads' n.
 Proof.
-  induction k.
-  - introv. replace (pow2 0 * n)%N with n by lia. trivial.
-  - introv. replace (pow2 (S k) * n)%N with (2 * (pow2 k * n))%N by lia.
-    intro H. apply IHk. apply leads_add0_rev. assumption.
+  induction k; auto.
 Qed.
 
 Lemma leads_add1_rev : forall n,
-  (n > 0)%N ->
-  leads (2 * n + 1) ->
-  leads n.
+  leads' (n~1) ->
+  leads' n.
 Proof.
-  introv Hn H. inversion H.
-  (* why is this proof so awkward? *)
-  - cases n; lia.
-  - cases n; cases n0; try lia. inversion H0. rewrite <- H3. assumption.
-  - cases n; cases n0; lia.
+  introv H. inverts H. assumption.
 Qed.
 
 Lemma leads_pow2_sub1 : forall k n,
-  leads n ->
-  leads (pow2 k * (n + 1) - 1).
+  leads' n ->
+  leads' (pow2' k * (n + 1) - 1).
 Proof.
   introv H. induction k.
-  - replace (pow2 0 * (n + 1) - 1)%N with n by lia. assumption.
-  - replace (pow2 (S k) * (n + 1) - 1)%N
-      with (2 * (pow2 k * (n + 1) - 1) + 1)%N by lia.
-    apply leads_add1. assumption.
+  - simpl. replace (n + 1 - 1)%positive with n by lia. assumption.
+  - replace (pow2' (S k) * (n + 1) - 1)%positive
+      with ((pow2' k * (n + 1) - 1)~1)%positive by lia.
+    auto.
 Qed.
 
-Lemma leads_3_pow2 : forall q r,
-  (r < pow2 q)%N ->
-  leads (3 * pow2 q + r).
+Lemma leads_pow2 : forall n,
+  leads' (pow2' n) -> n = 0%nat.
+Proof.
+  induction n.
+  - auto.
+  - introv H. inverts H as H1 H2.
+    apply IHn in H1. subst n. lia.
+Qed.
+
+Lemma leads_3_pow2 : forall q,
+  leads' (3 * pow2' q).
+Proof.
+  induction q.
+  * simpl. auto.
+  * change (3 * pow2' (S q))%positive
+      with ((3 * pow2' q)~0)%positive.
+    constructor; [assumption | lia].
+Qed.
+
+Lemma leads_3_pow2_r : forall q r,
+  (r < pow2' q)%positive ->
+  leads' (3 * pow2' q + r).
 Proof.
   induction q; introv H.
-  - rewrite N.lt_1_r in H. rewrite H.
-    replace (3 * pow2 0 + 0)%N with (2 * 1 + 1)%N by lia.
-    apply leads_add1. apply leads_1.
-  - destruct r as [| [r | r |]].
-    + replace (3 * pow2 (S q) + 0)%N with (2 * (3 * pow2 q))%N by lia.
-      apply leads_add0; try lia.
-      replace (3 * pow2 q)%N with (3 * pow2 q + 0)%N by lia.
-      apply IHq. lia.
-    + replace (3 * pow2 (S q) + N.pos r~1)%N with (2 * (3 * pow2 q + N.pos r) + 1)%N by lia.
-      apply leads_add1. apply IHq. lia.
-    + replace (3 * pow2 (S q) + N.pos r~0)%N with (2 * (3 * pow2 q + N.pos r))%N by lia.
-      apply leads_add0; try lia. apply IHq. lia.
-    + replace (3 * pow2 (S q) + 1)%N with (2 * (3 * pow2 q) + 1)%N by lia.
-      apply leads_add1.
-      replace (3 * pow2 q)%N with (3 * pow2 q + 0)%N by lia.
-      apply IHq. lia.
+  - lia.
+  - replace (3 * pow2' (S q))%positive
+      with ((3 * pow2' q)~0)%positive by lia.
+    destruct r as [r | r |]; cbn [Pos.add]; constructor; try lia.
+    + apply IHq. lia.
+    + apply IHq. lia.
+    + apply leads_3_pow2.
 Qed.
 
-Theorem step_reset_odd : forall n m,
-  E (2 * n + 1) m -->* E n m~1~0.
+Lemma step_reset_odd : forall n m,
+  E n~1 m -->* E n m~1~0.
 Proof. introv. destruct n; execute. Qed.
 
-Theorem step_reset : forall n m,
-  (n > 1)%N ->
-  (exists q r, b m = 3 * pow2 q + r /\ 2 * n <= r < pow2 q)%N ->
-  leads n ->
-  exists (n' : N) (m' : positive),
-  E n m -->* E n' m' /\
-  (n' > 0)%N /\ (n' < n)%N /\
-  (exists q r, b m' = 3 * pow2 q + r /\ 2 * n' <= r < pow2 q)%N /\
-  leads n'.
+Definition reset_invariant (n m : positive) :=
+  leads' n /\
+  (exists q r, b m = N.pos (3 * pow2' q + r) /\ 2 * n <= r < pow2' q)%positive.
+
+Corollary reset_invariant_leads_b_m : forall n m,
+  reset_invariant n m ->
+  leads (b m).
 Proof.
-  introv Hgt1 [q [r [Hinv1a [Hinv1b Hinv1c]]]] Hinvariant2.
-  destruct (prepare_K n Hgt1) as [k [n' [EK En']]].
-  assert (Hn': (n' > 0)%N).
-  { destruct n'; try lia. destruct k; try lia.
-    simpl in En'. rewrite En' in Hinvariant2.
-    replace (pow2 (S k)) with (pow2 k * 2)%N in Hinvariant2 by lia.
-    apply leads_pow2_rev in Hinvariant2.
-    contradict (not_leads_2 Hinvariant2). }
+  introv [_ [q [r [H1 [H2 H3]]]]].
+  rewrite H1. unfold leads.
+  apply leads_3_pow2_r. assumption.
+Qed.
+
+Hint Resolve reset_invariant_leads_b_m : core.
+
+Theorem step_reset : forall n m,
+  (n <> 1)%positive ->
+  reset_invariant n m ->
+  exists n' m',
+  E n m -->* E n' m' /\
+  (n' < n)%positive /\
+  reset_invariant n' m'.
+Proof.
+  introv Hgt1 [Hinv2 [q [r [Hinv1a [Hinv1b Hinv1c]]]]].
+  destruct (prepare_K n) as [k [n' [EK En']]].
+  destruct n' as [| n'].
+  { simpl in En'. subst n. apply leads_pow2 in Hinv2. subst k. lia. }
+  replace (pow2 (S k) * N.pos n' :+ pow2' k)
+    with (pow2' (S k) * n' + pow2' k)%positive
+    in En' by lia.
   exists n', (P (pow4 k (f m k)~1)). repeat split.
   - unfold E. rewrite EK.
     follow drop_KI. { lia. }
     finish.
-  - assumption.
-  - rewrite En'. nia.
+  - nia.
+  - rewrite En' in Hinv2.
+    replace (pow2' (S k) * n' + pow2' k)%positive
+      with (pow2' k * n'~1)%positive in Hinv2 by lia.
+    apply leads_pow2_rev in Hinv2.
+    inverts Hinv2. assumption.
   - exists (q + 2 * k + 2).
-    exists (pow2 (2 * k + 2) * (r - 2 * (pow2 k - 1)) + 3 * pow2 (2 * k) - 2)%N.
-    repeat constructor.
-    + destruct k. { simpl b. rewrite Hinv1a. repeat rewrite pow2_add. lia. }
+    exists (pow2' (2 * k + 2) * (r - 2 * pow2' k + 2)
+              + 3 * pow2' (2 * k) - 2)%positive.
+    repeat split.
+    + destruct k. { simpl b. rewrite Hinv1a. lia. }
       simpl pow4. rewrite pow4_shift. simpl b. rewrite b_pow4.
       replace (b (f m (S k))~1)
         with (4 * b (2 * (pow2 (S k) - 1) :+ m) + 2)%N by (simpl b; lia).
       rewrite b_add by lia. rewrite Hinv1a.
-      repeat rewrite pow2_add. replace (2 * S k) with (S (S (2 * k))) by lia. nia.
-    + transitivity r; try nia.
-      transitivity (pow2 (2 * k + 2) * (r - 2 * (pow2 k - 1)))%N; try lia.
-      assert (2 <= pow2 (2 * k + 2))%N. { rewrite pow2_add. lia. }
-      transitivity (2 * (r - 2 * (pow2 k - 1)))%N; nia.
-    + repeat rewrite pow2_add. nia. (* nia is so overpowered *)
-  - apply leads_add1_rev; try lia. apply (leads_pow2_rev k).
-    replace (pow2 k + pow2 (S k) * n')%N with (pow2 k * (2 * n' + 1))%N in En' by lia.
-    rewrite <- En'. assumption.
-Qed.
-
-Lemma n0_1_2 : forall n,
-  (n = 0)%N \/ (n = 1)%N \/ (n > 1)%N.
-Proof.
-  introv.
-  destruct (N.le_gt_cases n 1) as [H | H].
-  - rewrite N.le_1_r in H. destruct H.
-    + left. assumption.
-    + right. left. assumption.
-  - right. right. exact (N.lt_gt _ _ H).
+      replace (2 * S k) with (S (S (2 * k))) by lia. nia.
+    + nia.
+    + nia.
 Qed.
 
 Corollary do_reset : forall n m,
-  (n >= 1)%N ->
-  (exists q r, b m = 3 * pow2 q + r /\ 2 * n <= r < pow2 q)%N ->
-  leads n ->
+  reset_invariant n m ->
   exists m',
   E n m -->* E 1 m' /\
   leads (b m').
 Proof.
-  induction n using N_strong_induction.
-  introv Hge1 Hinvariant Hinvariant2.
-  apply N.ge_le, N.lt_eq_cases in Hge1.
-  destruct Hge1 as [Hgt1 | Heq1]. 2: {
-    exists m. rewrite Heq1. constructor; auto.
-    destruct Hinvariant as [q [r [Hinv1a [Hinv1b Hinv1c]]]].
-    rewrite Hinv1a. apply leads_3_pow2. assumption. }
-  destruct (step_reset n m (N.lt_gt _ _ Hgt1) Hinvariant Hinvariant2)
-    as [n' [m' [Hsteps [Hpos [Hless' [Hinvariant' Hinvariant2']]]]]].
-  destruct (n0_1_2 n') as [n0' | [n1' | n2']].
-  - rewrite n0' in Hpos. contradict (N.lt_irrefl _ (N.gt_lt _ _ Hpos)).
-  - rewrite n1' in Hsteps. exists m'.
-    constructor. { exact Hsteps. }
-    destruct Hinvariant' as [q' [r' [Hinv1a' [Hinv1b' Hinv1c']]]].
-    rewrite Hinv1a'. apply leads_3_pow2. assumption.
-  - assert (G: exists m'', E n' m' -->* E 1 m'' /\ leads (b m'')).
-    { apply H; try assumption. lia. }
-    destruct G as [m'' [G1 G2]]. exists m''.
-    constructor; try assumption.
-    follow Hsteps. apply G1.
+  induction n as [n IH] using positive_strong_induction.
+  introv Hinv.
+  destruct (Pos.eq_dec n 1) as [En | Hgt1].
+  { (* n = 1 *) subst n. exists m. eauto. }
+  Check step_reset.
+  destruct (step_reset n m Hgt1 Hinv)
+    as [n' [m' [Hsteps [Hless Hinv']]]].
+  destruct (IH n' Hless m' Hinv') as [m'' [Hsteps' Hleads']].
+  exists m''. eauto using evstep_trans.
 Qed.
 
-Lemma all1_P_pow2 : forall n,
-  all1 n ->
-  exists k,
-  (P n = pow2' k)%N.
-Proof.
-  induction n; introv H.
-  - inversion H. destruct (IHn H1) as [k Hk]. exists (S k). lia.
-  - inversion H.
-  - exists 1%nat. reflexivity.
-Qed.
+Lemma E_start : forall m,
+  E 1 m -->+ D 0 m~1.
+Proof. execute. Qed.
 
 Theorem E_next : forall m,
   leads (b m) ->
@@ -485,24 +452,35 @@ Theorem E_next : forall m,
   leads (b m').
 Proof.
   introv Hinvariant.
-  assert (H: exists m', E (b m) (P (b m~1 :+ m~1))~1~1~0 -->* E 1 m' /\
+  destruct (b m) as [| bm] eqn:Ebm. { destruct Hinvariant. }
+  unfold leads in Hinvariant.
+  assert (Hfinish: exists m', E bm (P (bm + m))~0~1~1~0 -->* E 1 m' /\
     leads (b m')).
-  { apply do_reset; try assumption.
-    - inversion Hinvariant; try lia. cases n; lia.
-    - assert (Hk: exists k, (P (b m~1 :+ m~1) = pow2' k)%N).
-      { apply all1_P_pow2. auto. }
-      destruct Hk as [k Hk].
-      exists (S k), (pow2 (S k) - 7)%N. repeat constructor.
-      + rewrite Hk. simpl b. rewrite b_pow2. lia.
-      + rewrite pow2_S. unfold pow2. rewrite <- Hk. simpl b. lia. (* found by guess & check *)
-      + lia. }
-  destruct H as [m' [H Hinvariant']]. exists m'. constructor; try assumption.
-  eapply (evstep_progress_trans _ _ (D 0 m~1)). { execute. }
-  eapply evstep_progress_trans. { apply D_finish. }
-  eapply progress_evstep_trans. { apply start_reset. auto. }
-  replace (N.succ (b m~1 + 0)) with (2 * (b m) + 1)%N by (simpl b; lia).
-  follow step_reset_odd.
-  assumption.
+  { apply do_reset. split.
+    - assumption.
+    - replace (bm + m)%positive with (b m :+ m) by lia.
+      destruct (b_add_pow2 m) as [k Ek]. rewrite Ek.
+      replace (b (pow2' k)~0~1~1~0) with (16 * (b (pow2' k)) + 9)%N
+        by (simpl b; lia).
+      rewrite b_pow2.
+      exists (S (S k)), (pow2' (S (S k)) - 7)%positive.
+      lia. }
+  destruct Hfinish as [m' [Hfinish Hleads']].
+  exists m'. split.
+  - eapply progress_evstep_trans. { apply E_start. }
+    follow D_finish. rewrite N.add_0_r.
+    follow start_reset. simpl b. rewrite Ebm.
+    replace (N.succ_pos (N.double (N.pos bm)))
+      with (bm~1)%positive by lia.
+    replace (P (N.double (N.pos bm) :+ m~1))
+      with ((P (bm + m))~0)%positive by lia.
+    (* This is only necessary as otherwise the reset invariant is tight enough
+       that proving it is a bit hairy – the fact that subtraction
+       on N and positive is saturating becomes something you actually need to
+       work around. *)
+    follow step_reset_odd.
+    apply Hfinish.
+  - apply Hleads'.
 Qed.
 
 Theorem nonhalt : ~ halts tm c0.
@@ -513,7 +491,5 @@ Proof.
   - intros c [m [Heq Hleads]]. subst c.
     destruct (E_next m Hleads) as [m' [Hsteps Hleads']].
     eauto.
-  - exists 17%positive. repeat split.
-    simpl b. replace 14%N with (2 * (2 * (2 * 1 + 1) + 1))%N by lia.
-    apply leads_add0; try lia. apply leads_add1. apply leads_add1. apply leads_1.
+  - exists 17%positive. repeat constructor. discriminate.
 Qed.

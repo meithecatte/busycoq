@@ -135,6 +135,19 @@ Proof.
   apply G.
 Qed.
 
+Lemma positive_strong_induction : forall (P : positive -> Prop),
+  (forall n, (forall k, (k < n)%positive -> P k) -> P n) ->
+  forall n, P n.
+Proof.
+  intros P H n.
+  replace n with (N.succ_pos (Pos.pred_N n)) by lia.
+  apply N_strong_induction with (P := fun n => P (N.succ_pos n)).
+  clear n. intros n IH.
+  apply H. intros k H'. specialize (IH (Pos.pred_N k)).
+  replace (N.succ_pos (Pos.pred_N k)) with k in IH by lia.
+  apply IH. lia.
+Qed.
+
 Definition het_add (a : N) (b : positive) : positive :=
   match a with
   | N0 => b
@@ -176,8 +189,14 @@ Lemma length_gt0_if_not_nil : forall A (xs : list A),
   [] <> xs -> length xs <> 0.
 Proof. introv H Hlen. apply length_zero_iff_nil in Hlen. auto. Qed.
 
+Lemma pow2_add : forall n m,
+  (pow2' (n + m) = pow2' n * pow2' m)%positive.
+Proof.
+  introv. induction n; simpl pow2' in *; lia.
+Qed.
+
 Ltac Zify.zify_pre_hook ::=
-  unfold pow2 in *; simpl pow2' in *;
+  unfold pow2 in *; repeat rewrite pow2_add in *; simpl pow2' in *;
   lazymatch goal with
   | H: [] <> _ |- _ => apply length_gt0_if_not_nil in H
   | H: [] = _ -> False |- _ => apply length_gt0_if_not_nil in H
