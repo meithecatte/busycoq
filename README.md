@@ -28,6 +28,8 @@ considered hard to decide automatically. At the moment, these include:
     (due to the nature of the proof, the final computation is done by an
     extracted OCaml program)
  - [Skelet #10](https://www.sligocki.com/2023/03/14/skelet-10.html)
+ - Skelet #33 (proof contributed by Jason Yuen; I am not aware of
+   the informal argument being outlined anywhere)
  - [Skelet #34](https://www.sligocki.com/2023/02/02/skelet-34.html)
  - [Skelet #35](https://www.sligocki.com/2023/02/05/shift-overflow.html)
 
