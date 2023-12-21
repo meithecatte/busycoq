@@ -99,3 +99,29 @@ Lemma b_pow2 : forall k,
 Proof.
   induction k; simpl; lia.
 Qed.
+
+Fixpoint pow4 (k : nat) (n : positive) : positive :=
+  match k with
+  | O => n
+  | S k => pow4 k (n~0~0)
+  end.
+
+Lemma pow4_shift : forall k n,
+  (pow4 k n~0~0 = (pow4 k n)~0~0)%positive.
+Proof.
+  induction k; introv.
+  - reflexivity.
+  - simpl. rewrite IHk. reflexivity.
+Qed.
+
+Lemma b_pow4 : forall k n,
+  (b (pow4 k n) = pow2 (2 * k) * (b n + 1) - 1)%N.
+Proof.
+  unfold pow2.
+  induction k; introv; simpl pow4; simpl pow2'.
+  - lia.
+  - rewrite pow4_shift. simpl b.
+    rewrite IHk.
+    rewrite <- plus_n_Sm.
+    lia.
+Qed.

@@ -146,12 +146,6 @@ Proof.
   - inversion H.
 Qed.
 
-Fixpoint pow4 (k : nat) (n : positive) : positive :=
-  match k with
-  | O => n
-  | S k => pow4 k (n~0~0)
-  end.
-
 (* n and l are in the wrong order? *)
 Fixpoint Lk {k} (n : bin k) (l : side) :=
   match n with
@@ -233,9 +227,8 @@ Proof.
   follow LaR_max.
   replace (1 >> 0 >> 1 >> 0 >> R (2 * (pow2 k - 1) :+ m)) with (R (f m k)~0)
     by reflexivity.
-  follow eat_bin_max.
-  - apply has0_1. apply has0_f.
-  - finish.
+  follow eat_bin_max. { simpl. auto. }
+  finish.
 Qed.
 
 Lemma prepare_K : forall (n : positive),
@@ -244,42 +237,13 @@ Lemma prepare_K : forall (n : positive),
   /\ n = pow2 (S k) * n' :+ pow2' k.
 Proof.
   induction n.
-  - exists O, (Npos n). auto.
+  - exists 0%nat, (N.pos n). auto.
   - destruct IHn as [k [n' [EIH IH]]].
     exists (S k), n'. split.
     + simpl. simpl in EIH. rewrite EIH. reflexivity.
     + lia.
-  - exists O, N0. repeat split.
+  - exists 0%nat, 0%N. repeat split.
     simpl. rewrite const_unfold at 1. reflexivity.
-Qed.
-
-Lemma pow4_shift : forall k n,
-  (pow4 k n~0~0 = (pow4 k n)~0~0)%positive.
-Proof.
-  induction k; introv.
-  - reflexivity.
-  - simpl. rewrite IHk. reflexivity.
-Qed.
-
-Lemma b_pow4 : forall k n,
-  (b (pow4 k n) = pow2 (2 * k) * (b n + 1) - 1)%N.
-Proof.
-  unfold pow2.
-  induction k; introv; simpl pow4; simpl pow2'.
-  - lia.
-  - rewrite pow4_shift. simpl b.
-    rewrite IHk.
-    rewrite <- plus_n_Sm.
-    lia.
-Qed.
-
-Lemma b_pow4_f : forall m k k',
-  (b (pow4 k (f m k')~1) > 0)%N.
-Proof.
-  introv.
-  destruct k.
-  - simpl b. lia.
-  - rewrite b_pow4. simpl b. lia.
 Qed.
 
 (* n = 1, or n starts with 11 in binary *)
@@ -296,9 +260,6 @@ Definition leads (n : N) : Prop :=
 
 Hint Constructors leads' : core.
 
-Lemma not_leads_2 : ~ leads' 2.
-Proof. intro H. inverts H. auto. Qed.
-
 Lemma leads_add0_rev : forall n,
   leads' n~0 ->
   leads' n.
@@ -313,24 +274,6 @@ Lemma leads_pow2_rev : forall n k,
   leads' n.
 Proof.
   induction k; auto.
-Qed.
-
-Lemma leads_add1_rev : forall n,
-  leads' (n~1) ->
-  leads' n.
-Proof.
-  introv H. inverts H. assumption.
-Qed.
-
-Lemma leads_pow2_sub1 : forall k n,
-  leads' n ->
-  leads' (pow2' k * (n + 1) - 1).
-Proof.
-  introv H. induction k.
-  - simpl. replace (n + 1 - 1)%positive with n by lia. assumption.
-  - replace (pow2' (S k) * (n + 1) - 1)%positive
-      with ((pow2' k * (n + 1) - 1)~1)%positive by lia.
-    auto.
 Qed.
 
 Lemma leads_pow2 : forall n,
@@ -434,7 +377,6 @@ Proof.
   introv Hinv.
   destruct (Pos.eq_dec n 1) as [En | Hgt1].
   { (* n = 1 *) subst n. exists m. eauto. }
-  Check step_reset.
   destruct (step_reset n m Hgt1 Hinv)
     as [n' [m' [Hsteps [Hless Hinv']]]].
   destruct (IH n' Hless m' Hinv') as [m'' [Hsteps' Hleads']].
