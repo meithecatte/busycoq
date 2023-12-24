@@ -140,6 +140,10 @@ struct Decide {
     /// don't run the Bouncers decider
     #[argh(switch)]
     no_bouncers: bool,
+
+    /// pretty-print the generated certificates
+    #[argh(switch)]
+    show_certs: bool,
 }
 
 fn main() {
@@ -227,6 +231,14 @@ impl Decide {
             let mut undecided = 0;
             for (index, cert) in certs {
                 if let Some(cert) = cert {
+                    if self.show_certs {
+                        if let Certificate::Bouncers(cert) = &cert {
+                            if cert.has_nontrivial_shift() {
+                                println!("#{index}: {cert:#?}\n");
+                            }
+                        }
+                    }
+
                     certfile.write_entry(index, &cert).unwrap();
                 } else {
                     undecided += 1;

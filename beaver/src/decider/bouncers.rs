@@ -40,6 +40,12 @@ pub struct Cert {
     shift_rules: Vec<ShiftRule>,
 }
 
+impl Cert {
+    pub fn has_nontrivial_shift(&self) -> bool {
+        self.shift_rules.iter().any(|rule| rule.tail_len != 0)
+    }
+}
+
 #[binrw]
 #[derive(Clone, Debug)]
 struct ShiftRule {

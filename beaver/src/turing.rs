@@ -314,4 +314,18 @@ mod tests {
 
         assert_eq!(conf.step(&tm), Ok(false));
     }
+
+    #[test]
+    fn bouncer() {
+        let tm: TM = "1RB1LE_1LC1RD_1LB1RC_1LA0RD_---0LA".parse().unwrap();
+        let mut tape = [Sym::S0; 20];
+        let mut conf = Configuration::new(&mut tape);
+
+        for i in 1..=64 {
+            assert_eq!(conf.step(&tm), Ok(true));
+            println!("{i}: {conf}");
+        }
+
+        panic!();
+    }
 }
