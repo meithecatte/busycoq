@@ -55,8 +55,9 @@ Proof. induction n; simpl; lia. Qed.
 Lemma b_add : forall u n,
   (u <= b n -> b (u :+ n) = b n - u)%N.
 Proof.
+  (* XXX: this is very ugly, why does [induction u using N.induction] not work here? *)
   apply (N.induction (fun u => forall n, u <= b n -> b (u :+ n) = b n - u)%N).
-  - intuition.
+  - auto with *.
   - introv H. simpl. lia.
   - intros u IH n H.
     rewrite het_add_succ_l, b_succ; rewrite IH; lia.

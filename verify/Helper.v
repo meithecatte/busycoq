@@ -11,6 +11,8 @@ From Coq Require Import ZArith.
 From BusyCoq Require Export LibTactics.
 Set Default Goal Selector "!".
 
+Ltac Tauto.intuition_solver ::= auto.
+
 (* sig *)
 Notation "[: x :]" := (exist _ x _).
 
@@ -72,16 +74,16 @@ Inductive reflect (P : Prop) : bool -> Prop :=
   | ReflectF : ~ P -> reflect P false.
 
 #[global]
-Hint Constructors reflect : bool.
+Hint Constructors reflect : core.
 
 Lemma reflect_iff : forall P b, reflect P b -> (P <-> b = true).
 Proof.
-  introv H. destruct H; intuition.
+  introv H. destruct H; intuition discriminate.
 Qed.
 
 Lemma iff_reflect : forall P b, (P <-> b = true) -> reflect P b.
 Proof.
-  destr_bool; intuition.
+  destr_bool; constructor; intuition discriminate.
 Qed.
 
 Lemma reflect_sym : forall A (x y : A) b,

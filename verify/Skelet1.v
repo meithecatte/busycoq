@@ -1355,7 +1355,7 @@ Proof.
   destruct (N.pred (N.pos xs) / N.pos uni_P)%N eqn:E; try lia.
   enough (N.pos p * N.pos uni_P < N.pos xs)%N.
   { destruct (max_stride 0 r); nia. }
-  pose proof (N.mul_div_le (N.pred (N.pos xs)) (N.pos uni_P)).
+  pose proof (N.Div0.mul_div_le (N.pred (N.pos xs)) (N.pos uni_P)).
   nia.
 Qed.
 
@@ -1474,7 +1474,7 @@ Qed.
 
 Local Hint Immediate cycle_nonhalt : core.
 
-Obligation Tactic := intros; subst; auto; discriminate.
+Local Obligation Tactic := intros; subst; auto; discriminate.
     
 Program Definition is_cycling (c : conf) : {~ halts tm (lift c)} + {True} :=
   match c with

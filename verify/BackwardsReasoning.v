@@ -16,7 +16,7 @@ Definition all_qs := list_prod all_qs all_syms.
 Lemma all_qs_spec : forall a, In a all_qs.
 Proof. introv. destruct a. apply in_prod; auto. Qed.
 
-Local Hint Resolve all_qs_spec : auto.
+Local Hint Resolve all_qs_spec : core.
 
 Fixpoint side_matches (xs : side) (ys : list Sym) : Prop :=
   match xs, ys with

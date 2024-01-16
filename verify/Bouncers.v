@@ -232,7 +232,7 @@ Lemma cyc_hd_cyc_get : forall cyc,
 Proof.
   intros [[xs ys] [Hcons Hinv]].
   unfold cyc_get, cyc_hd.
-  destruct xs, ys; intuition.
+  destruct xs, ys; intuition contradiction.
 Qed.
 
 Lemma skipn_cons_1 : forall A (x : A) xs, xs = skipn 1 (x :: xs).
@@ -342,6 +342,8 @@ Proof.
   inverts H. auto.
 Qed.
 
+Local Obligation Tactic := program_simpl.
+
 Program Definition align (xs : list Sym) (s : list segment) :=
   match xs with
   | [] => s
@@ -360,8 +362,6 @@ Proof.
 Qed.
 
 Local Hint Resolve align_correct : core.
-
-Obligation Tactic := program_simpl.
 
 (** We now have to relate the configuration expressed using symbolic tapes
     to the concrete configurations the machine can be in. *)
@@ -626,7 +626,7 @@ Qed.
 Local Hint Immediate transfer_repeat transfer_symbol : core.
 
 Local Obligation Tactic := program_simplify; eauto; simpl;
-  autorewrite with list; intuition; (lia || congruence).
+  autorewrite with list; intuition auto with arith; try (lia || congruence).
 
 (** Check whether [t] is a special case of [u]. Assumes that both tapes
     are aligned, which allows using a greedy algorithm. *)
