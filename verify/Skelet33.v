@@ -258,7 +258,7 @@ Definition leads (n : N) : Prop :=
   | N.pos n => leads' n
   end.
 
-Hint Constructors leads' : core.
+Local Hint Constructors leads' : core.
 
 Lemma leads_add0_rev : forall n,
   leads' n~0 ->
@@ -267,7 +267,7 @@ Proof.
   introv H. inverts H. assumption.
 Qed.
 
-Hint Resolve leads_add0_rev : core.
+Local Hint Resolve leads_add0_rev : core.
 
 Lemma leads_pow2_rev : forall n k,
   leads' (pow2' k * n) ->
@@ -326,7 +326,7 @@ Proof.
   apply leads_3_pow2_r. assumption.
 Qed.
 
-Hint Resolve reset_invariant_leads_b_m : core.
+Local Hint Resolve reset_invariant_leads_b_m : core.
 
 Theorem step_reset : forall n m,
   (n <> 1)%positive ->
