@@ -78,8 +78,6 @@ Ltac simpl_tape :=
 (** Prove a goal of the form [c -->+ c'] that consists of a single TM step. *)
 Ltac finish_progress := apply progress_base; prove_step.
 
-Ltac start_progress := eapply progress_intro; [prove_step | simpl_tape].
-
 (** Prove a goal of the form [c -->* c'] that consists of zero TM steps. *)
 Ltac finish_evstep := apply evstep_refl'; try (reflexivity || lia_refl).
 Ltac finish := finish_evstep || finish_progress.
@@ -92,6 +90,10 @@ Ltac step := (eapply evstep_step || eapply progress_step); [prove_step | simpl_t
     TM gets stuck (because the symbolic state doesn't make it clear what symbol
     is under the tape). *)
 Ltac execute := introv; repeat (try solve [finish]; step).
+
+(** For a goal of the form [c -->+ c'], take steps until the TM gets stuck,
+    taking at least one step. Transforms the goal into [c'' -->* c'] as a result. *)
+Ltac start_progress := eapply progress_intro; [prove_step | simpl_tape]; execute.
 
 (** [follow H], on a goal of the form [H: c1 -->* c2  |-  c1' -->* c3], will
     transform it into [|-  c2 -->* c3].  [adjust] is used to make it work when

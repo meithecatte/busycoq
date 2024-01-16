@@ -172,9 +172,8 @@ Proof.
   - destruct IHall1 as [m'' [H1 _]].
     exists (m''~0)%positive. split. { lia. }
     follow L_inc.
-    eapply (progress_evstep_trans _ _ (L (N.succ n) << 0 << 1 << 1 << 1 {{C}}> R n0~1)).
-    { execute. }
-    rewrite L_as_K1. follow R_inc_all1. { exact (all1_1 _ H). }
+    start_progress.
+    rewrite L_as_K1. follow R_inc_all1.
     rewrite H1. cases n; execute.
 Qed.
 
