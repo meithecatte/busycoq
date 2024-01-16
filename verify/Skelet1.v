@@ -10,7 +10,7 @@ From Coq Require Import PArith.BinPos PArith.Pnat.
 From Coq Require Import NArith.BinNat NArith.Nnat.
 From Coq Require Import Program.Tactics.
 From Coq Require Import ZifyBool.
-From BusyCoq Require Import Individual52. Import Individual52.
+From BusyCoq Require Import Individual52.
 Set Default Goal Selector "!".
 
 Definition tm : TM := fun '(q, s) =>

@@ -2,7 +2,7 @@
 
 (** Following https://www.sligocki.com/2023/02/02/skelet-34.html *)
 
-From BusyCoq Require Import Individual52 FixedBin ShiftOverflow. Import Individual52.
+From BusyCoq Require Import Individual52 FixedBin ShiftOverflow.
 From Coq Require Import PeanoNat.
 From Coq Require Import List. Import ListNotations.
 From Coq Require Import Lia.

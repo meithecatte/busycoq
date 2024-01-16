@@ -1,6 +1,6 @@
 (** * Skelet #33 *)
 
-From BusyCoq Require Import Individual52 FixedBin ShiftOverflow. Import Individual52.
+From BusyCoq Require Import Individual52 FixedBin ShiftOverflow.
 From Coq Require Import PeanoNat.
 From Coq Require Import List. Import ListNotations.
 From Coq Require Import Lia.

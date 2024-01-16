@@ -2,7 +2,7 @@
 
 (** Following https://www.sligocki.com/2023/03/14/skelet-10.html *)
 
-From BusyCoq Require Import Individual52 FixedBin ShiftOverflow. Import Individual52.
+From BusyCoq Require Import Individual52 FixedBin ShiftOverflow.
 From Coq Require Import PeanoNat.
 From Coq Require Import List. Import ListNotations.
 From Coq Require Import Lia.
@@ -107,15 +107,13 @@ Proof.
 Qed.
 
 (** * Complete Behavior *)
-(** D(n) from the informal writeup is [G n] here, as the former would collide
-    with the state. *)
-Definition G (n : dorf) : (Q * tape) :=
+Definition D (n : dorf) : (Q * tape) :=
   L n <{{D}} Z (incr n).
 
-Lemma incr_G : forall n,
-  G n -->+ G (incr n).
+Lemma incr_D : forall n,
+  D n -->+ D (incr n).
 Proof with execute.
-  unfold G.
+  unfold D.
   destruct n...
   - destruct n.
     + execute.
@@ -131,8 +129,8 @@ Qed.
 
 Theorem nonhalt : ~ halts tm c0.
 Proof.
-  apply multistep_nonhalt with (G zend).
-  { unfold G. execute. }
-  apply progress_nonhalt_simple with (C := G).
-  eauto using incr_G.
+  apply multistep_nonhalt with (D zend).
+  { unfold D. execute. }
+  apply progress_nonhalt_simple with (C := D).
+  eauto using incr_D.
 Qed.
