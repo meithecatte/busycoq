@@ -113,11 +113,11 @@ struct Decide {
     #[argh(positional)]
     certs: PathBuf,
 
-    /// list of indices to skip
+    /// path to a list of indices to skip
     #[argh(option, short='x')]
     exclude: Option<PathBuf>,
 
-    /// list of indices to check
+    /// path to a list of indices to check
     #[argh(option, short='i')]
     indices: Option<PathBuf>,
 
