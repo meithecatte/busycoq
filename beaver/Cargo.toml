@@ -12,6 +12,7 @@ bitvec = "1.0.1"
 bumpalo = "3.13.0"
 byteorder = "1.4.3"
 enum-map = "2.6.0"
+indexmap = "2.1.0"
 indicatif = { version = "0.17.5", features = ["rayon"] }
 itertools = "0.11.0"
 memmap2 = "0.7.1"

@@ -14,7 +14,7 @@ pub enum Dir {
     #[brw(magic = 0u8)] R,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Enum)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Enum, Hash)]
 pub enum Sym {
     S0,
     S1,
