@@ -403,6 +403,16 @@ Proof.
   - eauto.
 Qed.
 
+Lemma progress_evstep :
+  forall tm c c',
+  c -[ tm ]->+ c' ->
+  c -[ tm ]->* c'.
+Proof.
+  introv H.
+  apply progress_multistep in H. destruct H.
+  eauto using without_counter.
+Qed.
+
 Lemma evstep_progress_trans :
   forall tm c c' c'',
   c  -[ tm ]->* c'  ->

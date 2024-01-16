@@ -28,6 +28,7 @@ considered hard to decide automatically. At the moment, these include:
     (due to the nature of the proof, the final computation is done by an
     extracted OCaml program)
  - [Skelet #10](https://www.sligocki.com/2023/03/14/skelet-10.html)
+ - [Skelet #15](https://www.sligocki.com/2023/02/05/shift-overflow.html)
  - Skelet #26 (proof contributed by Jason Yuen; I am not aware of
    the informal argument being outlined anywhere)
  - [Skelet #33](https://discuss.bbchallenge.org/t/skelet-33-doesnt-halt-coq-proof/180)

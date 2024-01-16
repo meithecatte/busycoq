@@ -494,10 +494,10 @@ Proof.
 Qed.
 
 Theorem D1_next : forall m,
-  (reset_invariant m) ->
+  reset_invariant m ->
   exists m' a',
   D 0 1 m -->+ D 0 a' m' /\
-  (reset_invariant m').
+  reset_invariant m'.
 Proof.
   introv [Hinv1 [k [n' [Hinv2a Hinv2b]]]].
   destruct (start_reset1 (b m) (b m :+ m)) as [m' [Hm' H1]].
@@ -521,10 +521,10 @@ Proof.
 Qed.
 
 Theorem D_next : forall m a,
-  (reset_invariant m) ->
+  reset_invariant m ->
   exists m' a',
   D 0 a m -->+ D 0 a' m' /\
-  (reset_invariant m').
+  reset_invariant m'.
 Proof.
   introv Hinv.
   cases a.
@@ -532,14 +532,23 @@ Proof.
   - destruct (D1_next m Hinv) as [m' [a' H]]. exists m' a'. assumption.
 Qed.
 
-Theorem nonhalt : ~ halts tm c0.
+Theorem D0_nonhalt : forall m,
+  ~ halts tm (D 0 0 m).
 Proof.
-  apply multistep_nonhalt with (D 0 0 11). { execute. }
+  introv.
+  destruct (D0_next m) as [m' [Hrun Hinv]].
+  apply multistep_nonhalt with (D 0 1 m'). { auto using progress_evstep. }
   apply progress_nonhalt with
     (P := fun c => exists m a, D 0 a m = c /\ reset_invariant m).
-  - intros c [m [a [Heq Hinv]]]. subst c.
+  - clear m m' Hrun Hinv.
+    intros c [m [a [Heq Hinv]]]. subst c.
     destruct (D_next m a Hinv) as [m' [a' [Hsteps Hinv']]].
-    exists (D 0 a' m'). split; try assumption. eauto.
-  - exists 11%positive 0. repeat split. { lia. }
-    exists 0%nat 2%N. simpl b. lia.
+    eauto 6.
+  - eauto.
+Qed.
+
+Corollary nonhalt : ~ halts tm c0.
+Proof.
+  apply multistep_nonhalt with (D 0 0 11). { execute. }
+  apply D0_nonhalt.
 Qed.

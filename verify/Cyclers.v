@@ -5,11 +5,11 @@ From Coq Require Import Arith.Arith.
 From Coq Require Import Lia.
 From Coq Require Import Lists.List. Import ListNotations.
 From Coq Require Import Program.Tactics.
-From BusyCoq Require Export Flip.
+From BusyCoq Require Export Permute.
 Set Default Goal Selector "!".
 
 Module Cyclers (Ctx : Ctx).
-  Module Flip := Flip Ctx. Export Flip.
+  Module Permute := Permute Ctx. Export Permute.
 
 Lemma cycle_nonhalting :
   forall {tm : TM} {c c' k},

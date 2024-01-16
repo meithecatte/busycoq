@@ -2,7 +2,7 @@
 
 From Coq Require Export Lists.Streams.
 From Coq Require Import Lia.
-From BusyCoq Require Export Flip.
+From BusyCoq Require Export Permute.
 Set Default Goal Selector "!".
 
 Fixpoint repeat {A} (n : nat) (f : A -> A) (a : A) : A :=
@@ -35,7 +35,7 @@ Notation "f :> t" := (f t)  (at level 25, right associativity, only parsing).
 Notation "t <: f" := (f t)  (at level 24, left associativity, only parsing).
 
 Module Individual (Ctx : Ctx).
-  Module Flip := Flip Ctx. Export Flip.
+  Module Permute := Permute Ctx. Export Permute.
 
 (** Trivial lemmas, but [simpl] in these situations leaves a mess. *)
 Lemma move_left_const : forall s0 s r,
