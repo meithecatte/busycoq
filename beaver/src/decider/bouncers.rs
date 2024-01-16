@@ -592,7 +592,7 @@ fn find_progressions(records: &[Record]) -> impl Iterator<Item=[&Record; 3]> {
                     .tuple_windows()
                     .map(|(a, b)| b - a)
                     .tuple_windows()
-                    .map(|(a, b)| b - a);
+                    .map(|(a, b)| b as i32 - a as i32);
                 let Some(diff) = diffs.next() else {
                     i += k;
                     return Some(None);
