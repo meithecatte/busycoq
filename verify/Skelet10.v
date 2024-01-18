@@ -2,12 +2,8 @@
 
 (** Following https://www.sligocki.com/2023/03/14/skelet-10.html *)
 
-From BusyCoq Require Import Individual52 FixedBin ShiftOverflow.
-From Coq Require Import PeanoNat.
-From Coq Require Import List. Import ListNotations.
+From BusyCoq Require Import Individual52.
 From Coq Require Import Lia.
-From Coq Require Import PArith.BinPos PArith.Pnat.
-From Coq Require Import NArith.BinNat NArith.Nnat.
 Set Default Goal Selector "!".
 
 Definition tm : TM := fun '(q, s) =>
