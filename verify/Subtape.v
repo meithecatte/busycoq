@@ -2,11 +2,11 @@
 
 From Coq Require Import Bool.
 From Coq Require Import Lists.List. Import ListNotations.
-From BusyCoq Require Export Directed.
+From BusyCoq Require Export DirectedCompute.
 Set Default Goal Selector "!".
 
 Module Subtape (Ctx : Ctx).
-  Module Directed := Directed Ctx. Export Directed.
+  Module DirectedCompute := DirectedCompute Ctx. Export DirectedCompute.
 
 (** We use the directional formulation here, so that
     "the tape just got outside the segment" is easy to represent. *)

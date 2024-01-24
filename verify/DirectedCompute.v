@@ -1,11 +1,11 @@
-(** * Directed: the "head between tape cells" formulation *)
+(** * DirectedCompute: the "head between tape cells" formulation *)
 
 From Coq Require Import Bool.
 From Coq Require Import Lists.List. Import ListNotations.
 From BusyCoq Require Export Flip.
 Set Default Goal Selector "!".
 
-Module Directed (Ctx : Ctx).
+Module DirectedCompute (Ctx : Ctx).
   Module Flip := Flip Ctx. Export Flip.
 
 Definition dtape : Type := dir * list Sym * list Sym.
@@ -41,4 +41,4 @@ Lemma undir_right_s0 : forall n l,
   undir (R, l, repeat s0 n) = (l, s0, repeat s0 (pred n)).
 Proof. introv. destruct n; reflexivity. Qed.
 
-End Directed.
+End DirectedCompute.
