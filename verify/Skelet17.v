@@ -107,6 +107,9 @@ Definition lowerR (xs : list nat) : side :=
 Definition lower (xs : list nat) : Q * tape :=
   lowerL xs <| lowerR' [].
 
+Definition lower' (xs : list nat) : Q * tape :=
+  lowerL xs |> lowerR' [].
+
 Lemma lowerL_merge : forall x y ys,
   left10 x (lowerL (y :: ys)) = lowerL (x + y :: ys).
 Proof.
@@ -174,11 +177,13 @@ Qed.
 
 (** ** Higher-level behavior *)
 
+Notation Nonzero := (fun n => n <> O).
+
 Arguments left10 : simpl never.
 Arguments right10 : simpl never.
 
 Lemma goright_nonzero : forall xs x x' y ys,
-  Forall (fun n => n <> O) xs ->
+  Forall Nonzero xs ->
   lowerL (y :: ys) |> lowerR (x :: xs ++ [S x']) -->*
   lowerL (x' :: rev xs ++ (S x + y) :: ys) |> const 0.
 Proof.
@@ -197,7 +202,7 @@ Proof.
 Qed.
 
 Lemma goright_nonzero' : forall xs x y ys,
-  Forall (fun n => n <> O) xs ->
+  Forall Nonzero xs ->
   lowerL (y :: ys) |> lowerR' (xs ++ [S x]) -->*
   lowerL (x :: rev xs ++ (S y) :: ys) |> const 0.
 Proof.
@@ -239,7 +244,7 @@ Qed.
 #[export] Hint Resolve Forall_rev : core.
 
 Lemma increment : forall x xs y z zs,
-  Forall (fun n => n <> O) xs ->
+  Forall Nonzero xs ->
   Forall Even xs ->
   Even (S x) ->
   Odd y ->
@@ -247,17 +252,24 @@ Lemma increment : forall x xs y z zs,
   lower (x :: xs ++ y :: S z :: zs).
 Proof.
   introv Hnonzero Heven Hx Hy.
-  follow goleft_even10.
-  rewrite lowerL_nonempty by auto. execute.
-  rewrite fold_lowerR'.
-  follow goleft_even.
+  follow (goleft_even (S x :: xs)).
   destruct y. { destruct Hy. lia. }
-  unfold lowerL. unfold lowerL'. fold lowerL'.
+  unfold lowerL. rewrite <- fold_lowerL'.
   follow goleft_odd10. (* could get -->+ here *)
   rewrite fold_left10_r, fold_lowerL'.
+  rewrite app_nil_r. simpl rev.
   follow goright_nonzero'.
   rewrite rev_involutive. execute.
 Qed.
+
+#[local] Hint Extern 1 (Even _) => rewrite <- even_spec; reflexivity : core.
+
+(* This is rule (O6) in savask's writeup *)
+(*
+Lemma handle_zero : forall x xs x' xs',
+  x :: xs ==> x' :: xs' ->
+  O :: x :: xs ==> S x :: xs.
+*)
 
 Lemma increment_odd : forall x y xs,
   Odd (S x) ->
@@ -270,7 +282,7 @@ Qed.
 (* This corresponds to overflow followed by empty in Chris Xu's writeup.
    The config [lower (xs ++ [S y; O])] he lists isn't visited. *)
 Lemma overflow : forall x xs y,
-  Forall (fun n => n <> O) xs ->
+  Forall Nonzero xs ->
   Forall Even xs ->
   Even (S x) ->
   Odd y ->

@@ -3,8 +3,13 @@ From BusyCoq Require Export Individual BB52.
 Module Individual52 := Individual BB52.
 Export Individual52.
 
-Notation "0" := S0.
-Notation "1" := S1.
+Declare Scope sym_scope.
+Bind Scope sym_scope with Sym.
+Delimit Scope sym_scope with sym.
+Open Scope sym.
+
+Notation "0" := S0 : sym_scope.
+Notation "1" := S1 : sym_scope.
 
 (* Make sure that [{{D}}>] still refers to the state, even if we shadowed
    [D] itself with something else. *)
