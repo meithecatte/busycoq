@@ -11,6 +11,8 @@ From Coq Require Import ZArith.
 From BusyCoq Require Export LibTactics.
 Set Default Goal Selector "!".
 
+(* We are currently in a deprecation cycle where this gets changed
+   from [auto with *] to [auto]. Opt in to silence the warning. *)
 Ltac Tauto.intuition_solver ::= auto.
 
 (* sig *)
@@ -150,6 +152,7 @@ Proof.
   apply IH. lia.
 Qed.
 
+(* Heterogenous addition *)
 Definition het_add (a : N) (b : positive) : positive :=
   match a with
   | N0 => b
@@ -170,6 +173,7 @@ Add Zify BinOp Op_het_add.
 Lemma het_add_succ_l : forall a b, N.succ a :+ b = Pos.succ (a :+ b).
 Proof. lia. Qed.
 
+(* Powers of 2%positive with a nice computational behavior *)
 Fixpoint pow2' (k : nat) : positive :=
   match k with
   | O => 1
@@ -187,15 +191,16 @@ Proof. introv. unfold pow2. simpl. lia. Qed.
 Lemma pow2_gt0 : forall k, (pow2 k > 0)%N.
 Proof. unfold pow2. lia. Qed.
 
-Lemma length_gt0_if_not_nil : forall A (xs : list A),
-  [] <> xs -> length xs <> 0.
-Proof. introv H Hlen. apply length_zero_iff_nil in Hlen. auto. Qed.
-
 Lemma pow2_add : forall n m,
   (pow2' (n + m) = pow2' n * pow2' m)%positive.
 Proof.
   introv. induction n; simpl pow2' in *; lia.
 Qed.
+
+(* Make [lia]/[nia] more powerful *)
+Lemma length_gt0_if_not_nil : forall A (xs : list A),
+  [] <> xs -> length xs <> 0.
+Proof. introv H Hlen. apply length_zero_iff_nil in Hlen. auto. Qed.
 
 Ltac Zify.zify_pre_hook ::=
   unfold pow2 in *; repeat rewrite pow2_add in *; simpl pow2' in *;
