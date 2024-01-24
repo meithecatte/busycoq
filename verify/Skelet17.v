@@ -48,9 +48,13 @@ Proof.
   - introv. simpl. rewrite IHn. reflexivity.
 Qed.
 
-Lemma fold_left10 : forall n l,
+Lemma fold_left10_r : forall n l,
   left10 n l << 1 << 0 = left10 (S n) l.
 Proof. reflexivity. Qed.
+
+Lemma fold_left10_l : forall n l,
+  left10 n (l << 1 << 0) = left10 (S n) l.
+Proof. exact shift_left10. Qed.
 
 Lemma add_left10 : forall a b l,
   left10 a (left10 b l) = left10 (a + b) l.
@@ -101,7 +105,7 @@ Definition lowerR (xs : list nat) : side :=
   end.
 
 Definition lower (xs : list nat) : Q * tape :=
-  lowerL xs <| const 0.
+  lowerL xs <| lowerR' [].
 
 Lemma lowerL_merge : forall x y ys,
   left10 x (lowerL (y :: ys)) = lowerL (x + y :: ys).
@@ -185,7 +189,7 @@ Proof.
   - inverts Hxs as Ha Hxs.
     destruct a as [| a]. { congruence. }
     follow goright_10. execute.
-    rewrite fold_left10, lowerL_merge.
+    rewrite fold_left10_r, lowerL_merge.
     change (lowerL (S x + y :: ys) << 1)
       with (lowerL (O :: S x + y :: ys)).
     follow IHxs.
@@ -245,12 +249,43 @@ Proof.
   introv Hnonzero Heven Hx Hy.
   follow goleft_even10.
   rewrite lowerL_nonempty by auto. execute.
-  change (right10 (S x) (const 0) << 1) with (lowerR' [S x]).
+  rewrite fold_lowerR'.
   follow goleft_even.
   destruct y. { destruct Hy. lia. }
   unfold lowerL. unfold lowerL'. fold lowerL'.
   follow goleft_odd10. (* could get -->+ here *)
-  rewrite fold_left10, fold_lowerL'.
+  rewrite fold_left10_r, fold_lowerL'.
   follow goright_nonzero'.
   rewrite rev_involutive. execute.
+Qed.
+
+Lemma increment_odd : forall x y xs,
+  Odd (S x) ->
+  lower (S x :: y :: xs) -->*
+  lower (x :: S y :: xs).
+Proof.
+  introv Hx. follow goleft_odd10. execute.
+Qed.
+
+(* This corresponds to overflow followed by empty in Chris Xu's writeup.
+   The config [lower (xs ++ [S y; O])] he lists isn't visited. *)
+Lemma overflow : forall x xs y,
+  Forall (fun n => n <> O) xs ->
+  Forall Even xs ->
+  Even (S x) ->
+  Odd y ->
+  lower (S x :: xs ++ [y]) -->*
+  lower (x :: xs ++ [S y; 1; 0; 0]%nat).
+Proof.
+  introv Hnonzero Heven Hx Hy.
+  follow (goleft_even (S x :: xs)). rewrite app_nil_r.
+  destruct y. { destruct Hy. lia. }
+  unfold lowerL, lowerL'. rewrite <- fold_left10_l.
+  follow goleft_even10. execute.
+
+  change (const 0 << 1 << 1 << 1 << 0 << 1 << 1 << 0)
+    with (lowerL [1; 1; 0; 0])%nat.
+  follow goright_nonzero. rewrite rev_involutive.
+  execute.
+  replace (S (y + 1)) with (S (S y)) by lia. finish.
 Qed.
