@@ -10,15 +10,9 @@ Set Default Goal Selector "!".
 Module Flip (Ctx : Ctx).
   Module Compute := Compute Ctx. Export Compute.
 
-Definition flip_dir (d : dir) :=
-  match d with
-  | L => R
-  | R => L
-  end.
-
-Definition flip_tape (t : tape) :=
+Definition flip_tape (t : tape) : tape :=
   match t with
-  | l {{s}} r => r {{s}} l
+  | l {{s}} r => dflip r {{s}} dflip l
   end.
 
 Definition flip (tm : TM) : TM := fun qs =>
@@ -43,7 +37,10 @@ Definition flip_conf (c : Q * tape) : Q * tape :=
 Lemma flip_conf_involutive : forall c,
   flip_conf (flip_conf c) = c.
 Proof.
-  intros [q [[l s] r]]. reflexivity.
+  intros [q [[l s] r]]. simpl.
+  rewrite (dflip_involutive L).
+  rewrite (dflip_involutive R).
+  reflexivity.
 Qed.
 
 Lemma flip_some : forall tm q s s' d q',
@@ -53,14 +50,30 @@ Proof.
   introv H. unfold flip. rewrite H. destruct d; reflexivity.
 Qed.
 
-#[export] Hint Resolve flip_some : core.
+Local Hint Resolve flip_some : core.
+
+Lemma flip_tape_move_left : forall t,
+  flip_tape (move_left t) = move_right (flip_tape t).
+Proof.
+  intros [[[| s' l] s] r]; reflexivity.
+Qed.
+
+Lemma flip_tape_move_right : forall t,
+  flip_tape (move_right t) = move_left (flip_tape t).
+Proof.
+  intros [[l s] [| s' r]]; reflexivity.
+Qed.
+
+Local Hint Rewrite flip_tape_move_left : flip.
+Local Hint Rewrite flip_tape_move_right : flip.
 
 Lemma flip_step : forall tm c c',
   c -[ tm ]-> c' ->
   flip_conf c -[ flip tm ]-> flip_conf c'.
 Proof.
   introv H.
-  inverts H as E; [apply step_right | apply step_left]; auto.
+  inverts H as E; unfold flip_conf; autorewrite with flip;
+    constructor; auto.
 Qed.
 
 #[export] Hint Resolve flip_step : core.
@@ -100,22 +113,22 @@ Proof.
   rewrite flip_involutive in H. exact H.
 Qed.
 
-Lemma flip_halting : forall tm c,
-  halting tm c -> halting (flip tm) (flip_conf c).
+Lemma flip_halted : forall tm c,
+  halted tm c -> halted (flip tm) (flip_conf c).
 Proof.
   intros tm [q [[l s] r]].
-  unfold halting, flip. simpl.
+  unfold halted, flip. simpl.
   intros H. rewrite H.
   reflexivity.
 Qed.
 
-#[export] Hint Resolve flip_halting : core.
+#[export] Hint Resolve flip_halted : core.
 
 Lemma flip_halts_in : forall tm c n,
   halts_in tm c n -> halts_in (flip tm) (flip_conf c) n.
 Proof.
   introv H.
-  destruct H as [ch [Hexec Hhalting]].
+  destruct H as [ch [Hexec Hhalted]].
   eauto 6.
 Qed.
 

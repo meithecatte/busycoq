@@ -18,26 +18,26 @@ Proof. introv. destruct a. apply in_prod; auto. Qed.
 
 Local Hint Resolve all_qs_spec : core.
 
-Fixpoint side_matches (xs : side) (ys : list Sym) : Prop :=
-  match xs, ys with
-  | _, [] => True
-  | (Cons x xs), y :: ys => x = y /\ side_matches xs ys
+Fixpoint side_matches {d} (xs : side d) (ys : side d) : Prop :=
+  match ys with
+  | dnil => True
+  | dcons y ys => hd xs = y /\ side_matches (tl xs) ys
   end.
 
-Lemma side_matches_nil : forall xs, side_matches xs [].
-Proof. destruct xs. split. Qed.
+Lemma side_matches_nil : forall d (xs : side d), side_matches xs dnil.
+Proof. split. Qed.
 
-Lemma side_matches_cons : forall xs ys,
-  side_matches (Streams.tl xs) ys ->
-  side_matches xs (Streams.hd xs :: ys).
+Lemma side_matches_cons : forall d (xs ys : side d),
+  side_matches (tl xs) ys ->
+  side_matches xs (dcons (hd xs) ys).
 Proof.
-  introv H. destruct xs. simpl in *. intuition.
+  introv H. simpl in *. intuition.
 Qed.
 
 Local Hint Resolve side_matches_nil : core.
 Local Hint Resolve side_matches_cons : core.
 
-Definition stencil : Type := Q * ctape.
+Definition stencil : Type := Q * tape.
 
 Definition matches (t : Q * tape) (t' : stencil) : Prop :=
   match t, t' with
@@ -69,13 +69,13 @@ Definition halting_transitions (tm : TM) :=
     end).
 
 Definition haltings (tm : TM) : list stencil :=
-  map (fun '(q, s) => q;; [] {{s}} []) (halting_transitions tm).
+  map (fun '(q, s) => q;; <[] {{s}} []>) (halting_transitions tm).
 
 Lemma haltings_spec : forall tm c,
-  halting tm c -> Exists (matches c) (haltings tm).
+  halted tm c -> Exists (matches c) (haltings tm).
 Proof.
   introv H. destruct c as [q [[l s] r]].
-  unfold halting in H.
+  unfold halted in H.
   assert (Hfound : In (q, s) (halting_transitions tm)).
   { unfold halting_transitions.
     rewrite <- find_transitions_In.
@@ -87,12 +87,12 @@ Qed.
 
 (* Check if we could've had [s'] on the tape before moving
    in the direction [d]. *)
-Definition symbol_ok (t : ctape) (s' : Sym) (d : dir) :=
+Definition symbol_ok (t : tape) (s' : Sym) (d : dir) :=
   match d, t with
-  | L, _ {{_}} []       => true
-  | L, _ {{_}} (s :: _) => if eqb_sym s s' then true else false
-  | R,       [] {{_}} _ => true
-  | R, (s :: _) {{_}} _ => if eqb_sym s s' then true else false
+  | L, _ {{_}} dnil        => true
+  | L, _ {{_}} (dcons s _) => if eqb_sym s s' then true else false
+  | R,        dnil {{_}} _ => true
+  | R, (dcons s _) {{_}} _ => if eqb_sym s s' then true else false
   end.
 
 (* If we took the [(q, s)] transition and ended up at [st], how did the
@@ -106,8 +106,8 @@ Definition rewind (tm : TM) (st : stencil) (q : Q) (s : Sym) : option stencil :=
       if symbol_ok tfin s' d then
         let '(l, _, r) :=
           match d with
-          | L => right tfin
-          | R => left tfin
+          | L => move_right tfin
+          | R => move_left tfin
           end
         in
         Some (q;; l {{s}} r)
@@ -130,11 +130,11 @@ Proof.
     unfold rewind;
     rewrite Htm; destruct (eqb_q q' q'); try congruence;
     lazymatch goal with
-    | H: side_matches (?side << ?s) ?st |- _ =>
+    | H: side_matches (dcons ?side ?s) ?st |- _ =>
       destruct st; [clear H | inverts H]
     end; simpl;
     lazymatch goal with
-    | |- context [eqb_sym ?s ?s] => destruct (eqb_sym s1 s1); try congruence
+    | |- context [eqb_sym ?s ?s] => destruct (eqb_sym s s); try congruence
     | _ => idtac
     end;
     eexists; repeat split; auto.
@@ -173,7 +173,7 @@ Proof.
 Qed.
 
 Definition verify_backwards (tm : TM) (n : nat) : bool :=
-  if cmultistep tm n starting then
+  if cmultistep tm n c0 then
     forallb (has_contra tm n) (haltings tm)
   else
     false.
@@ -183,7 +183,7 @@ Theorem verify_backwards_correct : forall tm n,
   ~ halts tm c0.
 Proof.
   introv H Hhalts. unfold verify_backwards in H.
-  destruct (cmultistep tm n starting) as [[c' Hexec] |]; try discriminate.
+  destruct (cmultistep tm n c0) as [[c' Hexec] |]; try discriminate.
   destruct Hhalts as [m Hhalts].
   assert (Hle : n <= m)
     by eauto using within_halt.

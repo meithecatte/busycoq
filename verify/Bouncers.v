@@ -228,7 +228,7 @@ Proof.
 Qed.
 
 Lemma cyc_hd_cyc_get : forall cyc,
-  cyc_get cyc = cyc_hd cyc :: tl (cyc_get cyc).
+  cyc_get cyc = cyc_hd cyc :: List.tl (cyc_get cyc).
 Proof.
   intros [[xs ys] [Hcons Hinv]].
   unfold cyc_get, cyc_hd.

@@ -27,10 +27,10 @@ Definition substep_at (tm : TM) (q : Q) (s : Sym) (l r : list Sym)
   | None => None
   end.
 
-Lemma undir_left : forall l s r, undir (L, l, s :: r) = left (l {{s}} r).
+Lemma undir_left : forall l s r, undir (L, l, s :: r) = move_left (l {{s}} r).
 Proof. destruct l; reflexivity. Qed.
 
-Lemma undir_right : forall l s r, undir (R, s :: l, r) = right (l {{s}} r).
+Lemma undir_right : forall l s r, undir (R, s :: l, r) = move_right (l {{s}} r).
 Proof. destruct l; reflexivity. Qed.
 
 Lemma step_left_lift : forall tm q q' s s' l r,

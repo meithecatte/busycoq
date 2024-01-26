@@ -5,11 +5,11 @@ From Coq Require Import Arith.Arith.
 From Coq Require Import Lia.
 From Coq Require Import Lists.List. Import ListNotations.
 From Coq Require Import Program.Tactics.
-From BusyCoq Require Export Permute.
+From BusyCoq Require Export Flip.
 Set Default Goal Selector "!".
 
 Module Cyclers (Ctx : Ctx).
-  Module Permute := Permute Ctx. Export Permute.
+  Module Flip := Flip Ctx. Export Flip.
 
 Lemma cycle_nonhalting :
   forall {tm : TM} {c c' k},
@@ -27,11 +27,11 @@ Local Obligation Tactic := simpl; intros; subst;
 
 Program Definition verify_cycler (tm : TM) (n k : nat) :
   {~ halts tm c0} + {True} :=
-  bind c <- cmultistep tm n starting;
+  bind c <- cmultistep tm n c0;
   bind c' <- cmultistep tm k c;
   match k with
   | 0 => No
-  | S k => Reduce (eqb c c')
+  | S k => Reduce (eqb_conf c c')
   end.
 
 End Cyclers.

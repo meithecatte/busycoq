@@ -2,14 +2,10 @@
 
 From Coq Require Import Bool.Sumbool.
 From Coq Require Import Lists.List. Import ListNotations.
-From Coq Require Import Lists.Streams.
 From Coq Require Import PeanoNat.
 From Coq Require Import Lia.
-From BusyCoq Require Export Helper.
+From BusyCoq Require Export DirectedList.
 Set Default Goal Selector "!".
-
-(** The direction a Turing machine can step in. *)
-Inductive dir : Type := L | R.
 
 (** We parametrize over... *)
 Module Type Ctx.
@@ -49,48 +45,46 @@ Module TM (Ctx : Ctx).
 *)
 Definition TM : Type := Q * Sym -> option (Sym * dir * Q).
 
-Notation side := (Stream Sym).
+Notation side := (dlist Sym).
 
 (** The state of the tape is represented abstractly as a tuple [(l, s, r)],
-    where [v] is the symbol under the head, while [l] and [r] are infinite
-    streams of symbols on the left and right side of the head, respectively. *)
-Notation tape := (side * Sym * side)%type.
+    where [v] is the symbol under the head, while [l] and [r] are lists of
+    symbols on the left and right side of the head, respectively. *)
+Notation tape := (side L * Sym * side R)%type.
 
 (** We define a notation for tapes, evocative of a turing machine's head
     hovering over a particular symbol. **)
 Notation "l {{ s }} r" := (l, s, r)
-  (at level 30, s at next level, only parsing).
+  (at level 65, s at next level, only parsing).
 
-(** Moreover the streams could use some more natural notation, to have
-    the element at the start of the stream be on the right side, as necessary. *)
-Notation "s >> r" := (Cons s r) (at level 25, right associativity).
-Notation "l << s" := (Cons s l) (at level 24, left associativity).
-
-Local Example tape_ex (a b c d e : Sym) : tape :=
-  const s0 << a << b {{c}} d >> e >> const s0.
+Definition hd {d} (xs : side d) : Sym :=
+  match xs with
+  | dnil => s0
+  | dcons x _ => x
+  end.
 
 (** Helper functions for moving the tape head: *)
 Definition move_left (t : tape) : tape :=
   match t with
-  | l {{s}} r => tl l {{hd l}} s >> r
+  | l {{s}} r => tl l {{hd l}} s :> r
   end.
 
 Definition move_right (t : tape) : tape :=
   match t with
-  | l {{s}} r => l << s {{hd r}} tl r
+  | l {{s}} r => l <: s {{hd r}} tl r
   end.
 
 (** Notation for the configuration of a machine. Note that the position
     of the head within the tape is implicit, since the tape is centered
     at the head. *)
-Notation "q ;; t" := (q, t) (at level 35, only parsing).
+Notation "q ;; t" := (q, t) (at level 66, only parsing).
 
 (** For the directed head formulation, we use the following: *)
-Notation "l <{{ q }} r" := (q;; tl l {{hd l}} r)  (at level 30, q at next level).
-Notation "l {{ q }}> r" := (q;; l {{hd r}} tl r)  (at level 30, q at next level).
+Notation "l <{{ q }} r" := (q;; tl l {{hd l}} r)  (at level 66, q at next level).
+Notation "l {{ q }}> r" := (q;; l {{hd r}} tl r)  (at level 66, q at next level).
 
 (** The small-step semantics of Turing machines: *)
-Reserved Notation "c -[ tm ]-> c'" (at level 40).
+Reserved Notation "c -[ tm ]-> c'" (at level 70).
 
 Inductive step (tm : TM) : Q * tape -> Q * tape -> Prop :=
   | step_left q q' s s' l r :
@@ -108,7 +102,7 @@ Arguments step_right {tm q q' s s' l r}.
 #[export] Hint Constructors step : core.
 
 (** If we have an assumption of the form [tm (q, s) = Some (s', d, q')],
-   perform case analysis on [d]. *)
+   perform case analysis on [d] — for use within [auto] hints. *)
 Ltac destruct_dir tm q s :=
   lazymatch goal with
   | H: tm (q, s) = Some (?s', ?d, ?q') |- _ =>
@@ -122,10 +116,10 @@ Ltac destruct_dir tm q s :=
 #[export] Hint Extern 1 =>
   match goal with
   | |- context [?q;; _ {{?s}} _ -[ ?tm ]-> _] => destruct_dir tm q s
-  end : core.
+  end : core. 
 
 (** Executing a specified number of steps: *)
-Reserved Notation "c -[ tm ]->> n / c'" (at level 40, n at next level).
+Reserved Notation "c -[ tm ]->> n / c'" (at level 70, n at level 30).
 
 Inductive multistep (tm : TM) : nat -> Q * tape -> Q * tape -> Prop :=
   | multistep_0 c : c -[ tm ]->> 0 / c
@@ -145,7 +139,7 @@ Inductive multistep (tm : TM) : nat -> Q * tape -> Q * tape -> Prop :=
 
 (** Executing an unspecified number of steps (the "eventually
     reaches" relation): *)
-Reserved Notation "c -[ tm ]->* c'" (at level 40).
+Reserved Notation "c -[ tm ]->* c'" (at level 70).
 
 Inductive evstep (tm : TM) : Q * tape -> Q * tape -> Prop :=
   | evstep_refl c : c -[ tm ]->* c
@@ -159,7 +153,7 @@ Inductive evstep (tm : TM) : Q * tape -> Q * tape -> Prop :=
 #[export] Hint Constructors evstep : core.
 
 (** Executing an unspecified, but non-zero number of steps: *)
-Reserved Notation "c -[ tm ]->+ c'" (at level 40).
+Reserved Notation "c -[ tm ]->+ c'" (at level 70).
 
 Inductive progress (tm : TM) : Q * tape -> Q * tape -> Prop :=
   | progress_base c c' :
@@ -187,41 +181,39 @@ Proof.
 Qed.
 
 (** A halting configuration is one for which [tm (q, s)] returns [None]. *)
-Definition halting (tm : TM) (c : Q * tape) : Prop :=
+Definition halted (tm : TM) (c : Q * tape) : Prop :=
   match c with
   | (q, l {{s}} r) => tm (q, s) = None
   end.
 
 (** The initial configuration of the machine *)
-Definition c0 : Q * tape := q0;; const s0 {{s0}} const s0.
+Definition c0 : Q * tape := q0;; <[] {{s0}} []>.
 
 (** A Turing machine halts if it eventually reaches a halting configuration. *)
 Definition halts_in (tm : TM) (c : Q * tape) (n : nat) :=
-  exists ch, c -[ tm ]->> n / ch /\ halting tm ch.
+  exists ch, c -[ tm ]->> n / ch /\ halted tm ch.
 
 Definition halts (tm : TM) (c0 : Q * tape) :=
   exists n, halts_in tm c0 n.
 
 #[export] Hint Unfold halts halts_in : core.
 
-(** We prove that the "syntactic" notion of [halting] corresponds
+(** We prove that the "syntactic" notion of [halted] corresponds
     to the behavior of [step]. *)
-Lemma halting_no_step :
-  forall tm c c',
-  halting tm c ->
+Lemma halted_no_step : forall tm c c',
+  halted tm c ->
   ~ c -[ tm ]-> c'.
 Proof.
-  introv Hhalting Hstep.
+  introv Hhalted Hstep.
   inverts Hstep; congruence.
 Qed.
 
-Lemma no_halting_step :
-  forall tm c,
-  ~ halting tm c ->
+Lemma no_halted_step : forall tm c,
+  ~ halted tm c ->
   exists c',
   c -[ tm ]-> c'.
 Proof.
-  introv Hhalting.
+  introv H.
   destruct c as [q [[l s] r]].
   destruct (tm (q, s)) as [[[s' d] q'] |] eqn:E.
   - (* tm (q, s) = Some (s', d, q') *)
@@ -315,7 +307,7 @@ Lemma halts_in_S :
   halts_in tm c (S n).
 Proof.
   introv Hhalts Hstep.
-  destruct Hhalts as [ch [Hrun Hhalting]].
+  destruct Hhalts as [ch [Hrun Hhalted]].
   eauto.
 Qed.
 
@@ -332,13 +324,13 @@ Qed.
 
 #[export] Hint Resolve halts_step : core.
 
-Lemma halting_halts :
+Lemma halted_halts :
   forall tm c,
-  halting tm c ->
+  halted tm c ->
   halts tm c.
 Proof. eauto 6. Qed.
 
-#[export] Hint Immediate halting_halts : core.
+#[export] Hint Immediate halted_halts : core.
 
 Lemma progress_trans :
   forall tm c c' c'',
@@ -459,16 +451,16 @@ Proof.
   introv H E. subst n. apply rewind_split; assumption.
 Qed.
 
-Lemma halting_no_multistep:
+Lemma halted_no_multistep:
   forall tm c c' n,
   n > 0 ->
-  halting tm c ->
+  halted tm c ->
   ~ c -[ tm ]->> n / c'.
 Proof.
-  introv Hgt0 Hhalting Hrun.
+  introv Hgt0 Hhalted Hrun.
   inverts Hrun as Hstep Hrest.
   - inverts Hgt0.
-  - eapply halting_no_step in Hhalting. eauto.
+  - eapply halted_no_step in Hhalted. eauto.
 Qed.
 
 Lemma exceeds_halt : forall tm c c' n k,
@@ -477,11 +469,11 @@ Lemma exceeds_halt : forall tm c c' n k,
   c -[ tm ]->> n / c' ->
   False.
 Proof.
-  introv [ch [Hch Hhalting]] Hnk Hexec.
+  introv [ch [Hch Hhalted]] Hnk Hexec.
   eapply (rewind_split' k (n - k)) in Hexec; try lia.
   destruct Hexec as [ch' [H1 H2]].
   deterministic.
-  eapply halting_no_multistep in Hhalting.
+  eapply halted_no_multistep in Hhalted.
   - eauto.
   - lia.
 Qed.
@@ -503,7 +495,7 @@ Lemma preceeds_halt : forall tm c c' n k,
   halts_in tm c' (k - n).
 Proof.
   introv Hhalt Hexec Hle.
-  destruct Hhalt as [ch [Hrunch Hhalting]].
+  destruct Hhalt as [ch [Hrunch Hhalted]].
   apply (rewind_split' n (k - n)) in Hrunch; try lia.
   destruct Hrunch as [cm [H1 H2]].
   deterministic.
