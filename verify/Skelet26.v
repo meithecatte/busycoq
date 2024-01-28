@@ -464,7 +464,7 @@ Corollary do_reset1 : forall n m a,
   exists m' a',
   E1 n a m -->* E0 0 a' m' /\ reset_invariant m'.
 Proof.
-  induction n using N_strong_induction; introv Hinv1 Hinv2.
+  introv Hinv1 Hinv2.
   destruct (step_reset1 n m a Hinv1 Hinv2)
     as [n' [m' [Hsteps [Hless [Hinv1' [Hinv2a' Hinv2b']]]]]].
   destruct n' as [| n'].
