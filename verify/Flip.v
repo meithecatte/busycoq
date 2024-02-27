@@ -100,22 +100,22 @@ Proof.
   rewrite flip_involutive in H. exact H.
 Qed.
 
-Lemma flip_halting : forall tm c,
-  halting tm c -> halting (flip tm) (flip_conf c).
+Lemma flip_halted : forall tm c,
+  halted tm c -> halted (flip tm) (flip_conf c).
 Proof.
   intros tm [q [[l s] r]].
-  unfold halting, flip. simpl.
+  unfold halted, flip. simpl.
   intros H. rewrite H.
   reflexivity.
 Qed.
 
-#[export] Hint Resolve flip_halting : core.
+#[export] Hint Resolve flip_halted : core.
 
 Lemma flip_halts_in : forall tm c n,
   halts_in tm c n -> halts_in (flip tm) (flip_conf c) n.
 Proof.
   introv H.
-  destruct H as [ch [Hexec Hhalting]].
+  destruct H as [ch [Hexec Hhalted]].
   eauto 6.
 Qed.
 

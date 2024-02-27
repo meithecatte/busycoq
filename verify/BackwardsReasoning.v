@@ -68,14 +68,14 @@ Definition halting_transitions (tm : TM) :=
     | None => true
     end).
 
-Definition haltings (tm : TM) : list stencil :=
+Definition halteds (tm : TM) : list stencil :=
   map (fun '(q, s) => q;; [] {{s}} []) (halting_transitions tm).
 
-Lemma haltings_spec : forall tm c,
-  halting tm c -> Exists (matches c) (haltings tm).
+Lemma halteds_spec : forall tm c,
+  halted tm c -> Exists (matches c) (halteds tm).
 Proof.
   introv H. destruct c as [q [[l s] r]].
-  unfold halting in H.
+  unfold halted in H.
   assert (Hfound : In (q, s) (halting_transitions tm)).
   { unfold halting_transitions.
     rewrite <- find_transitions_In.
@@ -174,7 +174,7 @@ Qed.
 
 Definition verify_backwards (tm : TM) (n : nat) : bool :=
   if cmultistep tm n starting then
-    forallb (has_contra tm n) (haltings tm)
+    forallb (has_contra tm n) (halteds tm)
   else
     false.
 
@@ -188,13 +188,13 @@ Proof.
   assert (Hle : n <= m)
     by eauto using within_halt.
 
-  destruct Hhalts as [ch [Hhaltrun Hhalting]].
+  destruct Hhalts as [ch [Hhaltrun Hhalted]].
   apply (rewind_split' (m - n) n) in Hhaltrun; try lia.
   destruct Hhaltrun as [c1 [Hrun1 Hrun2]].
 
-  apply haltings_spec in Hhalting.
-  rewrite Exists_exists in Hhalting.
-  destruct Hhalting as [st [Hin Hmatches]].
+  apply halteds_spec in Hhalted.
+  rewrite Exists_exists in Hhalted.
+  destruct Hhalted as [st [Hin Hmatches]].
 
   rewrite forallb_forall in H. apply H in Hin.
   eapply has_contra_spec; eassumption.

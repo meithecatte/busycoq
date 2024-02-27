@@ -16,17 +16,17 @@ Definition Perm (tm tm' : TM) (f : Q -> Q) :=
     tm (q, s) = Some (s', d, q') ->
     tm' (f q, s) = Some (s', d, f q')).
 
-Lemma perm_halting : forall tm tm' f q t,
+Lemma perm_halted : forall tm tm' f q t,
   Perm tm tm' f ->
-  halting tm (q;; t) ->
-  halting tm' (f q;; t).
+  halted tm (q;; t) ->
+  halted tm' (f q;; t).
 Proof.
   introv [Hnone Hsome] H.
   destruct t as [[l s] r].
   apply Hnone, H.
 Qed.
 
-Local Hint Resolve perm_halting : core.
+Local Hint Resolve perm_halted : core.
 
 Lemma perm_step : forall tm tm' f q t q' t',
   Perm tm tm' f ->

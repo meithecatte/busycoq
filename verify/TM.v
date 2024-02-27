@@ -187,8 +187,8 @@ Proof.
   introv H1 H2. generalize dependent c. induction H2; eauto.
 Qed.
 
-(** A halting configuration is one for which [tm (q, s)] returns [None]. *)
-Definition halting (tm : TM) (c : Q * tape) : Prop :=
+(** The Turing machine has halted if [tm (q, s)] returns [None]. *)
+Definition halted (tm : TM) (c : Q * tape) : Prop :=
   match c with
   | (q, l {{s}} r) => tm (q, s) = None
   end.
@@ -198,31 +198,31 @@ Definition c0 : Q * tape := q0;; const s0 {{s0}} const s0.
 
 (** A Turing machine halts if it eventually reaches a halting configuration. *)
 Definition halts_in (tm : TM) (c : Q * tape) (n : nat) :=
-  exists ch, c -[ tm ]->> n / ch /\ halting tm ch.
+  exists ch, c -[ tm ]->> n / ch /\ halted tm ch.
 
 Definition halts (tm : TM) (c0 : Q * tape) :=
   exists n, halts_in tm c0 n.
 
 #[export] Hint Unfold halts halts_in : core.
 
-(** We prove that the "syntactic" notion of [halting] corresponds
+(** We prove that the "syntactic" notion of [halted] corresponds
     to the behavior of [step]. *)
-Lemma halting_no_step :
+Lemma halted_no_step :
   forall tm c c',
-  halting tm c ->
+  halted tm c ->
   ~ c -[ tm ]-> c'.
 Proof.
-  introv Hhalting Hstep.
+  introv Hhalted Hstep.
   inverts Hstep; congruence.
 Qed.
 
-Lemma no_halting_step :
+Lemma no_halted_step :
   forall tm c,
-  ~ halting tm c ->
+  ~ halted tm c ->
   exists c',
   c -[ tm ]-> c'.
 Proof.
-  introv Hhalting.
+  introv Hhalted.
   destruct c as [q [[l s] r]].
   destruct (tm (q, s)) as [[[s' d] q'] |] eqn:E.
   - (* tm (q, s) = Some (s', d, q') *)
@@ -316,7 +316,7 @@ Lemma halts_in_S :
   halts_in tm c (S n).
 Proof.
   introv Hhalts Hstep.
-  destruct Hhalts as [ch [Hrun Hhalting]].
+  destruct Hhalts as [ch [Hrun Hhalted]].
   eauto.
 Qed.
 
@@ -333,13 +333,13 @@ Qed.
 
 #[export] Hint Resolve halts_step : core.
 
-Lemma halting_halts :
+Lemma halted_halts :
   forall tm c,
-  halting tm c ->
+  halted tm c ->
   halts tm c.
 Proof. eauto 6. Qed.
 
-#[export] Hint Immediate halting_halts : core.
+#[export] Hint Immediate halted_halts : core.
 
 Lemma progress_trans :
   forall tm c c' c'',
@@ -460,16 +460,16 @@ Proof.
   introv H E. subst n. apply rewind_split; assumption.
 Qed.
 
-Lemma halting_no_multistep:
+Lemma halted_no_multistep:
   forall tm c c' n,
   n > 0 ->
-  halting tm c ->
+  halted tm c ->
   ~ c -[ tm ]->> n / c'.
 Proof.
-  introv Hgt0 Hhalting Hrun.
+  introv Hgt0 Hhalted Hrun.
   inverts Hrun as Hstep Hrest.
   - inverts Hgt0.
-  - eapply halting_no_step in Hhalting. eauto.
+  - eapply halted_no_step in Hhalted. eauto.
 Qed.
 
 Lemma exceeds_halt : forall tm c c' n k,
@@ -478,11 +478,11 @@ Lemma exceeds_halt : forall tm c c' n k,
   c -[ tm ]->> n / c' ->
   False.
 Proof.
-  introv [ch [Hch Hhalting]] Hnk Hexec.
+  introv [ch [Hch Hhalted]] Hnk Hexec.
   eapply (rewind_split' k (n - k)) in Hexec; try lia.
   destruct Hexec as [ch' [H1 H2]].
   deterministic.
-  eapply halting_no_multistep in Hhalting.
+  eapply halted_no_multistep in Hhalted.
   - eauto.
   - lia.
 Qed.
@@ -504,7 +504,7 @@ Lemma preceeds_halt : forall tm c c' n k,
   halts_in tm c' (k - n).
 Proof.
   introv Hhalt Hexec Hle.
-  destruct Hhalt as [ch [Hrunch Hhalting]].
+  destruct Hhalt as [ch [Hrunch Hhalted]].
   apply (rewind_split' n (k - n)) in Hrunch; try lia.
   destruct Hrunch as [cm [H1 H2]].
   deterministic.

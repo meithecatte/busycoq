@@ -104,7 +104,7 @@ Local Obligation Tactic := program_simplify; autorewrite with core; try (apply s
 
 (** Computable semantics of Turing machines. *)
 Program Definition cstep (tm : TM) (c : Q * ctape)
-    : {c' | lift c -[ tm ]-> lift c'} + {halting tm (lift c)} :=
+    : {c' | lift c -[ tm ]-> lift c'} + {halted tm (lift c)} :=
   match c with
   | q;; l {{s}} r =>
     match tm (q, s) with
