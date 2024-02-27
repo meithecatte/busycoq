@@ -119,7 +119,7 @@ Ltac destruct_dir tm q s :=
     end
   end.
 
-#[export] Hint Extern 1 =>
+Local Hint Extern 1 =>
   match goal with
   | |- context [?q;; _ {{?s}} _ -[ ?tm ]-> _] => destruct_dir tm q s
   end : core.
@@ -138,9 +138,10 @@ Inductive multistep (tm : TM) : nat -> Q * tape -> Q * tape -> Prop :=
 
 #[export] Hint Constructors multistep : core.
 
-#[export] Hint Extern 1 =>
+Local Hint Extern 1 =>
   lazymatch goal with
-  | H: _ -[ _ ]->> _ / _ |- _ => inverts H
+  | H: _ -[ _ ]->> S _ / _ |- _ => inverts H
+  | H: _ -[ _ ]->> O / _ |- _ => inverts H
   end : core.
 
 (** Executing an unspecified number of steps (the "eventually
@@ -249,7 +250,7 @@ Ltac step_deterministic :=
     pose proof (step_deterministic tm c c' c'' H1 H2); subst c''; clear H2
   end.
 
-#[export] Hint Extern 1 => step_deterministic : core.
+Local Hint Extern 1 => step_deterministic : core.
 
 Lemma multistep_trans :
   forall tm n m c c' c'',
@@ -279,7 +280,7 @@ Ltac multistep_deterministic :=
     pose proof (multistep_deterministic tm n c c' c'' H1 H2); subst c''; clear H2
   end.
 
-#[export] Hint Extern 1 => multistep_deterministic : core.
+Local Hint Extern 1 => multistep_deterministic : core.
 
 Ltac deterministic := repeat (step_deterministic || multistep_deterministic).
 
