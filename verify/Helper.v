@@ -46,6 +46,32 @@ Proof.
   reflexivity.
 Qed.
 
+Fixpoint lpow {A} (l : list A) (n : nat) : list A :=
+  match n with
+  | O => []
+  | S n => l ++ lpow l n
+  end.
+
+Notation "l ^^ n" := (lpow l n) (at level 20).
+
+Lemma lpow_shift : forall {A} (xs : list A) n,
+  xs^^n ++ xs = xs ++ xs^^n.
+Proof.
+  induction n.
+  - simpl. rewrite app_nil_r. reflexivity.
+  - simpl. rewrite <- app_assoc, IHn.
+    reflexivity.
+Qed.
+
+Lemma lpow_add : forall A n m (xs : list A),
+  xs^^(n + m) = xs^^n ++ xs^^m.
+Proof.
+  induction n; introv.
+  - reflexivity.
+  - simpl. rewrite IHn.
+    rewrite app_assoc. reflexivity.
+Qed.
+
 Lemma app_cons_r : forall {A} xs (x : A) ys,
   xs ++ x :: ys = (xs ++ [x]) ++ ys.
 Proof.
@@ -108,6 +134,32 @@ Fixpoint Str_app {A} (xs : list A) (ys : Stream A) : Stream A :=
   | x :: xs => Cons x (Str_app xs ys)
   end.
 
+(** Notation for tapes *)
+Notation "s >> r" := (Cons s r) (at level 25, right associativity).
+Notation "l << s" := (Cons s l) (at level 24, left associativity, only parsing).
+
+Notation "s :> r" := (s :: r) (at level 25, right associativity, only parsing).
+Notation "l <: s" := (s :: l) (at level 24, left associativity, only parsing).
+
+Notation "xs +> r" := (xs ++ r) (at level 25, right associativity, only parsing).
+Notation "l <+ xs" := (xs ++ l) (at level 24, left associativity, only parsing).
+
+Notation "xs *> r" := (Str_app xs r) (at level 25, right associativity).
+Notation "l <* xs" := (Str_app xs l) (at level 24, left associativity, only parsing).
+
+Notation "< [ ]" := nil (only parsing).
+Notation "< [ x ; .. ; y ]" := (cons y .. (cons x []) ..) (only parsing).
+
+Lemma Str_app_assoc {A} (xs ys : list A) (zs : Stream A) :
+  (xs ++ ys) *> zs = xs *> ys *> zs.
+Proof.
+  induction xs.
+  - reflexivity.
+  - simpl. rewrite IHxs. reflexivity.
+Qed.
+
+(** Strong induction principles, because the stdlib ones are incomplete
+    and I can't get them to work. *)
 Lemma strong_induction : forall (P : nat -> Prop),
   (forall n, (forall k, k < n -> P k) -> P n) ->
   forall n, P n.

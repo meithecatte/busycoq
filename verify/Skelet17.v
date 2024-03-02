@@ -22,56 +22,16 @@ Notation "c -->+ c'" := (c -[ tm ]->+ c') (at level 40).
 Notation "l <| r" := (l <{{C}} r) (at level 30).
 Notation "l |> r" := (l {{B}}> r) (at level 30).
 
-(** ** Representing (10)^n *)
-
-(* Perhaps it'd be wise to look into a better way of doing these kinds
-    of manipulations at some point. Appending a list to a stream is
-    a reasonable thing to do... *)
-
-Fixpoint left10 (n : nat) (l : side) : side :=
-  match n with
-  | O => l
-  | S n => left10 n l << 1 << 0
-  end.
-
-Fixpoint right10 (n : nat) (r : side) : side :=
-  match n with
-  | O => r
-  | S n => 1 >> 0 >> right10 n r
-  end.
-
-Lemma shift_left10 : forall n l,
-  left10 n (l << 1 << 0) = left10 n l << 1 << 0.
+Lemma shift10 : forall n l (i o : Sym),
+  l << i << o <* <[i; o]^^n = l <* <[i; o]^^n << i << o.
 Proof.
-  induction n.
-  - auto.
-  - introv. simpl. rewrite IHn. reflexivity.
+  introv.
+  change (l << i << o) with (l <* <[i; o]).
+  rewrite lpow_shift'.
+  reflexivity.
 Qed.
 
-Lemma fold_left10_r : forall n l,
-  left10 n l << 1 << 0 = left10 (S n) l.
-Proof. reflexivity. Qed.
-
-Lemma fold_left10_l : forall n l,
-  left10 n (l << 1 << 0) = left10 (S n) l.
-Proof. exact shift_left10. Qed.
-
-Lemma add_left10 : forall a b l,
-  left10 a (left10 b l) = left10 (a + b) l.
-Proof.
-  induction a; introv.
-  - reflexivity.
-  - simpl. repeat rewrite <- shift_left10.
-    rewrite IHa. reflexivity.
-Qed.
-
-Lemma shift_right10 : forall n r,
-  right10 n (1 >> 0 >> r) = 1 >> 0 >> right10 n r.
-Proof.
-  induction n.
-  - auto.
-  - introv. simpl. rewrite IHn. reflexivity.
-Qed.
+Local Hint Rewrite shift10 : tape_post.
 
 (** ** List-of-exponents representation *)
 
@@ -83,25 +43,25 @@ Qed.
 Fixpoint lowerL' (xs : list nat) : side :=
   match xs with
   | [] => const 0
-  | x::xs => left10 x (lowerL' xs) << 1
+  | x::xs => lowerL' xs <* <[1; 0]^^x << 1
   end.
 
 Definition lowerL (xs : list nat) : side :=
   match xs with
   | [] => const 0
-  | x::xs => left10 x (lowerL' xs)
+  | x::xs => lowerL' xs <* <[1; 0]^^x
   end.
 
 Fixpoint lowerR' (xs : list nat) : side :=
   match xs with
   | [] => const 0
-  | x::xs => 1 >> right10 x (lowerR' xs)
+  | x::xs => 1 >> [1; 0]^^x *> lowerR' xs
   end.
 
 Definition lowerR (xs : list nat) : side :=
   match xs with
   | [] => const 0
-  | x::xs => right10 x (lowerR' xs)
+  | x::xs => [1; 0]^^x *> lowerR' xs
   end.
 
 Definition lower (xs : list nat) : Q * tape :=
@@ -111,10 +71,10 @@ Definition lower' (xs : list nat) : Q * tape :=
   lowerL xs |> lowerR' [].
 
 Lemma lowerL_merge : forall x y ys,
-  left10 x (lowerL (y :: ys)) = lowerL (x + y :: ys).
+  lowerL (y :: ys) <* <[1; 0]^^x = lowerL (x + y :: ys).
 Proof.
   introv.
-  destruct ys as [| y0 ys]; simpl; apply add_left10.
+  destruct ys as [| y0 ys]; simpl_tape; reflexivity.
 Qed.
 
 Lemma lowerL_nonempty : forall xs,
@@ -127,11 +87,11 @@ Proof.
 Qed.
 
 Lemma fold_lowerL' : forall x xs,
-  left10 x (lowerL' xs) << 1 = lowerL' (x :: xs).
+  lowerL' xs <* <[1; 0]^^x << 1 = lowerL' (x :: xs).
 Proof. reflexivity. Qed.
 
 Lemma fold_lowerR' : forall x xs,
-  1 >> right10 x (lowerR' xs) = lowerR' (x :: xs).
+  1 >> [1; 0]^^x *> lowerR' xs = lowerR' (x :: xs).
 Proof. reflexivity. Qed.
 
 Arguments lowerL : simpl never.
@@ -142,35 +102,33 @@ Arguments lowerR' : simpl never.
 (** Basic machine behavior *)
 
 Lemma goright_10 : forall n l r,
-  l |> right10 n r -->* left10 n l |> r.
+  l |> [1; 0]^^n *> r -->* l <* <[1; 0]^^n |> r.
 Proof.
   induction n.
   - triv.
-  - execute. follow IHn.
-    rewrite shift_left10. finish.
+  - execute. follow IHn. simpl_tape. finish.
 Qed.
 
 Lemma goleft_even10 : forall n l r,
   Even n ->
-  left10 n l <| r -->* l <| right10 n r.
+  l <* <[1; 0]^^n <| r -->* l <| [1; 0]^^n *> r.
 Proof.
   introv H. destruct H as [n' H]. rewrite H.
   simpl. rewrite <- plus_n_O. clear n H. rename n' into n.
+  simpl_tape.
   generalize dependent l. generalize dependent r.
-  induction n.
-  - triv.
-  - execute.
-    rewrite <- plus_n_Sm. execute.
-    follow IHn.
-    repeat rewrite shift_right10. finish.
+  induction n; introv.
+  - finish.
+  - execute. follow IHn. simpl_tape. finish.
 Qed.
 
 Lemma goleft_odd10 : forall n l r,
   Even n ->
-  left10 (S n) (l << 1) <| r -->* left10 n (l << 1 << 0 << 1) |> r.
+  l << 1 <* <[1; 0]^^(S n) <| r -->*
+  l <* <[1; 0; 1] <* <[1; 0]^^n |> r.
 Proof.
   introv H.
-  simpl left10. rewrite <- shift_left10.
+  cbn[lpow]. rewrite <- lpow_shift, Str_app_assoc.
   follow goleft_even10. execute.
   follow goright_10. finish.
 Qed.
@@ -178,9 +136,6 @@ Qed.
 (** ** Higher-level behavior *)
 
 Notation Nonzero := (fun n => n <> O).
-
-Arguments left10 : simpl never.
-Arguments right10 : simpl never.
 
 Lemma goright_nonzero : forall xs x x' y ys,
   Forall Nonzero xs ->

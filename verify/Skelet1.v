@@ -25,193 +25,209 @@ Definition tm : TM := fun '(q, s) =>
 Notation "c --> c'" := (c -[ tm ]-> c')   (at level 40).
 Notation "c -->* c'" := (c -[ tm ]->* c') (at level 40).
 Notation "c -->+ c'" := (c -[ tm ]->+ c') (at level 40).
-Notation "f :> t" := (f t)  (at level 25, right associativity, only parsing).
-Notation "t <: f" := (f t)  (at level 24, left associativity, only parsing).
 Notation "l <| r" := (l <{{C}} 1 >> 0 >> r)  (at level 30).
 Notation "l |> r" := (l {{A}}> r)  (at level 30).
 
-Fixpoint run (n : nat) (t : side) : side :=
+Fixpoint run (n : nat) :=
   match n with
-  | O => t << 0
-  | S n => run n t << 1
+  | O => [0]
+  | S n => run n <: 1
   end.
 
-Definition x  (t : side) := t <: run 2 <: run 2.
-Definition Dl (t : side) := t <: run 2 <: run 1.
-Definition Dr (t : side) := run 2 :> run 1 :> t.
-Definition C0 (t : side) := t <: run 2 <: run 3 <: run 2.
-Definition C1 (t : side) := t <: run 2 <: run 0 <: run 1.
-Definition C2 (t : side) := t <: run 4 <: run 2.
-Definition C3 (t : side) := t <: run 1 <: run 1.
+Definition x  := run 2 <+ run 2.
+Definition Dl := run 2 <+ run 1.
+Definition Dr := run 2 +> run 1.
+Definition C0 := run 2 <+ run 3 <+ run 2.
+Definition C1 := run 2 <+ run 0 <+ run 1.
+Definition C2 := run 4 <+ run 2.
+Definition C3 := run 1 <+ run 1.
 Notation C := C3.
 Definition R := const 0.
 Definition L := const 0.
-Definition P  (t : side) := t <: run 2.
-Definition F0 (t : side) := t <: run 4 <: run 3 <: run 2.
-Definition F1 (t : side) := t <: run 4 <: run 0 <: run 1.
-Definition F2 (t : side) := t <: run 6 <: run 2.
-Definition F3 (t : side) := t <: run 3 <: run 1.
-Definition G0 (t : side) := t <: run 2 <: run 3 <: run 3 <: run 2.
-Definition G1 (t : side) := t <: run 2 <: run 3 <: run 0 <: run 1.
-Definition G2 (t : side) := t <: run 2 <: run 5 <: run 2.
+Definition P  := run 2.
+Definition F0 := run 4 <+ run 3 <+ run 2.
+Definition F1 := run 4 <+ run 0 <+ run 1.
+Definition F2 := run 6 <+ run 2.
+Definition F3 := run 3 <+ run 1.
+Definition G0 := run 2 <+ run 3 <+ run 3 <+ run 2.
+Definition G1 := run 2 <+ run 3 <+ run 0 <+ run 1.
+Definition G2 := run 2 <+ run 5 <+ run 2.
 
-Definition Fl (t : side) := t <: C2 <: repeat 7640 x <: Dl <: repeat 10344 x.
-Definition Gl (t : side) :=
-  t <: repeat 300 x <: Dl <: repeat 30826 x <: Dl <: repeat 72142 x <: Dl <:
-  repeat 3076 x <: Dl <: repeat 1538 x <: Dl.
-Definition Gr (t : side) :=
-  repeat 300 x :> Dr :> repeat 30826 x :> Dr :> repeat 72142 x :> Dr :>
-  repeat 3076 x :> Dr :> repeat 1538 x :> Dr :> t.
-Definition Hl (t : side) :=
-  t <: C1 <: Dl <: repeat 299 x <: C1 <: Dl <: repeat 30825 x
-  <: C1 <: Dl <: repeat 72141 x <: C1 <: Dl <: repeat 3075 x
-  <: C1 <: Dl <: repeat 1537 x.
+Definition Fl := C2 <+ x^^7640 <+ Dl <+ x^^10344.
+Definition Gl :=
+  x^^300 <+ Dl <+ x^^30826 <+ Dl <+ x^^72142 <+ Dl <+
+  x^^3076 <+ Dl <+ x^^1538 <+ Dl.
+Definition Gr :=
+  x^^300 +> Dr +> x^^30826 +> Dr +> x^^72142 +> Dr +>
+  x^^3076 +> Dr +> x^^1538 +> Dr.
+Definition Hl :=
+  C1 <+ Dl <+ x^^299 <+ C1 <+ Dl <+ x^^30825 <+
+  C1 <+ Dl <+ x^^72141 <+ C1 <+ Dl <+ x^^3075 <+
+  C1 <+ Dl <+ x^^1537.
 
-Lemma rule_x_left  : forall l r,       l <: x <| r -->* l <| x :> r.
+Lemma rule_x_left  : forall l r,       l <* x <| r -->* l <| x *> r.
 Proof. triv. Qed.
-Lemma rule_D_left  : forall l r,      l <: Dl <| r -->* l <| Dr :> r.
+Lemma rule_D_left  : forall l r,      l <* Dl <| r -->* l <| Dr *> r.
 Proof. triv. Qed.
-Lemma rule_C_left  : forall l r,       l <: C <| r -->* l <| C :> r.
+Lemma rule_C_left  : forall l r,       l <* C <| r -->* l <| C *> r.
 Proof. triv. Qed.
-Lemma rule_x_right : forall l r,       l |> x :> r -->* l <: x |> r.
+Lemma rule_x_right : forall l r,       l |> x *> r -->* l <* x |> r.
 Proof. triv. Qed.
-Lemma rule_D_right : forall l r,      l |> Dr :> r -->* l <: Dl |> r.
+Lemma rule_D_right : forall l r,      l |> Dr *> r -->* l <* Dl |> r.
 Proof. triv. Qed.
-Lemma rule_xR      : forall l,         l <: x |> R -->* l <| C :> x :> P :> R.
+Lemma rule_xR      : forall l,         l <* x |> R -->* l <| C *> x *> P *> R.
 Proof. unfold R, C, x, P. triv. Qed.
-Lemma rule_DR      : forall l,        l <: Dl |> R -->* l <| x :> R.
+Lemma rule_DR      : forall l,        l <* Dl |> R -->* l <| x *> R.
 Proof. unfold R, x. triv. Qed.
-Lemma rule_L       : forall r,    L <| C :> x :> r -->* L <: C1 <: Dl |> P :> r.
+Lemma rule_L       : forall r,    L <| C *> x *> r -->* L <* C1 <* Dl |> P *> r.
 Proof. unfold L, C1, Dl, C. triv. Qed.
-Lemma rule_C30     : forall l r,  l <: x |> C :> r -->* l <: C0 |> r.
+Lemma rule_C30     : forall l r,  l <* x |> C *> r -->* l <* C0 |> r.
 Proof. triv. Qed.
-Lemma rule_C01     : forall l r,      l <: C0 <| r -->* l <: C1 <: x |> r.
+Lemma rule_C01     : forall l r,      l <* C0 <| r -->* l <* C1 <* x |> r.
 Proof. triv. Qed.
-Lemma rule_C12     : forall l r,      l <: C1 <| r -->* l <: C2 |> r.
+Lemma rule_C12     : forall l r,      l <* C1 <| r -->* l <* C2 |> r.
 Proof. triv. Qed.
-Lemma rule_C23     : forall l r,      l <: C2 <| r -->* l <: C <: x |> r.
+Lemma rule_C23     : forall l r,      l <* C2 <| r -->* l <* C <* x |> r.
 Proof. triv. Qed.
-Lemma rule_DC      : forall l r, l <: Dl |> C :> r -->* l <: P <: x |> r.
+Lemma rule_DC      : forall l r, l <* Dl |> C *> r -->* l <* P <* x |> r.
 Proof. triv. Qed.
-Lemma rule_C2_C    : forall l r, l <: C2 |> C :> r -->* l <: F0 |> r.
+Lemma rule_C2_C    : forall l r, l <* C2 |> C *> r -->* l <* F0 |> r.
 Proof. triv. Qed.
-Lemma rule_F0      : forall l r,      l <: F0 <| r -->* l <: F1 <: x |> r.
+Lemma rule_F0      : forall l r,      l <* F0 <| r -->* l <* F1 <* x |> r.
 Proof. triv. Qed.
-Lemma rule_F1      : forall l r,      l <: F1 <| r -->* l <: F2 |> r.
+Lemma rule_F1      : forall l r,      l <* F1 <| r -->* l <* F2 |> r.
 Proof. triv. Qed.
-Lemma rule_F2      : forall l r,      l <: F2 <| r -->* l <: F3 <: x |> r.
+Lemma rule_F2      : forall l r,      l <* F2 <| r -->* l <* F3 <* x |> r.
 Proof. triv. Qed.
-Lemma rule_F3      : forall l r, l <: x <: F3 <| r -->* l <: P <: C1 <: Dl |> r.
+Lemma rule_F3      : forall l r, l <* x <* F3 <| r -->* l <* P <* C1 <* Dl |> r.
 Proof. triv. Qed.
-Lemma rule_C03     : forall l r, l <: C0 |> C :> r -->* l <: G0 |> r.
+Lemma rule_C03     : forall l r, l <* C0 |> C *> r -->* l <* G0 |> r.
 Proof. triv. Qed.
-Lemma rule_G0      : forall l r,      l <: G0 <| r -->* l <: G1 <: x |> r.
+Lemma rule_G0      : forall l r,      l <* G0 <| r -->* l <* G1 <* x |> r.
 Proof. triv. Qed.
-Lemma rule_G1      : forall l r,      l <: G1 <| r -->* l <: G2 |> r.
+Lemma rule_G1      : forall l r,      l <* G1 <| r -->* l <* G2 |> r.
 Proof. triv. Qed.
-Lemma rule_G2      : forall l r,      l <: G2 <| r -->* l <: P <: Dl <: x |> r.
+Lemma rule_G2      : forall l r,      l <* G2 <| r -->* l <* P <* Dl <* x |> r.
 Proof. triv. Qed.
-Lemma rule_P_left  : forall l r,       l <: P <| r -->* l <| P :> r.
+Lemma rule_P_left  : forall l r,       l <* P <| r -->* l <| P *> r.
 Proof. triv. Qed.
-Lemma rule_P_P     : forall l r,  l |> P :> P :> r -->* l <: x |> r.
+Lemma rule_P_P     : forall l r,  l |> P *> P *> r -->* l <* x |> r.
 Proof. triv. Qed.
-Lemma rule_P_x     : forall l r,  l |> P :> x :> r -->* l <: x |> P :> r.
+Lemma rule_P_x     : forall l r,  l |> P *> x *> r -->* l <* x |> P *> r.
 Proof. triv. Qed.
-Lemma rule_P_R     : forall l,         l |> P :> R -->* l <| P :> R.
+Lemma rule_P_R     : forall l,         l |> P *> R -->* l <| P *> R.
 Proof. unfold P, R. triv. Qed.
 Lemma rule_P_Dx    : forall l r,
-  l |> P :> Dr :> x :> r -->* l <: C1 <: Dl |> P :> r.
+  l |> P *> Dr *> x *> r -->* l <* C1 <* Dl |> P *> r.
 Proof. triv. Qed.
 Lemma rule_P_Cx    : forall l r,
-  l |> P :> C :> x :> r -->* l <| P :> Dr :> P :> r.
+  l |> P *> C *> x *> r -->* l <| P *> Dr *> P *> r.
 Proof. triv. Qed.
 Lemma rule_P_DP    : forall l r,
-  l |> P :> Dr :> P :> r -->* l <: C1 <: Dl |> r.
+  l |> P *> Dr *> P *> r -->* l <* C1 <* Dl |> r.
 Proof. triv. Qed.
 Lemma rule_P_DDx   : forall l r,
-  l |> P :> Dr :> Dr :> x :> r -->* l <: C2 <: C1 <: Dl |> r.
+  l |> P *> Dr *> Dr *> x *> r -->* l <* C2 <* C1 <* Dl |> r.
 Proof. triv. Qed.
 Lemma rule_P_DCx   : forall l r,
-  l |> P :> Dr :> C :> x :> r -->* l <: G1 <: Dl |> P :> r.
+  l |> P *> Dr *> C *> x *> r -->* l <* G1 <* Dl |> P *> r.
 Proof. triv. Qed.
 
+Opaque x Dl Dr C0 C1 C2 C3 P F0 F1 F2 F3 G0 G1 G2.
+
 Lemma rule_xn_left : forall n l r,
-  l <: repeat n x <| r -->* l <| repeat n x :> r.
-Proof. induction n; triv. rewrite repeat_shift. finish. Qed.
+  l <* x^^n <| r -->* l <| x^^n *> r.
+Proof.
+  induction n; introv.
+  - finish.
+  - simpl_tape.
+    follow rule_x_left.
+    follow IHn.
+    simpl_tape. finish.
+Qed.
 
 Lemma rule_xn_right : forall n l r,
-  l |> repeat n x :> r -->* l <: repeat n x |> r.
-Proof. induction n; triv. rewrite repeat_shift. finish. Qed.
+  l |> x^^n *> r -->* l <* x^^n |> r.
+Proof.
+  induction n; introv.
+  - finish.
+  - simpl_tape.
+    follow rule_x_right.
+    follow IHn.
+    simpl_tape. finish.
+Qed.
 
 Lemma rule_P_xn    : forall n l r,
-  l |> P :> repeat n x :> r -->* l <: repeat n x |> P :> r.
+  l |> P *> x^^n *> r -->* l <* x^^n |> P *> r.
 Proof.
-  induction n.
-  - triv.
-  - introv.
-    simpl. follow rule_P_x. follow IHn.
-    rewrite repeat_shift.
-    finish.
+  induction n; introv.
+  - finish.
+  - simpl_tape.
+    follow rule_P_x. follow IHn.
+    simpl_tape. finish.
 Qed.
 
 Lemma rule_P_DG    : forall l r,
-  l |> P :> Dr :> Gr :> r  -->*  l <: Hl |> P :> Dr :> r.
+  l |> P *> Dr *> Gr *> r  -->*  l <* Hl |> P *> Dr *> r.
 Proof.
   introv. unfold Gr.
-  rewrite (repeat_S 299).
+  rewrite (lpow_S 299). autorewrite with tape_post.
   follow rule_P_Dx. follow rule_P_xn.
-  rewrite (repeat_S 30825).
+  rewrite (lpow_S 30825). autorewrite with tape_post.
   follow rule_P_Dx. follow rule_P_xn.
-  rewrite (repeat_S 72141).
+  rewrite (lpow_S 72141). autorewrite with tape_post.
   follow rule_P_Dx. follow rule_P_xn.
-  rewrite (repeat_S 3075).
+  rewrite (lpow_S 3075). autorewrite with tape_post.
   follow rule_P_Dx. follow rule_P_xn.
-  rewrite (repeat_S 1537).
+  rewrite (lpow_S 1537). autorewrite with tape_post.
   follow rule_P_Dx. follow rule_P_xn.
+  unfold Hl. autorewrite with tape_post.
   finish.
 Qed.
 
 Lemma rule_P_DGn   : forall n l r,
-  l |> P :> Dr :> repeat n Gr :> r  -->*  l <: repeat n Hl |> P :> Dr :> r.
+  l |> P *> Dr *> Gr^^n *> r  -->*  l <* Hl^^n |> P *> Dr *> r.
 Proof.
   induction n; introv.
   - finish.
-  - simpl repeat. follow rule_P_DG. follow IHn.
-    rewrite repeat_shift. finish.
+  - simpl_tape. follow rule_P_DG. follow IHn.
+    simpl_tape. finish.
 Qed.
 
-Lemma rule_G_right : forall l r, l |> Gr :> r -->* l <: Gl |> r.
+Lemma rule_G_right : forall l r, l |> Gr *> r -->* l <* Gl |> r.
 Proof.
   introv. unfold Gl, Gr.
+  autorewrite with tape_post.
   repeat (follow rule_xn_right; follow rule_D_right).
   finish.
 Qed.
 
 Lemma rule_Gn_right : forall n l r,
-  l |> repeat n Gr :> r -->* l <: repeat n Gl |> r.
+  l |> Gr^^n *> r -->* l <* Gl^^n |> r.
 Proof.
   induction n; introv.
   - finish.
-  - simpl repeat. follow rule_G_right.
-    follow IHn. rewrite repeat_shift.
-    finish.
+  - simpl_tape. follow rule_G_right.
+    follow IHn.
+    simpl_tape. finish.
 Qed.
 
-Lemma rule_G_left : forall l r, l <: Gl <| r -->* l <| Gr :> r.
+Lemma rule_G_left : forall l r, l <* Gl <| r -->* l <| Gr *> r.
 Proof.
   introv. unfold Gl, Gr.
+  autorewrite with tape_post.
   repeat (follow rule_D_left; follow rule_xn_left).
   finish.
 Qed.
 
 Lemma rule_Gn_left : forall n l r,
-  l <: repeat n Gl <| r -->* l <| repeat n Gr :> r.
+  l <* Gl^^n <| r -->* l <| Gr^^n *> r.
 Proof.
   induction n; introv.
   - finish.
-  - simpl repeat. follow rule_G_left.
-    follow IHn. rewrite repeat_shift.
-    finish.
+  - simpl_tape. follow rule_G_left.
+    follow IHn.
+    simpl_tape. finish.
 Qed.
 
 Inductive lsym :=
@@ -261,14 +277,17 @@ Definition uni_P : positive := 53946.
 Definition uni_T : positive := 4 * uni_P - 5.
 
 Definition eqb_l (a b : lsym) : {a = b} + {a <> b}.
+Proof.
   decide equality; apply Pos.eq_dec.
 Defined.
 
 Definition eqb_r (a b : rsym) : {a = b} + {a <> b}.
+Proof.
   decide equality; apply Pos.eq_dec.
 Defined.
 
 Definition eqb_rtape (xs ys : rtape) : {xs = ys} + {xs <> ys}.
+Proof.
   decide equality; apply eqb_r.
 Defined.
 
@@ -280,33 +299,33 @@ Notation conf := (dir * ltape * rtape)%type.
 Fixpoint lift_right (t : rtape) : side :=
   match t with
   | [] => R
-  | r_xs n :: t => repeat (Pos.to_nat n) x :> lift_right t
-  | r_D :: t => Dr :> lift_right t
-  | r_C :: t => C :> lift_right t
-  | r_P :: t => P :> lift_right t
-  | r_Gs n :: t => repeat (Pos.to_nat n) Gr :> lift_right t
+  | r_xs n :: t => x^^(Pos.to_nat n) *> lift_right t
+  | r_D :: t => Dr *> lift_right t
+  | r_C :: t => C *> lift_right t
+  | r_P :: t => P *> lift_right t
+  | r_Gs n :: t => Gr^^(Pos.to_nat n) *> lift_right t
   end.
 
 Fixpoint lift_left (t : ltape) : side :=
   match t with
   | [] => L
-  | l_xs n :: t => lift_left t <: repeat (Pos.to_nat n) x
-  | l_D :: t => lift_left t <: Dl
-  | l_P :: t => lift_left t <: P
-  | l_C0 :: t => lift_left t <: C0
-  | l_C1 :: t => lift_left t <: C1
-  | l_C2 :: t => lift_left t <: C2
-  | l_C3 :: t => lift_left t <: C3
-  | l_F0 :: t => lift_left t <: F0
-  | l_F1 :: t => lift_left t <: F1
-  | l_F2 :: t => lift_left t <: F2
-  | l_F3 :: t => lift_left t <: F3
-  | l_G0 :: t => lift_left t <: G0
-  | l_G1 :: t => lift_left t <: G1
-  | l_G2 :: t => lift_left t <: G2
-  | l_Fs n :: t => lift_left t <: repeat (Pos.to_nat n) Fl
-  | l_Gs n :: t => lift_left t <: repeat (Pos.to_nat n) Gl
-  | l_Hs n :: t => lift_left t <: repeat (Pos.to_nat n) Hl
+  | l_xs n :: t => lift_left t <* x^^(Pos.to_nat n)
+  | l_D :: t => lift_left t <* Dl
+  | l_P :: t => lift_left t <* P
+  | l_C0 :: t => lift_left t <* C0
+  | l_C1 :: t => lift_left t <* C1
+  | l_C2 :: t => lift_left t <* C2
+  | l_C3 :: t => lift_left t <* C3
+  | l_F0 :: t => lift_left t <* F0
+  | l_F1 :: t => lift_left t <* F1
+  | l_F2 :: t => lift_left t <* F2
+  | l_F3 :: t => lift_left t <* F3
+  | l_G0 :: t => lift_left t <* G0
+  | l_G1 :: t => lift_left t <* G1
+  | l_G2 :: t => lift_left t <* G2
+  | l_Fs n :: t => lift_left t <* Fl^^(Pos.to_nat n)
+  | l_Gs n :: t => lift_left t <* Gl^^(Pos.to_nat n)
+  | l_Hs n :: t => lift_left t <* Hl^^(Pos.to_nat n)
   end.
 
 Definition lift (c : conf) : Q * tape :=
@@ -385,30 +404,30 @@ Ltac prove_liftrule :=
   intros n t; destruct n; try reflexivity;
   destruct t as [| [] t]; try reflexivity;
   simpl; rewrite Pos2Nat.inj_add;
-  rewrite repeat_add; reflexivity.
+  rewrite lpow_add; simpl_tape; reflexivity.
 
 Lemma lift_lxs : forall n l,
-  lift_left (lxs n l) = lift_left l <: repeat (N.to_nat n) x.
+  lift_left (lxs n l) = lift_left l <* x^^(N.to_nat n).
 Proof. prove_liftrule. Qed.
 
 Lemma lift_rxs : forall n r,
-  lift_right (rxs n r) = repeat (N.to_nat n) x :> lift_right r.
+  lift_right (rxs n r) = x^^(N.to_nat n) *> lift_right r.
 Proof. prove_liftrule. Qed.
 
 Lemma lift_Fls : forall n l,
-  lift_left (Fls n l) = lift_left l <: repeat (N.to_nat n) Fl.
+  lift_left (Fls n l) = lift_left l <* Fl^^(N.to_nat n).
 Proof. prove_liftrule. Qed.
 
 Lemma lift_Gls : forall n l,
-  lift_left (Gls n l) = lift_left l <: repeat (N.to_nat n) Gl.
+  lift_left (Gls n l) = lift_left l <* Gl^^(N.to_nat n).
 Proof. prove_liftrule. Qed.
 
 Lemma lift_Grs : forall n r,
-  lift_right (Grs n r) = repeat (N.to_nat n) Gr :> lift_right r.
+  lift_right (Grs n r) = Gr^^(N.to_nat n) *> lift_right r.
 Proof. prove_liftrule. Qed.
 
 Lemma lift_Hls : forall n l,
-  lift_left (Hls n l) = lift_left l <: repeat (N.to_nat n) Hl.
+  lift_left (Hls n l) = lift_left l <* Hl^^(N.to_nat n).
 Proof. prove_liftrule. Qed.
 
 Ltac pos_nat p :=
@@ -447,7 +466,7 @@ Definition unrxs (r : rtape) : option rtape :=
 
 Lemma unrxs_spec : forall r r',
   unrxs r = Some r' ->
-  lift_right r = x :> lift_right r'.
+  lift_right r = x *> lift_right r'.
 Proof.
   introv H.
   destruct r as [| [] r]; try discriminate; inverts H.
@@ -455,6 +474,9 @@ Proof.
   - cbn[lift_right].
     rewrite lift_Grs.
     handle_decr.
+    cbn[lpow].
+    unfold Gr at 1.
+    autorewrite with tape_post.
     reflexivity.
 Qed.
 
@@ -988,27 +1010,27 @@ Qed.
 Theorem stride_correct' : forall k t t' xs l,
   stride_level t = k ->
   stride xs 1 t = Some t' ->
-  l <: repeat (N.to_nat xs) x |> lift_right t -->* l <| lift_right t'.
+  l <* x^^(N.to_nat xs) |> lift_right t -->* l <| lift_right t'.
 Proof.
   (* We do induction on k, and then on t. This duplicates most of the cases,
      so we hoist them here manually. *)
   assert (case_xs : forall t t' xs xs' l,
     (forall t' xs l, stride xs 1 t = Some t' ->
-      l <: repeat (N.to_nat xs) x |> lift_right t -->* l <| lift_right t') ->
+      l <* x^^(N.to_nat xs) |> lift_right t -->* l <| lift_right t') ->
     stride xs 1 (r_xs xs' :: t) = Some t' ->
-    l <: repeat (N.to_nat xs) x |> lift_right (r_xs xs' :: t)
+    l <* x^^(N.to_nat xs) |> lift_right (r_xs xs' :: t)
       -->* l <| lift_right t').
   { introv IH H.
     simpl in H. eapply IH in H.
     simpl. follow rule_xn_right.
-    rewrite <- repeat_add.
+    rewrite <- Str_app_assoc, <- lpow_add.
     follow H. finish. }
 
   assert (case_D : forall t t' xs l,
     (forall t' xs l, stride xs 1 t = Some t' ->
-      l <: repeat (N.to_nat xs) x |> lift_right t -->* l <| lift_right t') ->
+      l <* x^^(N.to_nat xs) |> lift_right t -->* l <| lift_right t') ->
     stride xs 1 (r_D :: t) = Some t' ->
-    l <: repeat (N.to_nat xs) x |> lift_right (r_D :: t)
+    l <* x^^(N.to_nat xs) |> lift_right (r_D :: t)
       -->* l <| lift_right t').
   { introv IH H.
     simpl in H.
@@ -1022,9 +1044,9 @@ Proof.
 
   assert (case_Gs : forall t t' gs xs l,
     (forall t' xs l, stride xs 1 t = Some t' ->
-      l <: repeat (N.to_nat xs) x |> lift_right t -->* l <| lift_right t') ->
+      l <* x^^(N.to_nat xs) |> lift_right t -->* l <| lift_right t') ->
     stride xs 1 (r_Gs gs :: t) = Some t' ->
-    l <: repeat (N.to_nat xs) x |> lift_right (r_Gs gs :: t)
+    l <* x^^(N.to_nat xs) |> lift_right (r_Gs gs :: t)
       -->* l <| lift_right t').
   { introv IH H.
     simpl in H.
@@ -1038,7 +1060,7 @@ Proof.
 
   assert (case_P : forall t t' xs l,
     stride xs 1 (r_P :: t) = Some t' ->
-    l <: repeat (N.to_nat xs) x |> lift_right (r_P :: t)
+    l <* x^^(N.to_nat xs) |> lift_right (r_P :: t)
       -->* l <| lift_right t').
   { introv H. destruct t; inverts H.
     follow rule_P_R. follow rule_xn_left.
@@ -1094,7 +1116,7 @@ Qed.
 
 Corollary stride_correct : forall t t' xs l,
   stride xs 1 t = Some t' ->
-  l <: repeat (N.to_nat xs) x |> lift_right t -->* l <| lift_right t'.
+  l <* x^^(N.to_nat xs) |> lift_right t -->* l <| lift_right t'.
 Proof.
   introv. eapply stride_correct'; intuition.
 Qed.
@@ -1415,8 +1437,10 @@ Proof.
   - apply step_spec, H.
 Qed.
 
-Lemma init : c0 -->* L <: C1 |> P :> R.
-Proof. unfold L, C1, R. execute. Qed.
+Transparent C1 P.
+
+Lemma init : c0 -->* L <* C1 |> P *> R.
+Proof. unfold L, C1, P, R. simpl_tape. execute. Qed.
 
 Definition initial: conf := (right, [l_C1], [r_P]).
 

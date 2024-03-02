@@ -85,19 +85,19 @@ Qed.
 Fixpoint T (n : dorf) : side :=
   match n with
   | zend => const 0
-  | zO n' => T n' << 0 << 0
-  | zIO n' => T n' << 1 << 0 << 1 << 0
+  | zO n' => T n' <* <[0; 0]
+  | zIO n' => T n' <* <[1; 0; 1; 0]
   end.
 
 Definition L (n : dorf) : side :=
   match n with
   | zend => const 0
   | zO n' => T n'
-  | zIO n' => T n' << 1 << 0
+  | zIO n' => T n' <* <[1; 0]
   end.
 
 Lemma incr_left : forall n r,
-  T n <{{D}} 1 >> 1 >> r -->* T (zI n) {{A}}> r.
+  T n <{{D}} [1; 1] *> r -->* T (zI n) {{A}}> r.
 Proof.
   induction n; triv.
 Qed.

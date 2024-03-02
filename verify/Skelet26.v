@@ -17,31 +17,13 @@ Definition tm : TM := fun '(q, s) =>
   | E, 0 => Some (1, L, C)  | E, 1 => None
   end.
 
+From BusyCoq Require Import ShiftOverflowBins.
+
 Notation "c --> c'" := (c -[ tm ]-> c')   (at level 40).
 Notation "c -->* c'" := (c -[ tm ]->* c') (at level 40).
 Notation "c -->+ c'" := (c -[ tm ]->+ c') (at level 40).
 
 Notation P := Pos.succ.
-
-Fixpoint L' (n : positive) : side :=
-  match n with
-  | xH => const 0 << 1 << 0 << 0 << 0
-  | xO n => L' n << 0 << 0 << 0 << 0
-  | xI n => L' n << 1 << 0 << 0 << 0
-  end.
-
-Definition L (n : N) : side :=
-  match n with
-  | N0 => const 0
-  | Npos n => L' n
-  end.
-
-Fixpoint R (n : positive) : side :=
-  match n with
-  | xH => 1 >> 1 >> const 0
-  | xO n => 1 >> 0 >> R n
-  | xI n => 1 >> 1 >> R n
-  end.
 
 Definition D n a m : Q * tape :=
   L n <{{D}} 1 >> 0 >> 1 >> a >> R m.
@@ -93,50 +75,29 @@ Proof.
   introv H. generalize dependent l. induction H; triv.
 Qed.
 
-Fixpoint K0' (n : positive) : side :=
-  match n with
-  | xH =>    const 0 << 1 << 0 << 0
-  | xO n => K0' n << 0 << 0 << 0 << 0
-  | xI n => K0' n << 0 << 1 << 0 << 0
-  end.
-
-Definition K0 (n : N) : side :=
-  match n with
-  | N0 => const 0
-  | Npos n => K0' n
-  end.
-
-Fixpoint K1' (n : positive) : side :=
+Fixpoint J' (n : positive) : side :=
   match n with
   | xH =>    const 0 << 1
-  | xO n => K1' n << 0 << 0 << 0 << 0
-  | xI n => K1' n << 0 << 0 << 0 << 1
+  | xO n => J' n << 0 << 0 << 0 << 0
+  | xI n => J' n << 0 << 0 << 0 << 1
   end.
 
-Definition K1 (n : N) : side :=
+Definition J (n : N) : side :=
   match n with
   | N0 => const 0
-  | Npos n => K1' n
+  | Npos n => J' n
   end.
 
-Lemma L_as_K0 : forall n,
-  L n = K0 n << 0.
-Proof.
-  destruct n as [| n].
-  - apply const_unfold.
-  - simpl. induction n; simpl; try rewrite IHn; reflexivity.
-Qed.
-
-Lemma L_as_K1 : forall n,
-  L n = K1 n << 0 << 0 << 0.
+Lemma L_as_J : forall n,
+  L n = J n << 0 << 0 << 0.
 Proof.
   destruct n as [| n].
   - repeat rewrite <- const_unfold. reflexivity.
   - simpl. induction n; simpl; try rewrite IHn; reflexivity.
 Qed.
 
-Lemma K0_as_K1 : forall n,
-  K0 n = K1 n << 0 << 0.
+Lemma K_as_J : forall n,
+  K n = J n << 0 << 0.
 Proof.
   destruct n as [| n].
   - repeat rewrite <- const_unfold. reflexivity.
@@ -144,17 +105,17 @@ Proof.
 Qed.
 
 Definition E0 n a m : Q * tape :=
-  K0 n <{{D}} 1 >> 0 >> 1 >> a >> R m.
+  K n <{{D}} 1 >> 0 >> 1 >> a >> R m.
 
 Definition E1 n a m : Q * tape :=
-  K1 n <{{D}} 1 >> 0 >> 1 >> a >> R m.
+  J n <{{D}} 1 >> 0 >> 1 >> a >> R m.
 
 Theorem start_reset0 : forall n m,
   all1 m ->
   D n 0 m -->+ E0 (N.succ n) 1 (P m).
 Proof.
   introv H. unfold D.
-  follow L_inc. rewrite L_as_K0.
+  follow L_inc. rewrite L_as_K.
   execute. follow R_inc_all1.
   execute.
 Qed.
@@ -168,12 +129,12 @@ Theorem start_reset1 : forall n m,
 Proof.
   introv H. unfold D. induction H.
   - exists 1%positive. split. { reflexivity. }
-    follow L_inc. rewrite L_as_K1. cases n; execute.
+    follow L_inc. rewrite L_as_J. cases n; execute.
   - destruct IHall1 as [m'' [H1 _]].
     exists (m''~0)%positive. split. { lia. }
     follow L_inc.
     start_progress.
-    rewrite L_as_K1. follow R_inc_all1.
+    rewrite L_as_J. follow R_inc_all1.
     rewrite H1. cases n; execute.
 Qed.
 
@@ -182,7 +143,7 @@ Lemma eat_LI : forall l t,
   l <{{D}} R (t~1~1).
 Proof. triv. Qed.
 
-Lemma eat_K0I : forall l t,
+Lemma eat_KI : forall l t,
   has0 t ->
   l << 0 << 1 << 0 << 0 <{{D}} R t -->*
   l <{{D}} R (P t)~1~0.
@@ -191,7 +152,7 @@ Proof.
   follow R_inc_has0. execute.
 Qed.
 
-Lemma eat_K1I : forall l t,
+Lemma eat_JI : forall l t,
   has0 t ->
   l << 0 << 1 <{{D}} R t -->*
   l <{{D}} R (P t)~0.
@@ -255,7 +216,7 @@ Lemma eat_bin_max0 : forall k l t,
   l <{{D}} 1 >> 0 >> 1 >> 1 >> R (pow4 k (P t)).
 Proof.
   induction k; introv H.
-  - follow eat_K0I. finish.
+  - follow eat_KI. finish.
   - simpl. follow eat_LI. follow (IHk l (t~1~1)%positive). finish.
 Qed.
 
@@ -265,7 +226,7 @@ Lemma eat_bin_max1 : forall k l t,
   l <{{D}} 1 >> 0 >> R (pow4 k (P t)).
 Proof.
   induction k; introv H.
-  - follow eat_K1I. finish.
+  - follow eat_JI. finish.
   - simpl. follow eat_LI. follow (IHk l (t~1~1)%positive). finish.
 Qed.
 
@@ -300,7 +261,7 @@ Proof.
   - exists 3%positive. unfold f. lia.
 Qed.
 
-Lemma drop_K0I : forall l m k a,
+Lemma drop_KI : forall l m k a,
   (pow2 k - 1 <= b m)%N ->
   Lk (bin_min k) (l << 0 << 1 << 0 << 0) <{{D}} 1 >> 0 >> 1 >> a >> R m -->*
   l <{{D}} 1 >> 0 >> 1 >> 1 >> R (pow4 k (P (f m a k))).
@@ -312,7 +273,7 @@ Proof.
   follow eat_bin_max0. finish.
 Qed.
 
-Lemma drop_K1I : forall l m k a,
+Lemma drop_JI : forall l m k a,
   (pow2 k - 1 <= b m)%N ->
   Lk (bin_min k) (l << 0 << 1) <{{D}} 1 >> 0 >> 1 >> a >> R m -->*
   l <{{D}} 1 >> 0 >> R (pow4 k (P (f m a k))).
@@ -324,8 +285,8 @@ Proof.
   follow eat_bin_max1. finish.
 Qed.
 
-Lemma prepare_K0 : forall (n : N), (n > 0)%N -> exists (k : nat) (n' : N),
-  K0 n = Lk (bin_min k) (K0 n' << 0 << 1 << 0 << 0)
+Lemma prepare_K : forall (n : N), (n > 0)%N -> exists (k : nat) (n' : N),
+  K n = Lk (bin_min k) (K n' << 0 << 1 << 0 << 0)
   /\ (n = pow2 k + pow2 (S k) * n')%N.
 Proof.
   destruct n as [| n]. { lia. }
@@ -340,14 +301,14 @@ Proof.
     simpl. rewrite const_unfold at 1. reflexivity.
 Qed.
 
-Lemma prepare_K1 : forall (n : N) (k : nat) (n' : N),
+Lemma prepare_J : forall (n : N) (k : nat) (n' : N),
   (n = pow2 k + pow2 (S k) * n')%N ->
-  K1 n = Lk (bin_min k) (K1 n' << 0 << 0 << 0 << 1).
+  J n = Lk (bin_min k) (J n' << 0 << 0 << 0 << 1).
 Proof.
   introv. revert n. induction k; introv H.
   - rewrite H. cases n'; try reflexivity.
     repeat rewrite <- const_unfold. reflexivity.
-  - replace (K1 n) with (K1 (pow2 k + pow2 (S k) * n') << 0 << 0 << 0 << 0).
+  - replace (J n) with (J (pow2 k + pow2 (S k) * n') << 0 << 0 << 0 << 0).
     { rewrite IHk; reflexivity. }
     replace n with (2 * (pow2 k + pow2 (S k) * n'))%N by lia.
     generalize (pow2 k + pow2 (S k) * n')%N. intro n''.
@@ -366,10 +327,10 @@ Theorem step_reset0 : forall n m a,
   (n' < n)%N /\ (n' <= b m')%N /\ reset_invariant m'.
 Proof.
   introv Hinvariant Hgt0.
-  destruct (prepare_K0 n Hgt0) as [k [n' [EK En']]].
+  destruct (prepare_K n Hgt0) as [k [n' [EK En']]].
   exists n'. eexists. repeat split.
   - unfold E0. rewrite EK.
-    follow drop_K0I. { lia. }
+    follow drop_KI. { lia. }
     finish.
   - rewrite En'. nia.
   - destruct (f_lt m a k) as [x [E Hx]].
@@ -431,9 +392,9 @@ Theorem step_reset1 : forall n m a,
 Proof.
   introv [k [n' [Hinv2a Hinv2b]]].
   exists n'. eexists. repeat split.
-  - unfold E1. rewrite (prepare_K1 _ _ _ Hinv2a).
-    follow drop_K1I. { lia. }
-    unfold E0. rewrite K0_as_K1. finish.
+  - unfold E1. rewrite (prepare_J _ _ _ Hinv2a).
+    follow drop_JI. { lia. }
+    unfold E0. rewrite K_as_J. finish.
     simpl pow4. rewrite pow4_shift1. reflexivity.
   - rewrite Hinv2a. nia.
   - destruct (f_lt m a (S k)) as [x [E Hx]].

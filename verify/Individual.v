@@ -5,35 +5,6 @@ From Coq Require Import Lia.
 From BusyCoq Require Export Permute.
 Set Default Goal Selector "!".
 
-Fixpoint repeat {A} (n : nat) (f : A -> A) (a : A) : A :=
-  match n with
-  | O => a
-  | S n => f (repeat n f a)
-  end.
-
-Lemma repeat_shift : forall {A} f n (a : A),
-  f (repeat n f a) = repeat n f (f a).
-Proof.
-  induction n; introv.
-  - reflexivity.
-  - simpl. rewrite IHn. reflexivity.
-Qed.
-
-Lemma repeat_S : forall {A} n f (a : A),
-  repeat (S n) f a = f (repeat n f a).
-Proof. reflexivity. Qed.
-
-Lemma repeat_add : forall A n m f (a : A),
-  repeat (n + m) f a = repeat n f (repeat m f a).
-Proof.
-  introv. induction n.
-  - reflexivity.
-  - simpl. rewrite IHn. reflexivity.
-Qed.
-
-Notation "f :> t" := (f t)  (at level 25, right associativity, only parsing).
-Notation "t <: f" := (f t)  (at level 24, left associativity, only parsing).
-
 Module Individual (Ctx : Ctx).
   Module Permute := Permute Ctx. Export Permute.
 
@@ -48,6 +19,26 @@ Proof. reflexivity. Qed.
 
 Lemma tl_const : forall A (x : A), tl (const x) = const x.
 Proof. reflexivity. Qed.
+
+#[export] Hint Rewrite move_left_const move_right_const tl_const : tape_pre.
+#[export] Hint Rewrite <- const_unfold : tape_post.
+
+Lemma lpow_shift' : forall A n (xs : list A) ys,
+  xs^^n *> xs *> ys = xs *> xs^^n *> ys.
+Proof.
+  introv.
+  rewrite <- Str_app_assoc.
+  rewrite lpow_shift.
+  rewrite Str_app_assoc.
+  reflexivity.
+Qed.
+
+Lemma lpow_S : forall {A} n (xs : list A),
+  xs^^(S n) = xs +> xs^^n.
+Proof. reflexivity. Qed.
+
+#[export] Hint Rewrite lpow_shift' lpow_add : tape_post.
+#[export] Hint Rewrite @Str_app_assoc : tape_post.
 
 (** The direct formulation isn't as useful when the proof that the two
     configurations are the same is non-trivial. *)
@@ -69,11 +60,9 @@ Ltac prove_step := prove_step_left || prove_step_right.
 (** Simplify a tape expression, removing [move_left] and [move_right] leftover
     after [prove_step], without needlessly expanding the [cofix] in [const s0]. *)
 Ltac simpl_tape :=
-  try rewrite tl_const;
-  try rewrite move_left_const;
-  try rewrite move_right_const;
+  autorewrite with tape_pre;
   simpl;
-  try rewrite <- const_unfold.
+  autorewrite with tape_post.
 
 (** Prove a goal of the form [c -->+ c'] that consists of a single TM step. *)
 Ltac finish_progress := apply progress_base; prove_step.

@@ -5,7 +5,6 @@
 
 From BusyCoq Require Import Individual52 FixedBin ShiftOverflow.
 From Coq Require Import PeanoNat.
-From Coq Require Import List. Import ListNotations.
 From Coq Require Import Lia.
 From Coq Require Import PArith.BinPos PArith.Pnat.
 From Coq Require Import NArith.BinNat NArith.Nnat.
@@ -20,34 +19,16 @@ Definition tm : TM := fun '(q, s) =>
   | E, 0 => Some (1, L, A)  | E, 1 => Some (0, L, A)
   end.
 
+From BusyCoq Require Import ShiftOverflowBins.
+
 Notation "c --> c'" := (c -[ tm ]-> c')   (at level 40).
 Notation "c -->* c'" := (c -[ tm ]->* c') (at level 40).
 Notation "c -->+ c'" := (c -[ tm ]->+ c') (at level 40).
 
 Notation P := Pos.succ.
 
-Fixpoint L' (n : positive) : side :=
-  match n with
-  | xH => const 0 << 1 << 0 << 0 << 0
-  | xO n => L' n << 0 << 0 << 0 << 0
-  | xI n => L' n << 1 << 0 << 0 << 0
-  end.
-
-Definition L (n : N) : side :=
-  match n with
-  | N0 => const 0
-  | Npos n => L' n
-  end.
-
-Fixpoint R (n : positive) : side :=
-  match n with
-  | xH => 1 >> 1 >> const 0
-  | xO n => 1 >> 0 >> R n
-  | xI n => 1 >> 1 >> R n
-  end.
-
 Definition D n m : Q * tape :=
-  L n <{{C}} 1 >> 0 >> 1 >> 0 >> R m.
+  L n <{{C}} [1; 0; 1; 0] *> R m.
 
 Lemma L_inc : forall n r,
   L n <{{C}} r -->* L (N.succ n) {{B}}> r.
@@ -97,29 +78,8 @@ Proof.
   introv H. generalize dependent l. induction H; triv.
 Qed.
 
-Fixpoint K' (n : positive) : side :=
-  match n with
-  | xH =>    const 0 << 1 << 0 << 0
-  | xO n => K' n << 0 << 0 << 0 << 0
-  | xI n => K' n << 0 << 1 << 0 << 0
-  end.
-
-Definition K (n : N) : side :=
-  match n with
-  | N0 => const 0
-  | Npos n => K' n
-  end.
-
-Lemma L_as_K : forall n,
-  L n = K n << 0.
-Proof.
-  destruct n as [| n].
-  - apply const_unfold.
-  - simpl. induction n; simpl; try rewrite IHn; reflexivity.
-Qed.
-
 Definition E n a m : Q * tape :=
-  K n <{{C}} 1 >> 0 >> 1 >> a >> R m.
+  K n <{{C}} [1; 0; 1; a] *> R m.
 
 Theorem start_reset : forall n m,
   all1 m ->
@@ -142,29 +102,22 @@ Proof.
 Qed.
 
 Lemma eat_LI : forall l t,
-  l << 1 << 0 << 0 << 0 <{{C}} R t -->*
+  l <* <[1; 0; 0; 0] <{{C}} R t -->*
   l <{{C}} R (t~1~1).
 Proof. triv. Qed.
 
 Lemma eat_KI : forall l t,
   has0 t ->
-  l << 0 << 1 << 0 << 0 <{{C}} R t -->*
+  l <* <[0; 1; 0; 0] <{{C}} R t -->*
   l <{{C}} R (4 * P t).
 Proof.
   introv H. execute.
   follow R_inc_has0. execute.
 Qed.
 
-Fixpoint Lk {k} (n : bin k) (l : side) :=
-  match n with
-  | bb => l
-  | b0 n => Lk n l << 0 << 0 << 0 << 0
-  | b1 n => Lk n l << 1 << 0 << 0 << 0
-  end.
-
 Lemma Lk_inc : forall k (n n' : bin k),
   n -S-> n' -> forall l r,
-  Lk n l <{{C}} r -->* Lk n' l {{B}}> r.
+  l <* Lk n <{{C}} r -->* l <* Lk n' {{B}}> r.
 Proof.
   introv H. induction H; triv.
 Qed.
@@ -172,8 +125,8 @@ Qed.
 Lemma LaR_inc : forall l k (n n' : bin k) a m,
   has0 m ->
   n -S-> n' ->
-  Lk n  l <{{C}} 1 >> 0 >> 1 >> a >> R m -->*
-  Lk n' l <{{C}} 1 >> 0 >> 1 >> a >> R (P m).
+  l <* Lk n  <{{C}} [1; 0; 1; a] *> R m -->*
+  l <* Lk n' <{{C}} [1; 0; 1; a] *> R (P m).
 Proof.
   introv Hm Hn. destruct a;
     follow Lk_inc; execute; follow R_inc_has0; execute.
@@ -182,8 +135,8 @@ Qed.
 Lemma LaR_incs : forall l k u (n n' : bin k) a m,
   bin_plus u n n' ->
   (u <= b m)%N ->
-  Lk n  l <{{C}} 1 >> 0 >> 1 >> a >> R m -->*
-  Lk n' l <{{C}} 1 >> 0 >> 1 >> a >> R (u :+ m).
+  l <* Lk n  <{{C}} [1; 0; 1; a] *> R m -->*
+  l <* Lk n' <{{C}} [1; 0; 1; a] *> R (u :+ m).
 Proof.
   introv H.
   generalize dependent m. induction H; introv Hr.
@@ -195,8 +148,8 @@ Qed.
 
 Corollary LaR_max : forall l k a m,
   (pow2 k - 1 <= b m)%N ->
-  Lk (bin_min k) l <{{C}} 1 >> 0 >> 1 >> a >> R m -->*
-  Lk (bin_max k) l <{{C}} 1 >> 0 >> 1 >> a >> R (pow2 k - 1 :+ m).
+  l <* Lk (bin_min k) <{{C}} [1; 0; 1; a] *> R m -->*
+  l <* Lk (bin_max k) <{{C}} [1; 0; 1; a] *> R (pow2 k - 1 :+ m).
 Proof.
   introv H.
   apply LaR_incs.
@@ -206,8 +159,8 @@ Qed.
 
 Lemma eat_bin_max : forall k l t,
   has0 t ->
-  Lk (bin_max k) (l << 0 << 1 << 0 << 0) <{{C}} R t -->*
-  l <{{C}} 1 >> 0 >> 1 >> 0 >> R (pow4 k (P t)).
+  l <* <[0; 1; 0; 0] <* Lk (bin_max k) <{{C}} R t -->*
+  l <{{C}} [1; 0; 1; 0] *> R (pow4 k (P t)).
 Proof.
   induction k; introv H.
   - follow eat_KI. finish.
@@ -237,18 +190,18 @@ Qed.
 
 Lemma drop_KI : forall l m k a,
   (pow2 k - 1 <= b m)%N ->
-  Lk (bin_min k) (l << 0 << 1 << 0 << 0) <{{C}} 1 >> 0 >> 1 >> a >> R m -->*
-  l <{{C}} 1 >> 0 >> 1 >> 0 >> R (pow4 k (P (f m a k))).
+  l <* <[0; 1; 0; 0] <* Lk (bin_min k)  <{{C}} [1; 0; 1; a] *> R m -->*
+  l <{{C}} [1; 0; 1; 0] *> R (pow4 k (P (f m a k))).
 Proof.
   introv H.
   follow LaR_max.
-  replace (1 >> 0 >> 1 >> a >> R (pow2 k - 1 :+ m)) with (R (f m a k))
+  replace ([1; 0; 1; a] *> R (pow2 k - 1 :+ m)) with (R (f m a k))
     by (destruct a; reflexivity).
   follow eat_bin_max. finish.
 Qed.
 
 Lemma prepare_K : forall (n : N), (n > 0)%N -> exists (k : nat) (n' : N),
-  K n = Lk (bin_min k) (K n' << 0 << 1 << 0 << 0)
+  K n = K n' <* <[0; 1; 0; 0] <* Lk (bin_min k)
   /\ (n = pow2 k + pow2 (S k) * n')%N.
 Proof.
   destruct n as [| n]. { lia. }

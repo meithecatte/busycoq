@@ -1,7 +1,7 @@
 (** * TM: Definition of Turing Machines *)
 
 From Coq Require Import Bool.Sumbool.
-From Coq Require Import Lists.List. Import ListNotations.
+From Coq Require Import Lists.List. Export ListNotations.
 From Coq Require Import Lists.Streams.
 From Coq Require Import PeanoNat.
 From Coq Require Import Lia.
@@ -60,11 +60,6 @@ Notation tape := (side * Sym * side)%type.
     hovering over a particular symbol. **)
 Notation "l {{ s }} r" := (l, s, r)
   (at level 30, s at next level, only parsing).
-
-(** Moreover the streams could use some more natural notation, to have
-    the element at the start of the stream be on the right side, as necessary. *)
-Notation "s >> r" := (Cons s r) (at level 25, right associativity).
-Notation "l << s" := (Cons s l) (at level 24, left associativity).
 
 Local Example tape_ex (a b c d e : Sym) : tape :=
   const s0 << a << b {{c}} d >> e >> const s0.
