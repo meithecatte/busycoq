@@ -256,9 +256,9 @@ impl fmt::Display for TM {
 }
 
 impl FromStr for TM {
-    type Err = ();
+    type Err = &'static str;
 
-    fn from_str(s: &str) -> Result<Self, ()> {
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         let code = EnumMap::from_array(s.split('_').map(|state| {
             EnumMap::from_array(state.as_bytes().chunks(3).map(|cmd| {
                 match cmd {
