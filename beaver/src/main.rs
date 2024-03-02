@@ -99,6 +99,7 @@ enum SubCommand {
     Merge(index::Merge),
     Diff(index::Diff),
     Query(api::Query),
+    Inductive(inductive::Inductive),
 }
 
 #[derive(FromArgs)]
@@ -149,6 +150,7 @@ fn main() {
         SubCommand::Merge(merge) => merge.run(),
         SubCommand::Diff(diff) => diff.run(),
         SubCommand::Query(query) => query.run(),
+        SubCommand::Inductive(inductive) => inductive.run(),
     }
 }
 

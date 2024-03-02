@@ -46,19 +46,36 @@ impl Side {
         while self.try_compress(intern) {}
     }
 
+    pub fn pop_base(&mut self, intern: &ChunkIntern) -> Option<turing::Sym> {
+        loop {
+            match self.symbols.pop()? {
+                Symbol::Repeated(chunk, count) => {
+                    if count.get() > 1 {
+                        let count = NonZeroU32::new(count.get() - 1).unwrap();
+                        self.symbols.push(Symbol::Repeated(chunk, count));
+                    }
+
+                    self.symbols.extend_from_slice(intern.get(chunk));
+                }
+                Symbol::Base(sym) => return Some(sym),
+            }
+        }
+    }
+
     fn try_compress(&mut self, intern: &mut ChunkIntern) -> bool {
         let n = self.symbols.len();
 
-        for k in 2..MAX_SEGMENT_LEN.min(n / 2) {
+        for k in 2..=MAX_SEGMENT_LEN.min(n / 2) {
             if &self.symbols[n - k..n] == &self.symbols[n - 2*k..n - k] {
                 let chunk = intern.intern(&self.symbols[n - k..n]);
                 self.symbols.truncate(n - 2*k);
-                self.symbols.push(Symbol::Repeated(chunk, NonZeroU32::new(2).unwrap()));
+                let count = NonZeroU32::new(2).unwrap();
+                self.symbols.push(Symbol::Repeated(chunk, count));
                 return true;
             }
         }
 
-        for k in 2..MAX_SEGMENT_LEN.min(n - 1) {
+        for k in 2..=MAX_SEGMENT_LEN.min(n - 1) {
             let chunk_at = n - k - 1;
             if let Symbol::Repeated(chunk, count) = self.symbols[chunk_at] {
                 if &self.symbols[n - k..n] == intern.get(chunk) {
@@ -75,7 +92,7 @@ impl Side {
 
     /// Returns a struct that, when [`Display`][fmt::Display]ed, will print
     /// the contents of this [`Side`] as if it is the left side of the tape.
-    fn display_left<'a>(&'a self, intern: &'a ChunkIntern) -> DisplaySide<'a> {
+    pub fn display_left<'a>(&'a self, intern: &'a ChunkIntern) -> DisplaySide<'a> {
         DisplaySide {
             side: self,
             intern,
@@ -85,7 +102,7 @@ impl Side {
 
     /// Returns a struct that, when [`Display`][fmt::Display]ed, will print
     /// the contents of this [`Side`] as if it is the right side of the tape.
-    fn display_right<'a>(&'a self, intern: &'a ChunkIntern) -> DisplaySide<'a> {
+    pub fn display_right<'a>(&'a self, intern: &'a ChunkIntern) -> DisplaySide<'a> {
         DisplaySide {
             side: self,
             intern,
@@ -99,7 +116,7 @@ pub struct ChunkIntern {
 }
 
 impl ChunkIntern {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             chunks: IndexSet::new(),
         }
@@ -196,13 +213,13 @@ mod tests {
         let mut side = Side::new();
         use turing::Sym::*;
 
-        for x in [S0, S1, S0, S1, S1, S0, S1, S1, S0, S1, S1] {
+        for x in [S1, S0, S0, S1, S1, S0, S1, S1, S0, S1, S1] {
             side.push(&mut intern, Symbol::Base(x));
         }
 
         assert_eq!(side.symbols, [
-            Symbol::Base(S0),
             Symbol::Base(S1),
+            Symbol::Base(S0),
             Symbol::Repeated(Chunk(0), NonZeroU32::new(3).unwrap()),
         ]);
 
@@ -214,16 +231,38 @@ mod tests {
     }
 
     #[test]
+    fn chunking_edge() {
+        let mut intern = ChunkIntern::new();
+        let mut side = Side::new();
+        use turing::Sym::*;
+
+        for x in [S0, S1, S1, S1, S1] {
+            side.push(&mut intern, Symbol::Base(x));
+        }
+
+        assert_eq!(side.symbols, [
+            Symbol::Base(S0),
+            Symbol::Repeated(Chunk(0), NonZeroU32::new(2).unwrap()),
+        ]);
+
+        assert_eq!(intern.get(Chunk(0)), [
+            Symbol::Base(S1),
+            Symbol::Base(S1),
+        ]);
+    }
+
+
+    #[test]
     fn display() {
         let mut intern = ChunkIntern::new();
         let mut side = Side::new();
         use turing::Sym::*;
 
-        for x in [S0, S1, S0, S1, S1, S0, S1, S1] {
+        for x in [S1, S0, S0, S1, S1, S0, S1, S1] {
             side.push(&mut intern, Symbol::Base(x));
         }
 
-        assert_eq!(side.display_left(&intern).to_string(), "01(011)²");
-        assert_eq!(side.display_right(&intern).to_string(), "(110)²10");
+        assert_eq!(side.display_left(&intern).to_string(), "10(011)²");
+        assert_eq!(side.display_right(&intern).to_string(), "(110)²01");
     }
 }
