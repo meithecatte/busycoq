@@ -3,7 +3,7 @@ use std::fmt;
 use std::str::FromStr;
 use binrw::binrw;
 use enum_map::{Enum, EnumMap};
-use strum::EnumIter;
+use strum::{Display, EnumIter, FromRepr};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct OutOfSpace;
@@ -21,7 +21,7 @@ pub enum Sym {
     S1,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Enum, EnumIter)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Display, Enum, EnumIter, FromRepr)]
 pub enum State {
     A,
     B,
@@ -172,14 +172,9 @@ impl TryFrom<u8> for State {
     type Error = &'static str;
 
     fn try_from(x: u8) -> Result<State, &'static str> {
-        match x {
-            1 => Ok(State::A),
-            2 => Ok(State::B),
-            3 => Ok(State::C),
-            4 => Ok(State::D),
-            5 => Ok(State::E),
-            _ => Err("invalid byte for state"),
-        }
+        x.checked_sub(1)
+            .and_then(|x| Self::from_repr(x as usize))
+            .ok_or("invalid byte for state")
     }
 }
 
@@ -227,18 +222,6 @@ impl fmt::Display for Sym {
     }
 }
 
-impl fmt::Display for State {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            State::A => f.write_str("A"),
-            State::B => f.write_str("B"),
-            State::C => f.write_str("C"),
-            State::D => f.write_str("D"),
-            State::E => f.write_str("E"),
-        }
-    }
-}
-
 impl fmt::Display for Command {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
@@ -277,14 +260,8 @@ impl FromStr for TM {
                             _ => panic!(),
                         };
 
-                        let next = match cmd[2] {
-                            b'A' => State::A,
-                            b'B' => State::B,
-                            b'C' => State::C,
-                            b'D' => State::D,
-                            b'E' => State::E,
-                            _ => panic!(),
-                        };
+                        let next = State::from_repr(usize::from(cmd[2] - b'A'))
+                            .unwrap();
 
                         Command::Step { write, dir, next }
                     }
