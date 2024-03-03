@@ -256,11 +256,3 @@ impl Decide {
         println!("\n  {undecided:8} Undecided");
     }
 }
-
-fn running_min(x: &mut usize, y: usize) {
-    *x = y.min(*x);
-}
-
-fn running_max(x: &mut usize, y: usize) {
-    *x = y.max(*x);
-}

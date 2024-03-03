@@ -1,4 +1,4 @@
-use crate::{Certificate, Decider, running_min, running_max};
+use crate::{Certificate, Decider};
 use crate::database::DatabaseEntry;
 use crate::turing::{Configuration, Dir, Limit, OutOfSpace, Sym, TM};
 use enum_map::Enum;
@@ -30,29 +30,11 @@ pub enum FailReason {
 
 struct RecordDetect<'a> {
     conf: Configuration<'a>,
-    num_records: usize,
+    last_visited: [u32; SPACE_LIMIT],
     steps_taken: u32,
     // invariant: record_left <= record_right
     record_left: usize,
     record_right: usize,
-    leftmost_since_record: usize,
-    rightmost_since_record: usize,
-}
-
-#[derive(Debug)]
-struct Record {
-    direction: Dir,
-    record_index: usize,
-    accessed_since_previous: (usize, usize),
-}
-
-impl Record {
-    fn pos(&self) -> usize {
-        match self.direction {
-            Dir::L => self.accessed_since_previous.0,
-            Dir::R => self.accessed_since_previous.1,
-        }
-    }
 }
 
 impl<'a> RecordDetect<'a> {
@@ -60,32 +42,14 @@ impl<'a> RecordDetect<'a> {
         let pos = conf.pos;
         Self {
             conf,
-            num_records: 0,
+            last_visited: [0; SPACE_LIMIT],
             steps_taken: 0,
             record_left: pos,
             record_right: pos,
-            leftmost_since_record: pos,
-            rightmost_since_record: pos,
         }
     }
 
-    fn make_record(&mut self, direction: Dir) -> Record {
-        let range = (self.leftmost_since_record, self.rightmost_since_record);
-        let pos = self.conf.pos;
-        self.leftmost_since_record = pos;
-        self.rightmost_since_record = pos;
-
-        let record_index = self.num_records;
-        self.num_records += 1;
-
-        Record {
-            direction,
-            record_index,
-            accessed_since_previous: range,
-        }
-    }
-
-    fn next_record(&mut self, tm: &TM) -> Result<Record, FailReason> {
+    fn next_record(&mut self, tm: &TM) -> Result<Dir, FailReason> {
         while self.steps_taken < TIME_LIMIT {
             self.steps_taken += 1;
 
@@ -101,15 +65,14 @@ impl<'a> RecordDetect<'a> {
                 return Err(FailReason::OutOfSpace);
             }
 
-            running_min(&mut self.leftmost_since_record, pos);
-            running_max(&mut self.rightmost_since_record, pos);
+            self.last_visited[pos] = self.steps_taken;
 
             if self.record_right < pos {
                 self.record_right = pos;
-                return Ok(self.make_record(Dir::R));
+                return Ok(Dir::R);
             } else if pos < self.record_left {
                 self.record_left = pos;
-                return Ok(self.make_record(Dir::L))
+                return Ok(Dir::L)
             }
         }
 
@@ -117,32 +80,44 @@ impl<'a> RecordDetect<'a> {
     }
 }
 
-fn find_k(history: &[(usize, usize)], tortoise: &Record, hare: &Record) -> usize {
-    let l = tortoise.record_index + 1;
-    let r = hare.record_index;
-    let segment = &history[l..=r];
-
-    match hare.direction {
+fn find_k(
+    dir: Dir,
+    tortoise: &RecordDetect<'_>,
+    hare: &RecordDetect<'_>,
+) -> Option<usize> {
+    match dir {
         Dir::L => {
-            let far = segment.iter().map(|x| x.1).max().unwrap();
-            far - tortoise.pos()
+            let it = hare.last_visited[tortoise.conf.pos..].iter()
+                .take_while(|&&t| t >= tortoise.steps_taken)
+                .zip(hare.conf.tape[hare.conf.pos..].iter())
+                .zip(tortoise.conf.tape[tortoise.conf.pos..].iter());
+            let mut k = 0;
+            for ((_, a), b) in it {
+                if a != b {
+                    return None;
+                }
+
+                k += 1;
+            }
+
+            Some(k)
         }
         Dir::R => {
-            let far = segment.iter().map(|x| x.0).min().unwrap();
-            tortoise.pos() - far
-        }
-    }
-}
+            let it = hare.last_visited[..tortoise.conf.pos].iter().rev()
+                .take_while(|&&t| t >= tortoise.steps_taken)
+                .zip(hare.conf.tape[..hare.conf.pos].iter().rev())
+                .zip(tortoise.conf.tape[..tortoise.conf.pos].iter().rev());
+            let mut k = 0;
+            for ((_, a), b) in it {
+                if a != b {
+                    return None;
+                }
 
-fn compare_segment(
-    dir: Dir,
-    k: usize,
-    a: &Configuration,
-    b: &Configuration,
-) -> bool {
-    match dir {
-        Dir::L => a.tape[a.pos..=a.pos + k] == b.tape[b.pos..=b.pos + k],
-        Dir::R => a.tape[a.pos - k..=a.pos] == b.tape[b.pos - k..=b.pos],
+                k += 1;
+            }
+
+            Some(k)
+        }
     }
 }
 
@@ -152,22 +127,16 @@ fn decide_tcyclers(tm: &TM) -> Result<Cert, FailReason> {
     let mut hare = [Sym::S0; SPACE_LIMIT];
     let mut hare = RecordDetect::new(Configuration::new(&mut hare));
 
-    // Records the range of cells that were visited between two consecutive
-    // records.
-    let mut record_history = Vec::with_capacity(512);
-
     loop {
-        let tortoise_record = tortoise.next_record(tm)?;
-        let hare_record = hare.next_record(tm)?;
-        record_history.push(hare_record.accessed_since_previous);
-        let hare_record = hare.next_record(tm)?;
-        record_history.push(hare_record.accessed_since_previous);
+        let tortoise_dir = tortoise.next_record(tm)?;
+        let _ = hare.next_record(tm)?;
+        let hare_dir = hare.next_record(tm)?;
 
-        if hare_record.direction != tortoise_record.direction { continue }
+        if hare_dir != tortoise_dir { continue }
+        let dir = hare_dir;
+
         if tortoise.conf.state != hare.conf.state { continue }
-        let k = find_k(&record_history, &tortoise_record, &hare_record);
-        let dir = hare_record.direction;
-        if compare_segment(dir, k, &tortoise.conf, &hare.conf) {
+        if let Some(k) = find_k(dir, &tortoise, &hare) {
             return Ok(Cert {
                 dir,
                 n0: tortoise.steps_taken,
