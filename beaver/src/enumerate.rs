@@ -33,8 +33,12 @@ impl TM {
             .count() > 1
     }
 
-    fn state_has_trans(&self, q: State) -> bool {
+    pub fn state_has_trans(&self, q: State) -> bool {
         self.code[q].values().any(|&cmd| cmd != Command::Halt)
+    }
+
+    pub fn state_has_halt(&self, q: State) -> bool {
+        self.code[q].values().any(|&cmd| cmd == Command::Halt)
     }
 
     fn children(&self, q: State, s: Sym) -> impl Iterator<Item = TM> + '_ {
@@ -86,6 +90,7 @@ fn run(tm: &TM) -> RunResult {
             Ok(false) => {
                 let Ok(sym) = conf.head_symbol() else {
                     eprintln!("border of tape reached. this shouldn't happen. {tm}");
+                    // ...because 2 * SPACE_LIMIT < BUFFER_SIZE
                     return RunResult::Limit(Limit::Space);
                 };
 

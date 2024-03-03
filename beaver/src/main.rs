@@ -128,6 +128,10 @@ struct Decide {
     #[argh(option, short='a')]
     ad_hoc: Vec<u32>,
 
+    /// don't run the Syntactic decider
+    #[argh(switch)]
+    no_syntactic: bool,
+
     /// don't run the Cyclers decider
     #[argh(switch)]
     no_cyclers: bool,
@@ -194,6 +198,7 @@ impl Decide {
 
         let processed = AtomicU32::new(0);
 
+        let syntactic = DeciderStats::<Syntactic>::new(self.no_syntactic);
         let cyclers = DeciderStats::<Cyclers>::new(self.no_cyclers);
         let tcyclers = DeciderStats::<TCyclers>::new(self.no_tcyclers);
         let backwards = DeciderStats::<BackwardsReasoning>::new(self.no_backwards);
@@ -208,8 +213,8 @@ impl Decide {
                     .with_style(style);
                 loop {
                     let processed = processed.load(Ordering::Relaxed);
-                    bar.set_message(format!("C {} TC {} BR {} B {}",
-                        cyclers, tcyclers, backwards, bouncers));
+                    bar.set_message(format!("S {} C {} TC {} BR {} B {}",
+                        syntactic, cyclers, tcyclers, backwards, bouncers));
                     bar.set_position(processed as u64);
                     if processed == indices.len() as u32 {
                         return;
@@ -221,7 +226,8 @@ impl Decide {
 
             let certs = indices.par_iter().with_max_len(1).map(|&index| {
                 let tm = db.get(index);
-                let cert = cyclers.decide(&tm)
+                let cert = syntactic.decide(&tm)
+                    .or_else(|| cyclers.decide(&tm))
                     .or_else(|| tcyclers.decide(&tm))
                     .or_else(|| backwards.decide(&tm))
                     .or_else(|| bouncers.decide(&tm));
@@ -242,6 +248,7 @@ impl Decide {
             undecided
         });
 
+        syntactic.print_stats();
         cyclers.print_stats();
         tcyclers.print_stats();
         backwards.print_stats();
