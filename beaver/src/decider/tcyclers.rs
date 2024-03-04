@@ -96,6 +96,11 @@ impl<'a> RecordDetect<'a> {
             }
 
             let pos = self.conf.pos;
+            // bail out now, and not when we take the next step
+            if pos >= SPACE_LIMIT {
+                return Err(FailReason::OutOfSpace);
+            }
+
             running_min(&mut self.leftmost_since_record, pos);
             running_max(&mut self.rightmost_since_record, pos);
 
