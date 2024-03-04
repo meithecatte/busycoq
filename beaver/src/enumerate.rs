@@ -3,12 +3,18 @@ use argh::FromArgs;
 use itertools::Itertools;
 use strum::IntoEnumIterator;
 use enum_map::{enum_map, Enum, EnumMap};
+use std::mem;
+use std::thread;
+use std::time::Duration;
+use indicatif::{ProgressBar, ProgressStyle};
+use std::sync::atomic::{AtomicU32, Ordering};
+use rayon::prelude::*;
 
 const TIME_LIMIT: u32 = 47_176_870;
 const BUFFER_SIZE: usize = 32_768;
 const SPACE_LIMIT: usize = 12_289;
 const BB4: u32 = 107;
-const SPLIT_LEVEL: usize = 5;
+const SPLIT_LEVEL: usize = 6;
 
 impl TM {
     fn blank() -> TM {
@@ -109,20 +115,50 @@ fn run(tm: &TM) -> RunResult {
 #[derive(Default)]
 struct EnumerationResults {
     undecided: EnumMap<Limit, Vec<TM>>,
+    nonhalting: u64,
     pruned: EnumMap<Prune, u64>,
     halted_count: u64,
     time_record: u32,
     best_beaver: Option<TM>,
-    tasks: u32,
     max_split: u32,
+
+    /// Subtrees that are still yet to be explored
+    postponed: Vec<TM>,
 }
 
 impl EnumerationResults {
-    fn enumerate_at(&mut self, tm: TM) {
+    fn merge_with(&mut self, other: Self) {
+        for (limit, undecided) in other.undecided {
+            self.undecided[limit].extend(undecided);
+        }
+
+        self.nonhalting += other.nonhalting;
+
+        for (prune, count) in other.pruned {
+            self.pruned[prune] += count;
+        }
+
+        self.halted_count += other.halted_count;
+
+        if other.time_record > self.time_record {
+            self.time_record = other.time_record;
+            self.best_beaver = other.best_beaver;
+        }
+
+        self.max_split = self.max_split.max(other.max_split);
+        self.postponed.extend(other.postponed);
+    }
+
+    fn enumerate_at(&mut self, tm: TM, postpone_level: usize) {
         use RunResult::*;
 
-        if tm.level() == SPLIT_LEVEL {
-            self.tasks += 1;
+        if tm.level() == postpone_level {
+            self.postponed.push(tm);
+            return;
+        }
+
+        if crate::decider::decide_fast(&tm) {
+            self.nonhalting += 1;
             return;
         }
 
@@ -140,14 +176,14 @@ impl EnumerationResults {
                 if tm.can_extend() {
                     self.max_split = self.max_split.max(t);
                     tm.children(q, s)
-                        .for_each(|tm| self.enumerate_at(tm));
+                        .for_each(|tm| self.enumerate_at(tm, postpone_level));
                 } else {
                     self.halted_count += 1;
 
                     if t > self.time_record {
                         self.time_record = t;
                         self.best_beaver = Some(tm);
-                        println!("new record: {tm} halts in {t} steps");
+                        //println!("new record: {tm} halts in {t} steps");
                     }
                 }
             }
@@ -172,7 +208,43 @@ impl Enumerate {
             next: State::B, 
         };
 
-        results.enumerate_at(tm);
+        results.enumerate_at(tm, SPLIT_LEVEL);
+
+        let tasks = mem::take(&mut results.postponed);
+        let processed = AtomicU32::new(0);
+
+        thread::scope(|s| {
+            let progress_thread = s.spawn(|| {
+                let style = ProgressStyle::with_template(
+                    "[{elapsed_precise}] {bar:30.cyan} {pos:>8}/{len:8} {msg} ETA {eta}"
+                ).unwrap();
+                let bar = ProgressBar::new(tasks.len() as u64)
+                    .with_style(style);
+                loop {
+                    let processed = processed.load(Ordering::Relaxed);
+                    bar.set_position(processed as u64);
+                    if processed == tasks.len() as u32 {
+                        return;
+                    }
+
+                    thread::park_timeout(Duration::from_millis(250));
+                }
+            });
+
+            let parts: Vec<_> = tasks.par_iter().with_max_len(1).map(|tm| {
+                let mut part = EnumerationResults::default();
+                part.enumerate_at(*tm, 10);
+                processed.fetch_add(1, Ordering::Relaxed);
+                part
+            }).collect();
+
+            for part in parts {
+                results.merge_with(part);
+            }
+
+            assert!(results.postponed.is_empty());
+            progress_thread.thread().unpark();
+        });
 
         for (limit, machines) in &results.undecided {
             println!("{:10} {limit:?}", machines.len());
@@ -190,8 +262,8 @@ impl Enumerate {
         println!("{:10} total pruned", total_pruned);
 
         println!("{:10} halted", results.halted_count);
+        println!("{:10} non-halting", results.nonhalting);
         println!("{:10} time record", results.time_record);
-        println!("task split: {}", results.tasks);
         println!("max split: {}", results.max_split);
     }
 }

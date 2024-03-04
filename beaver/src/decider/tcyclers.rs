@@ -146,7 +146,7 @@ fn compare_segment(
     }
 }
 
-fn decide_tcyclers(tm: &TM) -> Result<Cert, FailReason> {
+pub fn decide_tcyclers(tm: &TM) -> Result<Cert, FailReason> {
     let mut tortoise = [Sym::S0; SPACE_LIMIT];
     let mut tortoise = RecordDetect::new(Configuration::new(&mut tortoise));
     let mut hare = [Sym::S0; SPACE_LIMIT];

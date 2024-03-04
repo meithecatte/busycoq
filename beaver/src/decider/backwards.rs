@@ -103,7 +103,7 @@ impl Backwards<'_> {
     }
 }
 
-fn decide_backwards(tm: &TM) -> Result<Cert, FailReason> {
+pub fn decide_backwards(tm: &TM) -> Result<Cert, FailReason> {
     let backwards = Backwards {
         tm,
         configs_visited: Cell::new(0),

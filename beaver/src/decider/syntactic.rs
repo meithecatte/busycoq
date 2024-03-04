@@ -19,7 +19,7 @@ pub enum FailReason {
 /// but Halt) are eventually reached by the machine. Therefore, we only need
 /// to detect the existence of the set S, and the machine is guaranteed to get
 /// stuck in it at some point.
-fn decide_syntactic(tm: &TM) -> Result<(), FailReason> {
+pub fn decide_syntactic(tm: &TM) -> Result<(), FailReason> {
     let mut can_reach_halt = enum_map! { q => tm.state_has_halt(q) };
     loop {
         let mut made_progress = false;

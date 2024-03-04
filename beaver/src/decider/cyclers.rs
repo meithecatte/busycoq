@@ -29,7 +29,7 @@ fn check(s: Result<bool, OutOfSpace>) -> Result<(), FailReason> {
     }
 }
 
-fn decide_cyclers(tm: &TM) -> Result<Cert, FailReason> {
+pub fn decide_cyclers(tm: &TM) -> Result<Cert, FailReason> {
     let mut tortoise = [Sym::S0; SPACE_LIMIT];
     let mut tortoise = Configuration::new(&mut tortoise);
 
