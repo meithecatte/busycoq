@@ -24,6 +24,11 @@ pub fn decide_fast(tm: &TM) -> bool {
         _ => {}
     }
 
-    tcyclers::decide_tcyclers(tm).is_ok()
-        || backwards::decide_backwards(tm).is_ok()
+    match tcyclers::decide_tcyclers(tm) {
+        Ok(_) => return true,
+        Err(tcyclers::FailReason::Halted) => return false,
+        _ => {}
+    }
+
+    backwards::decide_backwards(tm).is_ok()
 }

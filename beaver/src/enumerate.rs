@@ -47,6 +47,24 @@ impl TM {
         self.code[q].values().any(|&cmd| cmd == Command::Halt)
     }
 
+    fn states_are_equiv(&self, a: State, b: State) -> bool {
+        let is_either = |q| q == a || q == b;
+        let state_eqv = |q1, q2| q1 == q2 || (is_either(q1) && is_either(q2));
+        self.code[a].values().zip(self.code[b].values()).all(|cmds| {
+            match cmds {
+                (&Command::Step { write: s1, dir: d1, next: q1 },
+                 &Command::Step { write: s2, dir: d2, next: q2 }) => {
+                    s1 == s2 && d1 == d2 && state_eqv(q1, q2)
+                }
+                _ => false
+            }
+        })
+    }
+
+    fn should_prune(&self, a: State) -> bool {
+        State::iter().any(|b| a != b && self.states_are_equiv(a, b))
+    }
+
     fn children(&self, q: State, s: Sym) -> impl Iterator<Item = TM> + '_ {
         State::iter()
             .take_while_inclusive(move |&next| {
@@ -66,6 +84,7 @@ impl TM {
 #[derive(Debug, Enum)]
 enum Prune {
     BB4,
+    StateEquiv,
 }
 
 #[derive(Debug)]
@@ -150,8 +169,6 @@ impl EnumerationResults {
     }
 
     fn enumerate_at(&mut self, tm: TM, postpone_level: usize) {
-        use RunResult::*;
-
         if tm.level() == postpone_level {
             self.postponed.push(tm);
             return;
@@ -166,17 +183,24 @@ impl EnumerationResults {
         //println!("{}{tm} {behavior:?}", " ".repeat(tm.level() - 1));
 
         match behavior {
-            Limit(limit) => {
+            RunResult::Limit(limit) => {
                 self.undecided[limit].push(tm);
             }
-            Prune(prune) => {
+            RunResult::Prune(prune) => {
                 self.pruned[prune] += 1;
             }
-            Halted(q, s, t) => {
+            RunResult::Halted(q, s, t) => {
                 if tm.can_extend() {
                     self.max_split = self.max_split.max(t);
                     tm.children(q, s)
-                        .for_each(|tm| self.enumerate_at(tm, postpone_level));
+                        .for_each(|tm| {
+                            if tm.should_prune(q) {
+                                self.pruned[Prune::StateEquiv] += 1;
+                                return;
+                            }
+
+                            self.enumerate_at(tm, postpone_level);
+                        });
                 } else {
                     self.halted_count += 1;
 
@@ -205,7 +229,19 @@ impl Enumerate {
         tm.code[State::A][Sym::S0] = Command::Step {
             write: Sym::S1,
             dir: Dir::R,
-            next: State::B, 
+            next: State::B,
+        };
+
+        tm.code[State::B][Sym::S0] = Command::Step {
+            write: Sym::S1,
+            dir: Dir::R,
+            next: State::C,
+        };
+
+        tm.code[State::C][Sym::S0] = Command::Step {
+            write: Sym::S1,
+            dir: Dir::R,
+            next: State::D,
         };
 
         results.enumerate_at(tm, SPLIT_LEVEL);
