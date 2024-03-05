@@ -1,4 +1,3 @@
-mod api;
 mod certificate;
 mod database;
 mod decider;
@@ -7,6 +6,9 @@ mod index;
 mod memo;
 mod turing;
 mod undo;
+
+#[cfg(feature = "ureq")]
+mod api;
 
 use certificate::{Certificate, CertList};
 use database::{Database, DatabaseEntry};
@@ -100,6 +102,7 @@ enum SubCommand {
     Enumerate(enumerate::Enumerate),
     Merge(index::Merge),
     Diff(index::Diff),
+    #[cfg(feature = "ureq")]
     Query(api::Query),
     Inductive(inductive::Inductive),
 }
@@ -156,6 +159,7 @@ fn main() {
         SubCommand::Enumerate(enumerate) => enumerate.run(),
         SubCommand::Merge(merge) => merge.run(),
         SubCommand::Diff(diff) => diff.run(),
+        #[cfg(feature = "ureq")]
         SubCommand::Query(query) => query.run(),
         SubCommand::Inductive(inductive) => inductive.run(),
     }
