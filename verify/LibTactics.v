@@ -1,8 +1,9 @@
 (** * LibTactics: A Collection of Handy General-Purpose Tactics *)
 
-(** This file originates in "Programming Language Foundations", a textbook
-    from the "Software Foundations" series. The original author of this file
-    seems to be Arthur Charguéraud. The textbook in question is MIT-licensed. *)
+(** This file has been copied from "Programming Language Foundations", a textbook
+    from the "Software Foundations" series. The origin of this file seems to be
+    https://github.com/charguer/tlc – with Arthur Charguéraud being the original
+    author. See LICENSE-LibTactics. *)
 
 (** Some changes have been introduced for the purposes of BusyCoq:
     - the [>>] notation has been marked [Local]. *)
