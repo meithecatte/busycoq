@@ -557,7 +557,7 @@ Proof.
   contradiction.
 Qed.
 
-Corollary progress_nonhalt_simple : forall tm (A : Set) (C : A -> Q * tape) i0,
+Corollary progress_nonhalt_simple : forall tm (A : Type) (C : A -> Q * tape) i0,
   (forall i, exists i', C i -[ tm ]->+ C i') ->
   ~ halts tm (C i0).
 Proof with eauto.
