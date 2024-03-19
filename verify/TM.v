@@ -189,7 +189,8 @@ Definition halted (tm : TM) (c : Q * tape) : Prop :=
   end.
 
 (** The initial configuration of the machine *)
-Definition c0 : Q * tape := q0;; const s0 {{s0}} const s0.
+Definition tape0 : tape := const s0 {{s0}} const s0.
+Definition c0 : Q * tape := q0;; tape0.
 
 (** A Turing machine halts if it eventually reaches a halting configuration. *)
 Definition halts_in (tm : TM) (c : Q * tape) (n : nat) :=
@@ -199,6 +200,24 @@ Definition halts (tm : TM) (c0 : Q * tape) :=
   exists n, halts_in tm c0 n.
 
 #[export] Hint Unfold halts halts_in : core.
+
+Lemma move_left_tape0 :
+  move_left tape0 = tape0.
+Proof.
+  unfold tape0, move_left.
+  rewrite <- const_unfold.
+  reflexivity.
+Qed.
+
+Lemma move_right_tape0 :
+  move_right tape0 = tape0.
+Proof.
+  unfold tape0, move_right.
+  rewrite <- const_unfold.
+  reflexivity.
+Qed.
+
+#[export] Hint Rewrite move_left_tape0 move_right_tape0 : tape.
 
 (** We prove that the "syntactic" notion of [halted] corresponds
     to the behavior of [step]. *)

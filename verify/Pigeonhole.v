@@ -47,13 +47,16 @@ Theorem pigeonhole_principle : forall (X : Type) (l1 l2 : list X),
 Proof.
   intros X l1. induction l1 as [| x l1 IH]; introv Hsubset Hlonger.
   - inverts Hlonger.
-  - (* Proof sketch: if [In x l1], we win. Otherwise, remove x from l2,
-       which lets us preserve [Hlonger] for the induction hypothesis.
+  - (* Proof sketch: if [In x l1], we win – that's the element that repeats.
+       Otherwise, remove x from l2, which lets us preserve [Hlonger]
+       for the induction hypothesis.
 
        How do we decide if [In x l1], though?
 
-       Answer: [Hsubset] implicitly knows, for each element of [l1], where
-       it occurs in [l2]. Well, at least one occurrence of each. *)
+       Answer: [Hsubset] implicitly encodes one position of [x] in [l2],
+       as well as one position of each element of [l1] in [l2]. If the position
+       of [x] is not referenced by any element of [l1], we can remove it and
+       invoke the induction hypothesis. *)
 
     (* First, we locate at least one occurrence of [x] in [l2]: *)
     inverts Hsubset as Hx Hsubset.
