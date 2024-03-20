@@ -250,55 +250,29 @@ Proof.
 Qed.
 
 (** Make [lia] understand [div2] *)
-Lemma eliminate_div2 : forall x y,
-  y = div2 x ->
-  exists p : nat, x = 2 * y + p /\ p < 2.
+Lemma div2_zify : forall x,
+  x = 2 * (div2 x) \/ x = 2 * (div2 x) + 1.
 Proof.
-  introv H.
-  rewrite <- double_twice. subst y.
+  intros.
+  repeat rewrite <- double_twice.
   destruct (Even_or_Odd x) as [H | H].
-  - exists 0. apply Even_double in H. lia.
-  - exists 1. apply Odd_double in H. lia.
+  - apply Even_double in H. lia.
+  - apply Odd_double in H. lia.
 Qed.
 
-Inductive HasName [A B P: Type] : (A -> B) -> A -> B -> P -> Prop :=
-  | MkHasName f x v H : HasName f x v H.
-
-Ltac give_name f x :=
-  lazymatch goal with
-  | _: HasName f x _ _ |- _ => fail 0 f x "already has a name"
-  | _ =>
-    let v := fresh "v" in
-    let H := fresh "Heq" v in
-    remember (f x) as v eqn:H;
-    pose proof MkHasName f x v H
-  end.
-
-Ltac give_names f :=
-  repeat match goal with
-  | _: context [ f ?x ] |- _ => give_name f x
-  | |- context [ f ?x ] => give_name f x
-  end.
-
-Ltac eliminate_div2 :=
-  give_names div2;
-  repeat lazymatch goal with
-  | H: HasName div2 ?x ?v ?Heq |- _ =>
-    clear H;
-    apply eliminate_div2 in Heq;
-    let r := fresh "r" v in
-    let Er := fresh "E" r in
-    let Hr := fresh "H" r in
-    destruct Heq as [r [Er Hr]]
-  end.
+#[global] Instance Op_nat_div2 : UnOp div2 :=
+  { TUOp x := (x / 2)%Z;
+    TUOpInj x := ltac:(now rewrite div2_div, Nat2Z.inj_div) }.
+Add Zify UnOp Op_nat_div2.
 
 (* Make [lia]/[nia] more powerful *)
 Lemma length_gt0_if_not_nil : forall A (xs : list A),
   [] <> xs -> length xs <> 0.
 Proof. introv H Hlen. apply length_zero_iff_nil in Hlen. auto. Qed.
 
+Ltac Zify.zify_convert_to_euclidean_division_equations_flag ::= constr:(true).
+
 Ltac Zify.zify_pre_hook ::=
-  eliminate_div2;
   unfold pow2 in *; repeat rewrite pow2_add in *; simpl pow2' in *;
   lazymatch goal with
   | H: [] <> _ |- _ => apply length_gt0_if_not_nil in H
