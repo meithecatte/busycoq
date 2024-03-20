@@ -1,11 +1,13 @@
 (** * Enumerate: TNF enumeration *)
 
-From Coq Require Import List. Import ListNotations.
 From Coq Require Import Lists.Streams.
+From Coq Require Import List. Import ListNotations.
 From Coq Require Import Lia.
 From BusyCoq Require Export Permute.
 From BusyCoq Require Import Pigeonhole.
 Set Default Goal Selector "!".
+
+From Coq Require Import Arith.PeanoNat.
 
 Module Enumerate (Ctx : Ctx).
   Module Permute := Permute Ctx. Export Permute.
@@ -167,4 +169,76 @@ Proof.
   - eauto.
   - destruct IHzvisits as [q'' [IH1 IH2]].
     simpl. eauto.
+Qed.
+
+Fixpoint find_zvisits (tm : TM) (q : Q) (n : nat) : option (list Q) :=
+  match n with
+  | 0 => None
+  | S n =>
+    match tm (q, s0) with
+    | Some (s, d, q') =>
+      if eqb_sym s s0 then
+        match find_zvisits tm q' n with
+        | Some qs => Some (q' :: qs)
+        | None => None
+        end
+      else
+        Some []
+    | None => Some []
+    end
+  end.
+
+Proposition find_zvisits_some : forall tm q qs n,
+  zvisits tm q qs ->
+  length qs < n ->
+  find_zvisits tm q n = Some qs.
+Proof.
+  introv H. generalize dependent n.
+  induction H; introv Hlen;
+    destruct n; try lia.
+  - simpl. inverts H as H; rewrite H; auto.
+    destruct (eqb_sym s s0); [contradiction | reflexivity].
+  - simpl. rewrite H.
+    destruct (eqb_sym s0 s0); try congruence.
+    simpl in Hlen.
+    rewrite IHzvisits; auto. lia.
+Qed.
+
+Corollary find_zvisits_some' : forall tm q qs,
+  zvisits tm q qs ->
+  find_zvisits tm q (length all_qs) = Some qs.
+Proof.
+  introv H.
+  apply find_zvisits_some; eauto using zvisits_bound.
+Qed.
+
+Fixpoint max_zvisits (tm : TM) (qs : list Q) : nat :=
+  match qs with
+  | [] => 0
+  | q :: qs =>
+    match find_zvisits tm q (length all_qs) with
+    | None => max_zvisits tm qs
+    | Some xs => max (length xs) (max_zvisits tm qs)
+    end
+  end.
+
+Lemma max_zvisits_le : forall tm q qs,
+  max_zvisits tm qs <= max_zvisits tm (q :: qs).
+Proof.
+  introv. simpl.
+  destruct (find_zvisits tm q (length all_qs)); lia.
+Qed.
+
+Lemma max_zvisits_spec : forall tm qs q qs',
+  zvisits tm q qs' ->
+  In q qs ->
+  length qs' <= max_zvisits tm qs.
+Proof.
+  induction qs; introv Hvisits Hin.
+  - destruct Hin.
+  - destruct Hin as [Hin | Hin].
+    + subst a.
+      apply find_zvisits_some' in Hvisits.
+      simpl. rewrite Hvisits. lia.
+    + transitivity (max_zvisits tm qs); eauto using max_zvisits_le.
 Qed.
