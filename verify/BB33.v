@@ -11,7 +11,15 @@ Module BB33 <: Ctx.
   Definition Q := state.
   Definition Sym := sym.
   Definition q0 := A.
+  Definition q1 := B.
   Definition s0 := S0.
+  Definition s1 := S1.
+
+  Lemma q0_neq_q1 : q0 <> q1.
+  Proof. discriminate. Qed.
+
+  Lemma s0_neq_s1 : s0 <> s1.
+  Proof. discriminate. Qed.
 
   Definition eqb_q (a b : Q): {a = b} + {a <> b}.
     decide equality.

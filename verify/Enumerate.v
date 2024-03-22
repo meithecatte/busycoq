@@ -242,3 +242,96 @@ Proof.
       simpl. rewrite Hvisits. lia.
     + transitivity (max_zvisits tm qs); eauto using max_zvisits_le.
 Qed.
+
+(** Structure of the enumeration tree *)
+Definition is_child_of (tm tm' : TM) :=
+  forall qs, tm' qs = None \/ tm qs = tm' qs.
+
+Lemma child_trans : forall tm tm' tm'',
+  is_child_of tm  tm'  ->
+  is_child_of tm' tm'' ->
+  is_child_of tm  tm''.
+Proof.
+  introv H1 H2.
+  intro qs.
+  destruct (H2 qs). { auto. }
+  destruct (H1 qs); constructor; congruence.
+Qed.
+
+Lemma child_step : forall tm tm' c c',
+  is_child_of tm tm' ->
+  c -[ tm' ]-> c' ->
+  c -[ tm  ]-> c'.
+Proof.
+  introv Hchild Hstep.
+  inverts Hstep;
+    destruct (Hchild (q, s));
+    constructor; congruence.
+Qed.
+
+Local Hint Resolve child_step : core.
+
+Lemma child_multistep : forall tm tm' c c' n,
+  is_child_of tm tm' ->
+  c -[ tm' ]->> n / c' ->
+  c -[ tm  ]->> n / c'.
+Proof.
+  introv Hchild Hsteps.
+  induction Hsteps; eauto.
+Qed.
+
+Lemma child_evstep : forall tm tm' c c',
+  is_child_of tm tm' ->
+  c -[ tm' ]->* c' ->
+  c -[ tm  ]->* c'.
+Proof.
+  introv Hchild Hsteps.
+  induction Hsteps; eauto.
+Qed.
+
+Lemma parent_step : forall tm tm' c c',
+  is_child_of tm tm' ->
+  c -[ tm  ]-> c' ->
+  c -[ tm' ]-> c' \/ halted tm' c.
+Proof.
+  introv Hchild Hstep.
+  inverts Hstep;
+    destruct (Hchild (q, s)); auto;
+    left; constructor; congruence.
+Qed.
+
+Lemma parent_multistep : forall tm tm' c c' n,
+  is_child_of tm tm' ->
+  c -[ tm  ]->> n / c' ->
+  c -[ tm' ]->> n / c' \/ halts tm' c.
+Proof.
+  introv Hchild Hsteps.
+  induction Hsteps.
+  - auto.
+  - eapply parent_step in H. 2: eassumption.
+    destruct H; auto.
+    destruct IHHsteps; eauto.
+Qed.
+
+Lemma parent_halted : forall tm tm' c,
+  is_child_of tm tm' ->
+  halted tm c ->
+  halted tm' c.
+Proof.
+  introv Hchild Hhalted.
+  destruct c as [q [[l s] r]]. simpl in *.
+  destruct (Hchild (q, s)); congruence.
+Qed.
+
+Local Hint Resolve parent_halted : core.
+
+Lemma child_nonhalt : forall tm tm' c,
+  is_child_of tm tm' ->
+  ~ halts tm' c ->
+  ~ halts tm  c.
+Proof.
+  introv Hchild Hnonhalt Hhalt.
+  destruct Hhalt as [n [ch [Hsteps Hhalted]]].
+  eapply parent_multistep in Hsteps. 2: eassumption.
+  destruct Hsteps; eauto 8.
+Qed.

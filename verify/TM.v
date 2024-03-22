@@ -22,6 +22,15 @@ Module Type Ctx.
   (** and the blank symbol [s0]. *)
   Parameter s0 : Sym.
 
+  (** during enumeration, we also want: *)
+  (** distinguished non-starting state *)
+  Parameter q1 : Q.
+  Parameter q0_neq_q1 : q0 <> q1.
+
+  (** distinguished non-blank symbol *)
+  Parameter s1 : Sym.
+  Parameter s0_neq_s1 : s0 <> s1.
+
   (** Moreover we want decidable equality for [Q] and [Sym]. *)
   Parameter eqb_q : forall (a b : Q), {a = b} + {a <> b}.
   Parameter eqb_sym : forall (a b : Sym), {a = b} + {a <> b}.
@@ -221,8 +230,7 @@ Qed.
 
 (** We prove that the "syntactic" notion of [halted] corresponds
     to the behavior of [step]. *)
-Lemma halted_no_step :
-  forall tm c c',
+Lemma halted_no_step : forall tm c c',
   halted tm c ->
   ~ c -[ tm ]-> c'.
 Proof.
@@ -230,8 +238,7 @@ Proof.
   inverts Hstep; congruence.
 Qed.
 
-Lemma no_halted_step :
-  forall tm c,
+Lemma no_halted_step : forall tm c,
   ~ halted tm c ->
   exists c',
   c -[ tm ]-> c'.
@@ -246,8 +253,7 @@ Proof.
 Qed.
 
 (** Other useful lemmas: *)
-Lemma step_deterministic :
-  forall tm c c' c'',
+Lemma step_deterministic : forall tm c c' c'',
   c -[ tm ]-> c'  ->
   c -[ tm ]-> c'' ->
   c' = c''.
@@ -266,8 +272,7 @@ Ltac step_deterministic :=
 
 Local Hint Extern 1 => step_deterministic : core.
 
-Lemma multistep_trans :
-  forall tm n m c c' c'',
+Lemma multistep_trans : forall tm n m c c' c'',
   c  -[ tm ]->> n / c' ->
   c' -[ tm ]->> m / c'' ->
   c  -[ tm ]->> (n + m) / c''.
@@ -276,8 +281,7 @@ Proof.
   induction H1; simpl; eauto.
 Qed.
 
-Lemma multistep_deterministic :
-  forall tm n c c' c'',
+Lemma multistep_deterministic : forall tm n c c' c'',
   c -[ tm ]->> n / c'  ->
   c -[ tm ]->> n / c'' ->
   c' = c''.
@@ -298,8 +302,7 @@ Local Hint Extern 1 => multistep_deterministic : core.
 
 Ltac deterministic := repeat (step_deterministic || multistep_deterministic).
 
-Lemma multistep_last :
-  forall tm n c c'',
+Lemma multistep_last : forall tm n c c'',
   c -[ tm ]->> S n / c'' ->
   exists c', c -[ tm ]->> n / c' /\ c' -[ tm ]-> c''.
 Proof.
@@ -314,8 +317,7 @@ Lemma evstep_one : forall {tm c c'},
   c -[ tm ]->* c'.
 Proof. eauto. Qed.
 
-Lemma evstep_trans :
-  forall tm c c' c'',
+Lemma evstep_trans : forall tm c c' c'',
   c  -[ tm ]->* c'  ->
   c' -[ tm ]->* c'' ->
   c  -[ tm ]->* c''.
@@ -323,8 +325,7 @@ Proof.
   introv H1 H2. induction H1; eauto.
 Qed.
 
-Lemma halts_in_S :
-  forall tm c c' n,
+Lemma halts_in_S : forall tm c c' n,
   halts_in tm c' n ->
   c -[ tm ]-> c' ->
   halts_in tm c (S n).
@@ -336,8 +337,7 @@ Qed.
 
 #[export] Hint Resolve halts_in_S : core.
 
-Lemma halts_step :
-  forall tm c c',
+Lemma halts_step : forall tm c c',
   halts tm c' ->
   c -[ tm ]-> c' ->
   halts tm c.
@@ -346,6 +346,17 @@ Proof.
 Qed.
 
 #[export] Hint Resolve halts_step : core.
+
+Lemma halts_multistep : forall tm c c' n,
+  halts tm c' ->
+  c -[ tm ]->> n / c' ->
+  halts tm c.
+Proof.
+  introv Hhalts Hsteps.
+  induction Hsteps; eauto.
+Qed.
+
+#[export] Hint Resolve halts_multistep : core.
 
 Lemma halted_halts :
   forall tm c,
