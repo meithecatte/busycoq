@@ -697,13 +697,14 @@ Proof.
   destruct n1; inverts H.
 
   eapply skip_halts with (n := n0); try eassumption.
-  apply progress_nonhalt with
-    (P := fun c => exists r, c = lift (q;; undir (L, [], r)) /\ t0 ~ r).
-  - introv H1. destruct H1 as [r' [Ec Hr']]. subst c.
+  apply progress_nonhalt_cond with
+    (C := fun r => lift (q;; undir (L, [], r)))
+    (P := fun r => t0 ~ r).
+  - intros r' Hr'.
     apply steps_some with (t := (L, [], r')) in E; auto.
     destruct E as [[[d l] r''] [[E [Hl Hr]] Hrun]]. subst d. inverts Hl.
-    eauto 6.
-  - exists r. auto.
+    eauto.
+  - auto.
 Qed.
 
 Theorem verify_bouncer_correct : forall tm d n0 n1 split shifts,

@@ -389,10 +389,9 @@ Qed.
 Theorem nonhalt : ~ halts tm c0.
 Proof.
   apply multistep_nonhalt with (E 1 17). { execute. }
-  apply progress_nonhalt with
-    (P := fun c => exists m, E 1 m = c /\ leads (b m)).
-  - intros c [m [Heq Hleads]]. subst c.
+  apply progress_nonhalt_cond with (C := E 1) (P := fun m => leads (b m)).
+  - intros m Hleads.
     destruct (E_next m Hleads) as [m' [Hsteps Hleads']].
     eauto.
-  - exists 17%positive. repeat constructor. discriminate.
+  - repeat constructor. discriminate.
 Qed.

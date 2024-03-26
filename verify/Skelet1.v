@@ -1489,11 +1489,8 @@ Lemma cycle_nonhalt : forall l,
   ~ halts tm (lift (right, l_C0 :: l, K)).
 Proof.
   introv.
-  apply progress_nonhalt with
-    (P := fun c => exists l, c = lift (right, l_C0 :: l, K)).
-  - introv H. destruct H as [l1 H]. subst c.
-    repeat eexists. apply infinite_cycle.
-  - eauto.
+  apply progress_nonhalt_simple with (C := fun l => lift (right, l_C0 :: l, K)).
+  - eauto using infinite_cycle.
 Qed.
 
 Local Hint Immediate cycle_nonhalt : core.

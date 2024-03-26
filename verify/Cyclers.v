@@ -18,7 +18,7 @@ Lemma cycle_nonhalting :
   ~ halts tm c.
 Proof.
   introv E Hgt0. subst c'.
-  apply progress_nonhalt with (P := fun c' => c = c');
+  apply progress_nonhalt_simple with (C := fun (_: nat) => c);
     intros; subst; eauto.
 Qed.
 

@@ -269,13 +269,14 @@ Theorem tcycle_nonhalting : forall tm n k k' q t t',
 Proof.
   introv Hrun Hle Heq.
   replace k' with (k + (k' - k)) in * by lia. clear Hle.
-  apply progress_nonhalt with (P := fun '(q0, t0) => q = q0 /\ EqLimit k t t0).
-  - intros [q0 t0] [Hq Ht]. subst q0.
+  apply progress_nonhalt_cond with (C := fun t0 => q;; t0)
+    (P := fun t0 => EqLimit k t t0).
+  - intros t0 Ht.
     eapply lmultistep_EqLimit in Hrun; try exact Ht.
     destruct Hrun as [t2 []].
-    exists (q, t2). repeat split.
-    + apply EqLimit_trans with t'; eauto.
+    exists t2. repeat split.
     + eauto.
+    + eauto using EqLimit_trans.
   - auto.
 Qed.
 

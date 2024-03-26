@@ -499,12 +499,13 @@ Proof.
   introv.
   destruct (D0_next m) as [m' [Hrun Hinv]].
   apply multistep_nonhalt with (D 0 1 m'). { auto using progress_evstep. }
-  apply progress_nonhalt with
-    (P := fun c => exists m a, D 0 a m = c /\ reset_invariant m).
+  apply progress_nonhalt_cond with (i0 := (m', 1))
+    (C := fun '(m, a) => D 0 a m)
+    (P := fun '(m, a) => reset_invariant m).
   - clear m m' Hrun Hinv.
-    intros c [m [a [Heq Hinv]]]. subst c.
+    intros [m a] Hinv.
     destruct (D_next m a Hinv) as [m' [a' [Hsteps Hinv']]].
-    eauto 6.
+    eexists (_, _). eauto.
   - eauto.
 Qed.
 
