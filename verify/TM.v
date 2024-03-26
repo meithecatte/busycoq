@@ -569,9 +569,8 @@ Proof.
   destruct (Nat.leb_spec (S n) k).
   - assert (Hhalts' : halts_in tm c' (k - S n))
       by eauto using preceeds_halt.
-    assert (Hnhalts : ~ halts_in tm c' (k - S n)).
-    { apply H; [lia | assumption]. }
-    contradiction.
+    enough (Hnhalts : ~ halts_in tm c' (k - S n)) by contradiction.
+    apply H; intuition lia.
   - eauto using exceeds_halt.
 Qed.
 
@@ -582,9 +581,8 @@ Lemma progress_nonhalt : forall tm (P : Q * tape -> Prop) c,
 Proof.
   introv Hstep H0 Hhalts.
   destruct Hhalts as [k Hhalts].
-  assert (Hnhalts : ~ halts_in tm c k)
-    by eauto using progress_nonhalt'.
-  contradiction.
+  enough (Hnhalts : ~ halts_in tm c k) by contradiction.
+  eauto using progress_nonhalt'.
 Qed.
 
 Corollary progress_nonhalt_simple : forall tm (A : Type) (C : A -> Q * tape) i0,
@@ -595,6 +593,18 @@ Proof with eauto.
   apply progress_nonhalt with (P := fun c => exists i, c = C i)...
   - introv [i Hi]. subst c.
     destruct (Hstep i) as [i' Hi']...
+Qed.
+
+Corollary progress_nonhalt_cond : forall tm (A : Type) (i0 : A)
+  (C : A -> Q * tape) (P : A -> Prop),
+  (forall i, P i -> exists i', C i -[ tm ]->+ C i' /\ P i') ->
+  P i0 ->
+  ~ halts tm (C i0).
+Proof with eauto.
+  introv Hstep Hi0.
+  apply progress_nonhalt with (P := fun c => exists i, c = C i /\ P i)...
+  - introv [i [E HP]]. subst c.
+    destruct (Hstep i HP) as [i' [Hi' HP']]...
 Qed.
 
 End TM.
