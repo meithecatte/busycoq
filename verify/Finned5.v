@@ -1,7 +1,6 @@
 (** * Cubic-finned machine #5 (https://bbchallenge.org/11018487) *)
 
-From BusyCoq Require Import Individual52.
-From Coq Require Import Lia.
+From BusyCoq Require Import Individual52 Finned.
 Set Default Goal Selector "!".
 
 Definition tm : TM := fun '(q, s) =>
@@ -58,57 +57,10 @@ Definition f (i : I) : Q * tape :=
     const 0 <* [1]^^a << 0 <* [1]^^b {{0}} [1; 0]^^d *> const 0
   end.
 
-Ltac single := eapply progress_intro; [prove_step | simpl_tape; finish].
-Ltac goto x := match type of x with
-  | I => exists x
-  | _ -> I => exists (x ltac:(lia))
-  end; single.
-
-Lemma align_d : forall d, [0; 1]^^d *> const 0 = 0 >> [1; 0]^^d *> const 0.
-Proof.
-  induction d; simpl.
-  - rewrite <- const_unfold. reflexivity.
-  - rewrite IHd. reflexivity.
-Qed.
-
 Theorem nonhalt : ~ halts tm c0.
 Proof.
   replace c0 with (A;; const 0 << 0 {{0}} const 0)
     by now rewrite <- const_unfold.
   apply progress_nonhalt_simple with (C := f) (i0 := I0 0 0 eq_refl).
-  intros [].
-  - (* I0 *) goto (I1 a (S b)).
-  - (* I1 *)
-    destruct b as [| b']. { lia. }
-    goto (I2 a b' 0).
-  - (* I2 *)
-    destruct b as [| b'].
-    + goto (I4 a).
-    + goto (I3 a b' d).
-  - (* I3 *)
-    destruct b as [| b']. { lia. }
-    goto (I2 a b' (S d)).
-  - (* I4 *)
-    destruct a as [| a'].
-    + goto (I6 0 1 0).
-    + goto (I5 0 a' 2 (S a')).
-  - (* I5 *)
-    destruct b as [| b'].
-    + goto (I6 a c d).
-    + goto (I5 a b' (S c) d).
-  - (* I6 *)
-    + goto (I7 a c d).
-  - (* I7 *)
-    destruct c as [| c']. { lia. }
-    goto (I8 (S a) 0 c' d).
-  - (* I8 *)
-    destruct c as [| c'].
-    + simpl f. rewrite align_d.
-      goto (I9 a (S b) d).
-    + goto (I8 a (S b) c' d).
-  - (* I9 *)
-    destruct d as [| d'].
-    + goto (I0 a (S b)).
-    + simpl f. rewrite <- align_d.
-      goto (I5 a (S b) 0 d').
+  intros []; finned.
 Qed.
