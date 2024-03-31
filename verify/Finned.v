@@ -77,7 +77,8 @@ Ltac solve_tape :=
     apply tape_eq_intro; solve_side
   end.
 
-Ltac show_leftover :=
+Ltac noop_hook _ := idtac.
+Ltac show_leftover _ :=
   match goal with
   | |- ?X => idtac "couldn't prove" X
   end.
@@ -85,9 +86,9 @@ Ltac show_leftover :=
 Ltac autogoto_tac debug_hook :=
     unshelve eexists;
     [econstructor | simpl; align_tape; single;
-     apply evstep_refl'; solve_tape; debug_hook]; lia.
+     apply evstep_refl'; solve_tape; debug_hook ()]; lia.
 
-Tactic Notation "autogoto" := autogoto_tac idtac.
+Tactic Notation "autogoto" := autogoto_tac noop_hook.
 Tactic Notation "debug" "autogoto" := autogoto_tac show_leftover.
 
 Ltac maybe_casesplit_at xs :=
@@ -108,7 +109,7 @@ Ltac maybe_casesplit :=
     end
   end.
 
-Ltac finned_tac debug := simpl; maybe_casesplit; autogoto_tac debug.
+Ltac finned_tac debug_hook := simpl; maybe_casesplit; autogoto_tac debug_hook.
 
-Tactic Notation "finned" := finned_tac idtac.
+Tactic Notation "finned" := finned_tac noop_hook.
 Tactic Notation "debug" "finned" := finned_tac show_leftover.
