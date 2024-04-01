@@ -35,6 +35,8 @@ considered hard to decide automatically. At the moment, these include:
    (proof contributed by Jason Yuen)
  - [Skelet #34](https://www.sligocki.com/2023/02/02/skelet-34.html)
  - [Skelet #35](https://www.sligocki.com/2023/02/05/shift-overflow.html)
+ - the five "cubic-finned" machines analyzed by Justin Blanchard
+   (bbchallenge indices 7763480, 8120967, 10756090, 11017998, and 11018487).
 
 ## Running the deciders
 
