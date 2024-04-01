@@ -1,7 +1,6 @@
 (** * Cubic-finned machine #2 (https://bbchallenge.org/8120967) *)
 
 From BusyCoq Require Import Individual52 Finned.
-From Coq Require Import Lia.
 Set Default Goal Selector "!".
 
 Definition tm : TM := fun '(q, s) =>
