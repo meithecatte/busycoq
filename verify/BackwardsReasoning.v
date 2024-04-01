@@ -134,7 +134,7 @@ Proof.
       destruct st; [clear H | inverts H]
     end; simpl;
     lazymatch goal with
-    | |- context [eqb_sym ?s ?s] => destruct (eqb_sym s1 s1); try congruence
+    | |- context [eqb_sym ?s ?s] => destruct (eqb_sym s s); try congruence
     | _ => idtac
     end;
     eexists; repeat split; auto.
