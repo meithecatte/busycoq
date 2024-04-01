@@ -100,16 +100,16 @@ Ltac maybe_casesplit_at xs :=
   end.
 
 Ltac maybe_casesplit :=
-  lazymatch goal with
+  simpl; lazymatch goal with
   | |- context [ ?q;; ?l {{?s}} ?r -[ ?tm ]->+ _ ] =>
     let instr := eval compute in (tm (q, s)) in
-    match instr with
+    lazymatch instr with
     | Some (_, L, _) => maybe_casesplit_at l
     | Some (_, R, _) => maybe_casesplit_at r
     end
   end.
 
-Ltac finned_tac debug_hook := simpl; maybe_casesplit; autogoto_tac debug_hook.
+Ltac finned_tac debug_hook := repeat maybe_casesplit; autogoto_tac debug_hook.
 
 Tactic Notation "finned" := finned_tac noop_hook.
 Tactic Notation "debug" "finned" := finned_tac show_leftover.
