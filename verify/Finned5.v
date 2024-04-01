@@ -19,16 +19,16 @@ Notation "c -->+ c'" := (c -[ tm ]->+ c') (at level 40).
 Close Scope sym.
 
 Inductive I : Type :=
-  | I0 (a b : nat) (H : 2*a = b) : I                 (* 1RB -> I1 *)
-  | I1 (a b : nat) (H : 2*a + 1 = b) : I             (* 0LC -> I2 *)
-  | I2 (a b d : nat) (H : 2*a = b + 2*d) : I         (* 1LD -> I3, I4 *)
-  | I3 (a b d : nat) (H : 2*a = b + 2*d + 1) : I     (* 0LC -> I2 *)
-  | I4 (a : nat) : I                                 (* 1LA -> I5, I6 *)
-  | I5 (a b c d : nat) (H : 2*a + d + 1 = b + c) : I (* 1LA -> I5, I6 *)
-  | I6 (a c d : nat) (H : 2*a + d + 1 = c) : I       (* 1RB -> I7 *)
-  | I7 (a c d : nat) (H : 2*a + d + 1 = c) : I       (* 0RE -> I8 *)
-  | I8 (a b c d : nat) (H : 2*a + d = b + c + 2) : I (* 1RE -> I8, I9 *)
-  | I9 (a b d : nat) (H : 2*a + d = b + 1) : I       (* 1RA -> I0, I5 *)
+  | I0 (a b : nat)     (H : 2*a = b) : I
+  | I1 (a b : nat)     (H : 2*a + 1 = b) : I
+  | I2 (a b d : nat)   (H : 2*a = b + 2*d) : I
+  | I3 (a b d : nat)   (H : 2*a = b + 2*d + 1) : I
+  | I4 (a d : nat)     (H : a = d) : I
+  | I5 (a b c d : nat) (H : 2*a + d + 1 = b + c) : I
+  | I6 (a c d : nat)   (H : 2*a + d + 1 = c) : I
+  | I7 (a c d : nat)   (H : 2*a + d + 1 = c) : I
+  | I8 (a b c d : nat) (H : 2*a + d = b + c + 2) : I
+  | I9 (a b d : nat)   (H : 2*a + d = b + 1) : I
   .
 
 Open Scope sym.
@@ -43,8 +43,8 @@ Definition f (i : I) : Q * tape :=
     const 0 <* [1]^^a << 0 <* [1]^^b {{1}} [0; 1]^^d *> const 0
   | I3 a b d _ => D;;
     const 0 <* [1]^^a << 0 <* [1]^^b {{1}} 1 >> [0; 1]^^d *> const 0
-  | I4 a => D;;
-    const 0 <* [1]^^a {{0}} 1 >> [0; 1]^^a *> const 0
+  | I4 a d _ => D;;
+    const 0 <* [1]^^a {{0}} 1 >> [0; 1]^^d *> const 0
   | I5 a b c d _ => A;;
     const 0 <* [1]^^a << 0 <* [1]^^b {{1}} [1]^^c *> [0; 1]^^d *> const 0
   | I6 a c d _ => A;;

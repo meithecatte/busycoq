@@ -1,8 +1,18 @@
 From BusyCoq Require Import Individual52.
-From Coq Require Import Lia.
+From Coq Require Import Lia PeanoNat.
+
+Ltac deduce_eq0 :=
+  lazymatch goal with
+  | H: _ + _ = O |- _ =>
+    apply Nat.eq_add_0 in H; destruct H
+  | H: S _ * _ = O |- _ =>
+    apply Nat.eq_mul_0_r in H; [| discriminate]
+  | H: ?x = O |- _ =>
+    is_var x; subst x
+  end.
 
 Ltac single := eapply progress_intro; [prove_step | simpl_tape].
-Ltac goto x := match type of x with
+Ltac goto x := lazymatch type of x with
   | I => exists x
   | _ -> I => exists (x ltac:(lia))
   end; single; finish.
@@ -95,7 +105,7 @@ Ltac maybe_casesplit_at xs :=
   lazymatch xs with
   | _^^?n *> _ =>
     let n' := fresh n "'" in
-    destruct n as [| n']; try lia
+    destruct n as [| n']; try lia; repeat deduce_eq0
   | _ => idtac
   end.
 
