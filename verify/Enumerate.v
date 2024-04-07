@@ -335,3 +335,19 @@ Proof.
   eapply parent_multistep in Hsteps. 2: eassumption.
   destruct Hsteps; eauto 8.
 Qed.
+
+(** Halting-equivalence *)
+Definition eqv (tm tm' : TM) :=
+  forall n, halts_in tm c0 n <-> halts_in tm' c0 n.
+
+Lemma perm_eqv : forall tm tm' f,
+  Perm tm tm' f ->
+  f q0 = q0 ->
+  eqv tm tm'.
+Proof.
+  introv HP Hq0. split; introv H.
+  - replace c0 with (f q0;; tape0) by now rewrite Hq0.
+    eauto.
+  - replace c0 with (f q0;; tape0) in H by now rewrite Hq0.
+    unfold c0. eauto.
+Qed.
