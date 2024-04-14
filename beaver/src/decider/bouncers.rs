@@ -572,10 +572,16 @@ impl fmt::Display for SymbolicTM<'_> {
 ///  - the step counts are in a quadratic progression
 ///  - the pattern extends until the end of the list of records
 fn find_progressions(records: &[Record]) -> impl Iterator<Item=[&Record; 3]> {
+    // The tape length grows by one with each entry in `records`, thus
+    // we simply enumerate the sequences with constant distance in the record
+    // array.
     (1..=records.len() / 3).flat_map(move |k| {
         (0..k).flat_map(move |mut i| {
             // Enumerate progressions starting at i mod k
             iter::from_fn(move || {
+                // We need three data points to uniquely identify a quadratic
+                // progression (which will always exist), and then one more
+                // to confirm.
                 if i + 3 * k >= records.len() {
                     return None;
                 }
@@ -594,13 +600,21 @@ fn find_progressions(records: &[Record]) -> impl Iterator<Item=[&Record; 3]> {
                     .tuple_windows()
                     .map(|(a, b)| b as i32 - a as i32);
                 let Some(diff) = diffs.next() else {
+                    // the (state, direction) pair changed too soon
                     i += k;
                     return Some(None);
                 };
+                // Number of additional second-differences for which the pattern
+                // continues.
+                //
+                // We consumed:
+                // length + 1 second-differences in total
+                // length + 2 first-differences
+                // length + 3 records
                 let length = diffs.take_while(|&d| d == diff).count();
                 // The index that would be included if we wanted to extend
                 // the progression.
-                let next_index = i + (length + 4) * k;
+                let next_index = i + (length + 3) * k;
 
                 let progression = if length > 0 && next_index >= records.len() {
                     let records = records.iter()
