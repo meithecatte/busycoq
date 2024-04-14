@@ -14,7 +14,7 @@ byteorder = "1.4.3"
 enum-map = "2.6.0"
 indexmap = "2.1.0"
 indicatif = { version = "0.17.5", features = ["rayon"] }
-itertools = { git = "https://github.com/rust-itertools/itertools" }
+itertools = "0.12.1"
 memmap2 = "0.7.1"
 ndarray = "0.15.6"
 rayon = "1.7.0"
