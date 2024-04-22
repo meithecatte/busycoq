@@ -104,6 +104,7 @@ pub fn decide_bouncer(tm: &TM) -> Result<Cert, FailReason> {
     Err(reason)
 }
 
+/// Generate the `tape_split` part of the certificate.
 fn describe_split<'a>(
     tape: impl Iterator<Item = Segment<'a>>,
 ) -> Vec<(u16, u16)> {
@@ -125,8 +126,8 @@ fn describe_split<'a>(
     split
 }
 
-// Check whether `tape` is a special-case of `stencil`, assuming both
-// are left-aligned.
+/// Check whether `tape` is a special-case of `stencil`, assuming both
+/// are left-aligned.
 fn is_special_case_left<'a, 'b>(
     tape: impl Iterator<Item = Segment<'a>> + DoubleEndedIterator,
     stencil: impl Iterator<Item = Segment<'b>> + DoubleEndedIterator,
@@ -164,8 +165,8 @@ fn is_special_case_left<'a, 'b>(
     stencil.next().is_none()
 }
 
-// Check whether `tape` is a special-case of `stencil`, assuming both
-// are right-aligned.
+/// Check whether `tape` is a special-case of `stencil`, assuming both
+/// are right-aligned.
 fn is_special_case_right<'a, 'b>(
     tape: impl Iterator<Item = Segment<'a>>,
     stencil: impl Iterator<Item = Segment<'b>>,
@@ -257,6 +258,8 @@ impl<'bump> SymbolicTM<'bump> {
         }
     }
 
+    /// Returns `true` if we're currently pointing at a specific edge
+    /// of the tape.
     fn is_on_edge(&self, dir: Dir) -> bool {
         if dir != self.dir {
             return false;
@@ -713,7 +716,7 @@ fn split_tapes(records: [&Record; 3]) -> Option<Vec<Segment<'_>>> {
     // We index the DP array by the pair of
     //   (symbols consumed from s0, symbols used in repeaters).
     // The indices into all three tapes can be recovered from this.
-    let f = |(i0, d), memo: &Memo<DPResult, _, _>| -> DPResult {
+    let f = |(i0, d), memo: &mut Memo<DPResult, _, _>| -> DPResult {
         let i1 = i0 + d;
         let i2 = i0 + 2 * d;
 
@@ -746,7 +749,7 @@ fn split_tapes(records: [&Record; 3]) -> Option<Vec<Segment<'_>>> {
         DPResult::fail()
     };
 
-    let memo = Memo::new((s0.len() + 1, s1.len() - s0.len() + 1), &f);
+    let mut memo = Memo::new((s0.len() + 1, s1.len() - s0.len() + 1), &f);
     let mut result = vec![];
     let mut i0 = 0;
     let mut d = 0;
