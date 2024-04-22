@@ -131,9 +131,9 @@ struct Decide {
     #[argh(option, short='a')]
     ad_hoc: Vec<u32>,
 
-    /// don't run the Syntactic decider
+    /// run the Syntactic decider
     #[argh(switch)]
-    no_syntactic: bool,
+    wip_syntactic: bool,
 
     /// don't run the Cyclers decider
     #[argh(switch)]
@@ -202,7 +202,7 @@ impl Decide {
 
         let processed = AtomicU32::new(0);
 
-        let syntactic = DeciderStats::<Syntactic>::new(self.no_syntactic);
+        let syntactic = DeciderStats::<Syntactic>::new(!self.wip_syntactic);
         let cyclers = DeciderStats::<Cyclers>::new(self.no_cyclers);
         let tcyclers = DeciderStats::<TCyclers>::new(self.no_tcyclers);
         let backwards = DeciderStats::<BackwardsReasoning>::new(self.no_backwards);
