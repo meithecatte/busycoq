@@ -60,33 +60,36 @@ will be generated at `decided.dat`.
 ## Results
 
 ```
+Syntactic:
+  14827625 Decided
+  73836439 NotApplicable
 Cyclers:
-  11229238 Decided
+   9303910 Decided
          0 OutOfSpace
-   3092791 OutOfTime
+   2572607 OutOfTime
          0 Halted
-  74342035 NotApplicable
+  61959922 NotApplicable
 Translated Cyclers:
-  73860624 Decided
+  61553106 Decided
          0 OutOfSpace
-    481411 OutOfTime
+    406816 OutOfTime
          0 Halted
-   3092791 NotApplicable
+   2572607 NotApplicable
 Backwards Reasoning:
-   2035576 Decided
-    979028 OutOfSpace
+   1446444 Decided
+    973381 OutOfSpace
     559598 OutOfTime
 Bouncers:
-   1406032 Decided
+   1402235 Decided
      23433 OutOfSpace
-    109161 OutOfTime
+    107311 OutOfTime
          0 Halted
 
-    132594 Undecided
+    130744 Undecided
 
-real    34m38.321s
-user    391m10.605s
-sys     0m8.354s
+real    2m15.218s
+user    25m28.051s
+sys     0m4.046s
 ```
 
 Here are some results from an earlier run with higher limits (50M steps,
