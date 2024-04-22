@@ -1,3 +1,4 @@
+#![cfg_attr(not(feature = "bouncers-dp"), allow(dead_code))]
 use ndarray::{Array, NdIndex, IntoDimension};
 
 pub struct Memo<'a, A, D, I> {

@@ -1,13 +1,11 @@
 use crate::{Certificate, Decider};
 use crate::database::DatabaseEntry;
 use crate::turing::{Command, Configuration, Dir, Sym, State, TM, OutOfSpace};
-use crate::memo::Memo;
 use enum_map::Enum;
 use itertools::Itertools;
 use bumpalo::Bump;
 use std::collections::VecDeque;
 use std::fmt;
-use std::num::NonZeroU32;
 use std::iter;
 use binrw::binrw;
 
@@ -658,7 +656,11 @@ impl fmt::Display for Segment<'_> {
 }
 
 /// Find a symbolic tape matching a sequence of 3 records meeting the heuristic.
+#[cfg(feature = "bouncers-dp")]
 fn split_tapes(records: [&Record; 3]) -> Option<Vec<Segment<'_>>> {
+    use crate::memo::Memo;
+    use std::num::NonZeroU32;
+
     let s0 = &records[0].tape;
     let s1 = &records[1].tape;
     let s2 = &records[2].tape;
@@ -769,6 +771,49 @@ fn split_tapes(records: [&Record; 3]) -> Option<Vec<Segment<'_>>> {
     }
 
     Some(result)
+}
+
+#[cfg(not(feature = "bouncers-dp"))]
+fn split_tapes(records: [&Record; 3]) -> Option<Vec<Segment<'_>>> {
+    let s0 = &records[0].tape;
+    let s1 = &records[1].tape;
+    let s2 = &records[2].tape;
+
+    let mut result = vec![];
+    let mut i0 = 0;
+    let mut i1 = 0;
+    let mut i2 = 0;
+
+    'outer: loop {
+        // If i0 and i1 point to the end, then i2 also does
+        if i0 == s0.len() && i1 == s1.len() {
+            return Some(result);
+        }
+
+        if i0 < s0.len() && i1 < s1.len() && i2 < s2.len() &&
+            s0[i0] == s1[i1] && s1[i1] == s2[i2]
+        {
+            result.push(Segment::Sym(s0[i0]));
+            i0 += 1; i1 += 1; i2 += 1;
+            continue;
+        }
+
+        let remaining_s0 = s0.len() - i0;
+        let remaining_s1 = s1.len() - i1;
+        let longest_match = s1.iter().skip(i1)
+            .zip(s2.iter().skip(i2))
+            .take(remaining_s1 - remaining_s0)
+            .take_while(|&(a, b)| a == b).count();
+        for k in (1..=longest_match).rev() {
+            if s2[i2..i2 + k] == s2[i2 + k..i2 + 2 * k] {
+                result.push(Segment::Repeat(&s1[i1..i1 + k]));
+                i1 += k; i2 += 2 * k;
+                continue 'outer;
+            }
+        }
+
+        return None;
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Enum)]
