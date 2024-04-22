@@ -6,7 +6,6 @@ use itertools::Itertools;
 use bumpalo::Bump;
 use std::collections::VecDeque;
 use std::fmt;
-use std::iter;
 use binrw::binrw;
 
 const SPACE_LIMIT: usize = 1024;
@@ -577,16 +576,14 @@ fn find_progressions(records: &[Record]) -> impl Iterator<Item=[&Record; 3]> {
     // we simply enumerate the sequences with constant distance in the record
     // array.
     (1..=records.len() / 3).flat_map(move |k| {
-        (0..k).flat_map(move |mut i| {
-            // Enumerate progressions starting at i mod k
-            iter::from_fn(move || {
-                // We need three data points to uniquely identify a quadratic
-                // progression (which will always exist), and then one more
-                // to confirm.
-                if i + 3 * k >= records.len() {
-                    return None;
-                }
+        (0..k).filter_map(move |mut i| {
+            // Enumerate progressions starting at i mod k. Since we require that
+            // it continues until the end of the data, at most one progression
+            // will be returned for each (i, k) pair.
 
+            // We need three data points to fit a quadratic progression
+            // (which cannot fail), and then one more to confirm.
+            while i + 3 * k < records.len() {
                 let state = records[i].state;
                 let dir = records[i].dir;
 
@@ -603,8 +600,9 @@ fn find_progressions(records: &[Record]) -> impl Iterator<Item=[&Record; 3]> {
                 let Some(diff) = diffs.next() else {
                     // the (state, direction) pair changed too soon
                     i += k;
-                    return Some(None);
+                    continue;
                 };
+
                 // Number of additional second-differences for which the pattern
                 // continues.
                 //
@@ -617,19 +615,19 @@ fn find_progressions(records: &[Record]) -> impl Iterator<Item=[&Record; 3]> {
                 // the progression.
                 let next_index = i + (length + 3) * k;
 
-                let progression = if length > 0 && next_index >= records.len() {
+                if length > 0 && next_index >= records.len() {
                     let records = records.iter()
                         .skip(i).step_by(k).take(3);
-                    Some(array_init::from_iter(records).unwrap())
+                    return Some(array_init::from_iter(records).unwrap());
                 } else {
-                    None
+                    // We allow for an overlap of two elements, since that is the
+                    // maximum two different quadratic progressions can
+                    // overlap by.
+                    i += k * (length + 1);
                 };
+            }
 
-                // We allow for an overlap of two elements, since that is the
-                // maximum two different quadratic progressions can overlap by.
-                i += k * (length + 1);
-                Some(progression)
-            }).flatten()
+            None
         })
     })
 }
