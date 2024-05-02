@@ -84,9 +84,9 @@ Bouncers:
 
     132594 Undecided
 
-real	2m16.238s
-user	25m57.907s
-sys	0m4.162s
+real	2m11.670s
+user	25m32.012s
+sys	0m3.364s
 ```
 
 Here are some results from an earlier run with higher limits (50M steps,
