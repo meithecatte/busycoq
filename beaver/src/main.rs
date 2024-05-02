@@ -43,10 +43,12 @@ struct DeciderStats<D: Decider> {
 impl<D: Decider> fmt::Display for DeciderStats<D> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let decided = self.decided.load(Ordering::Relaxed);
-        if decided < 10000 {
+        if decided < 10_000 {
             write!(f, "{decided}")
-        } else {
+        } else if decided < 10_000_000 {
             write!(f, "{}k", decided / 1000)
+        } else {
+            write!(f, "{}M", decided / 1000_000)
         }
     }
 }
