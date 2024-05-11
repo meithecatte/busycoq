@@ -2,11 +2,11 @@
 
 From Coq Require Export Lists.Streams.
 From Coq Require Import Lia.
-From BusyCoq Require Export Permute.
+From BusyCoq Require Export WNFA.
 Set Default Goal Selector "!".
 
 Module Individual (Ctx : Ctx).
-  Module Permute := Permute Ctx. Export Permute.
+  Module WNFA := WNFA Ctx. Export WNFA.
 
 (** Trivial lemmas, but [simpl] in these situations leaves a mess. *)
 Lemma move_left_const : forall s0 s r,
