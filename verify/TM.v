@@ -522,18 +522,27 @@ Proof.
   exfalso. eauto using exceeds_halt.
 Qed.
 
-Lemma preceeds_halt : forall tm c c' n k,
+Lemma preceeds_halt : forall {tm c c' n k},
   halts_in tm c k ->
   c -[ tm ]->> n / c' ->
-  n <= k ->
-  halts_in tm c' (k - n).
+  halts_in tm c' (k - n) /\ n <= k.
 Proof.
-  introv Hhalt Hexec Hle.
+  introv Hhalt Hexec.
+  assert (Hle : n <= k) by eauto using within_halt.
   destruct Hhalt as [ch [Hrunch Hhalted]].
   apply (rewind_split' n (k - n)) in Hrunch; try lia.
   destruct Hrunch as [cm [H1 H2]].
   deterministic.
   eauto.
+Qed.
+
+Corollary preceeds_halt' : forall tm c c' n k,
+  halts_in tm c k ->
+  c -[ tm ]->> n / c' ->
+  halts_in tm c' (k - n).
+Proof.
+  introv Hhalt Hexec.
+  now destruct (preceeds_halt Hhalt Hexec).
 Qed.
 
 Lemma skip_halts: forall tm c c' n,
@@ -542,9 +551,7 @@ Lemma skip_halts: forall tm c c' n,
   ~ halts tm c.
 Proof.
   introv Hexec Hnonhalt [k Hhalt].
-  destruct (Nat.ltb_spec k n).
-  - eauto using exceeds_halt.
-  - eauto using preceeds_halt.
+  eauto using preceeds_halt'.
 Qed.
 
 Corollary multistep_nonhalt : forall tm c c',
@@ -562,16 +569,13 @@ Lemma progress_nonhalt' : forall tm (P : Q * tape -> Prop),
   forall k c, P c -> ~ halts_in tm c k.
 Proof.
   introv Hstep.
-  induction k using strong_induction.
+  induction k as [k IH] using strong_induction.
   introv H0 Hhalts.
   apply Hstep in H0. destruct H0 as [c' [HP Hrun]].
   apply progress_multistep in Hrun. destruct Hrun as [n Hrun].
-  destruct (Nat.leb_spec (S n) k).
-  - assert (Hhalts' : halts_in tm c' (k - S n))
-      by eauto using preceeds_halt.
-    enough (Hnhalts : ~ halts_in tm c' (k - S n)) by contradiction.
-    apply H; intuition lia.
-  - eauto using exceeds_halt.
+  destruct (preceeds_halt Hhalts Hrun) as [Hhalts' Hle].
+  enough (Hnhalts : ~ halts_in tm c' (k - S n)) by contradiction.
+  apply IH; intuition lia.
 Qed.
 
 Lemma progress_nonhalt : forall tm (P : Q * tape -> Prop) c,
@@ -605,6 +609,70 @@ Proof with eauto.
   apply progress_nonhalt with (P := fun c => exists i, c = C i /\ P i)...
   - introv [i [E HP]]. subst c.
     destruct (Hstep i HP) as [i' [Hi' HP']]...
+Qed.
+
+(* Constructively extracting useful information from the fact that a particular
+   Turing machine has halted. *)
+Lemma progress_halts : forall tm (P : Q * tape -> Prop) (Z : Q * tape -> Prop) c1,
+  (forall c, P c -> Z c \/ exists c', P c' /\ c -[ tm ]->+ c') ->
+  P c1 ->
+  halts tm c1 ->
+  exists c2, P c2 /\ Z c2.
+Proof.
+  (* proof by induction on the number of steps the TM takes to halt *)
+  introv Hstep HP Hhalt.
+  destruct Hhalt as [n Hhalt].
+  generalize dependent c1.
+  induction n as [n IH] using strong_induction.
+  introv HP Hhalts.
+  destruct (Hstep c1 HP) as [HZ | (c' & HP' & Hsteps)].
+  - eauto.
+  - apply progress_multistep in Hsteps. destruct Hsteps as [k Hsteps].
+    destruct (preceeds_halt Hhalts Hsteps) as [Hhalts' Hle].
+    apply IH with (n - S k) c'; [lia|eauto..].
+Qed.
+
+Lemma progress_halts_cond :
+  forall tm (A : Type) (C : A -> Q * tape) (P : A -> Prop) (Z : A -> Prop) i0,
+  (forall i, P i -> Z i \/ exists i', C i -[ tm ]->+ C i' /\ P i') ->
+  P i0 ->
+  halts tm (C i0) ->
+  exists i, P i /\ Z i.
+Proof with eauto.
+  introv Hstep HP Hhalt.
+  enough (H: exists c2, (exists i, c2 = C i /\ P i)
+        /\ (exists i, c2 = C i /\ P i /\ Z i)) by jauto.
+  apply progress_halts with tm (C i0); eauto.
+  introv (i1 & -> & HPi1).
+  destruct (Hstep i1 HPi1) as [| (i' & Hexec & HPi')]; eauto 6.
+Qed.
+
+Lemma halts_evstep : forall tm c c',
+  halts tm c' ->
+  c -[ tm ]->* c' ->
+  halts tm c.
+Proof.
+  introv Hhalts Hsteps.
+  apply with_counter in Hsteps. destruct Hsteps. eauto.
+Qed.
+
+Lemma halts_evstep' : forall tm c c',
+  halts tm c ->
+  c -[ tm ]->* c' ->
+  halts tm c'.
+Proof.
+  introv Hhalts Hsteps.
+  apply with_counter in Hsteps. destruct Hsteps as [k Hsteps].
+  destruct Hhalts as [n Hhalts].
+  eauto using preceeds_halt'.
+Qed.
+
+Lemma halted_evstep_halts : forall tm c c',
+  c -[ tm ]->* c' ->
+  halted tm c' ->
+  halts tm c.
+Proof.
+  eauto using halts_evstep.
 Qed.
 
 End TM.
